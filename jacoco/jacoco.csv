@@ -233,7 +233,7 @@ software.amazon.ion:ion-java,software.amazon.ion.impl,IonReaderTextRawTokensX.Pr
 software.amazon.ion:ion-java,software.amazon.ion.impl,IonReaderTextRawTokensX.ProhibitedCharacters.new IonReaderTextRawTokensX.ProhibitedCharacters() {...},0,16,0,4,0,2,0,4,0,2
 software.amazon.ion:ion-java,software.amazon.ion.impl,UnifiedDataPageX,116,151,11,12,21,35,17,16,8,13
 software.amazon.ion:ion-java,software.amazon.ion.impl,LocalSymbolTableAsStruct,15,180,4,20,2,46,4,14,0,6
-software.amazon.ion:ion-java,software.amazon.ion.impl,IonReaderBinaryRawX,333,2045,109,287,66,543,108,161,5,52
+software.amazon.ion:ion-java,software.amazon.ion.impl,IonReaderBinaryRawX,336,2053,110,290,67,544,109,162,5,52
 software.amazon.ion:ion-java,software.amazon.ion.impl,IonReaderTextRawTokensX.ProhibitedCharacters,0,70,1,15,0,7,1,11,0,4
 software.amazon.ion:ion-java,software.amazon.ion.impl,SymbolTokenImpl,37,52,7,9,2,15,7,8,1,6
 software.amazon.ion:ion-java,software.amazon.ion.impl,PrivateSymtabExtendsCache,7,58,5,11,0,13,5,6,0,3

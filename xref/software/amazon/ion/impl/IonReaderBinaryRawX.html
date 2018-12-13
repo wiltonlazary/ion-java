@@ -1123,12 +1123,12 @@
 <a class="jxr_linenumber" name="L1115" href="#L1115">1115</a>         year  = readVarUInt();
 <a class="jxr_linenumber" name="L1116" href="#L1116">1116</a>         Precision p = Precision.YEAR; <em class="jxr_comment">// our lowest significant option</em>
 <a class="jxr_linenumber" name="L1117" href="#L1117">1117</a> 
-<a class="jxr_linenumber" name="L1118" href="#L1118">1118</a>         <em class="jxr_comment">// now we look for hours and minutes</em>
+<a class="jxr_linenumber" name="L1118" href="#L1118">1118</a>         <em class="jxr_comment">// now we look for months</em>
 <a class="jxr_linenumber" name="L1119" href="#L1119">1119</a>         <strong class="jxr_keyword">if</strong> (_local_remaining &gt; 0) {
 <a class="jxr_linenumber" name="L1120" href="#L1120">1120</a>             month = readVarUInt();
 <a class="jxr_linenumber" name="L1121" href="#L1121">1121</a>             p = Precision.MONTH;
 <a class="jxr_linenumber" name="L1122" href="#L1122">1122</a> 
-<a class="jxr_linenumber" name="L1123" href="#L1123">1123</a>             <em class="jxr_comment">// now we look for hours and minutes</em>
+<a class="jxr_linenumber" name="L1123" href="#L1123">1123</a>             <em class="jxr_comment">// now we look for days</em>
 <a class="jxr_linenumber" name="L1124" href="#L1124">1124</a>             <strong class="jxr_keyword">if</strong> (_local_remaining &gt; 0) {
 <a class="jxr_linenumber" name="L1125" href="#L1125">1125</a>                 day   = readVarUInt();
 <a class="jxr_linenumber" name="L1126" href="#L1126">1126</a>                 p = Precision.DAY; <em class="jxr_comment">// our lowest significant option</em>
@@ -1144,121 +1144,127 @@
 <a class="jxr_linenumber" name="L1136" href="#L1136">1136</a>                         <strong class="jxr_keyword">if</strong> (_local_remaining &gt; 0) {
 <a class="jxr_linenumber" name="L1137" href="#L1137">1137</a>                             <em class="jxr_comment">// now we read in our actual "milliseconds since the epoch"</em>
 <a class="jxr_linenumber" name="L1138" href="#L1138">1138</a>                             frac = readDecimal(_local_remaining);
-<a class="jxr_linenumber" name="L1139" href="#L1139">1139</a>                         }
-<a class="jxr_linenumber" name="L1140" href="#L1140">1140</a>                     }
-<a class="jxr_linenumber" name="L1141" href="#L1141">1141</a>                 }
-<a class="jxr_linenumber" name="L1142" href="#L1142">1142</a>             }
-<a class="jxr_linenumber" name="L1143" href="#L1143">1143</a>         }
-<a class="jxr_linenumber" name="L1144" href="#L1144">1144</a>         <em class="jxr_comment">// restore out outer limit(s)</em>
-<a class="jxr_linenumber" name="L1145" href="#L1145">1145</a>         _local_remaining  = save_limit;
-<a class="jxr_linenumber" name="L1146" href="#L1146">1146</a>         <em class="jxr_comment">// now we let timestamp put it all together</em>
-<a class="jxr_linenumber" name="L1147" href="#L1147">1147</a>         <strong class="jxr_keyword">try</strong> {
-<a class="jxr_linenumber" name="L1148" href="#L1148">1148</a>             @SuppressWarnings(<span class="jxr_string">"deprecation"</span>)
-<a class="jxr_linenumber" name="L1149" href="#L1149">1149</a>             <a name="Timestamp" href="../../../../software/amazon/ion/Timestamp.html#Timestamp">Timestamp</a> val =
-<a class="jxr_linenumber" name="L1150" href="#L1150">1150</a>                 Timestamp.createFromUtcFields(p, year, month, day, hour,
-<a class="jxr_linenumber" name="L1151" href="#L1151">1151</a>                                               minute, second, frac, offset);
-<a class="jxr_linenumber" name="L1152" href="#L1152">1152</a>             <strong class="jxr_keyword">return</strong> val;
-<a class="jxr_linenumber" name="L1153" href="#L1153">1153</a>         }
-<a class="jxr_linenumber" name="L1154" href="#L1154">1154</a>         <strong class="jxr_keyword">catch</strong> (IllegalArgumentException e)
-<a class="jxr_linenumber" name="L1155" href="#L1155">1155</a>         {
-<a class="jxr_linenumber" name="L1156" href="#L1156">1156</a>             <em class="jxr_comment">// Rewrap to the expected type.</em>
-<a class="jxr_linenumber" name="L1157" href="#L1157">1157</a>             <strong class="jxr_keyword">throw</strong> newErrorAt(<span class="jxr_string">"Invalid timestamp encoding: "</span> + e.getMessage());
-<a class="jxr_linenumber" name="L1158" href="#L1158">1158</a>         }
-<a class="jxr_linenumber" name="L1159" href="#L1159">1159</a>     }
-<a class="jxr_linenumber" name="L1160" href="#L1160">1160</a> 
-<a class="jxr_linenumber" name="L1161" href="#L1161">1161</a>     <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">final</strong> String readString(<strong class="jxr_keyword">int</strong> len) <strong class="jxr_keyword">throws</strong> IOException
-<a class="jxr_linenumber" name="L1162" href="#L1162">1162</a>     {
-<a class="jxr_linenumber" name="L1163" href="#L1163">1163</a>         <em class="jxr_comment">// len is bytes, which is greater than or equal to java</em>
-<a class="jxr_linenumber" name="L1164" href="#L1164">1164</a>         <em class="jxr_comment">// chars even after utf8 to utf16 decoding nonsense</em>
-<a class="jxr_linenumber" name="L1165" href="#L1165">1165</a>         <em class="jxr_comment">// the char array is way faster than using string buffer</em>
-<a class="jxr_linenumber" name="L1166" href="#L1166">1166</a>         <strong class="jxr_keyword">char</strong>[] chars = <strong class="jxr_keyword">new</strong> <strong class="jxr_keyword">char</strong>[len];
-<a class="jxr_linenumber" name="L1167" href="#L1167">1167</a>         <strong class="jxr_keyword">int</strong>    c, ii = 0;
-<a class="jxr_linenumber" name="L1168" href="#L1168">1168</a>         <strong class="jxr_keyword">int</strong>    save_limit = _local_remaining - len;
-<a class="jxr_linenumber" name="L1169" href="#L1169">1169</a>         _local_remaining = len;
-<a class="jxr_linenumber" name="L1170" href="#L1170">1170</a>         <strong class="jxr_keyword">while</strong> (!isEOF()) {
-<a class="jxr_linenumber" name="L1171" href="#L1171">1171</a>             c = readUnicodeScalar();
-<a class="jxr_linenumber" name="L1172" href="#L1172">1172</a>             <strong class="jxr_keyword">if</strong> (c &lt; 0) throwUnexpectedEOFException();
-<a class="jxr_linenumber" name="L1173" href="#L1173">1173</a>             <strong class="jxr_keyword">if</strong> (c &lt; 0x10000) {
-<a class="jxr_linenumber" name="L1174" href="#L1174">1174</a>                 chars[ii++] = (<strong class="jxr_keyword">char</strong>)c;
-<a class="jxr_linenumber" name="L1175" href="#L1175">1175</a>             }
-<a class="jxr_linenumber" name="L1176" href="#L1176">1176</a>             <strong class="jxr_keyword">else</strong> { <em class="jxr_comment">// when c is &gt;= 0x10000 we need surrogate encoding</em>
-<a class="jxr_linenumber" name="L1177" href="#L1177">1177</a>                 chars[ii++] = (<strong class="jxr_keyword">char</strong>)PrivateIonConstants.makeHighSurrogate(c);
-<a class="jxr_linenumber" name="L1178" href="#L1178">1178</a>                 chars[ii++] = (<strong class="jxr_keyword">char</strong>)PrivateIonConstants.makeLowSurrogate(c);
-<a class="jxr_linenumber" name="L1179" href="#L1179">1179</a>             }
-<a class="jxr_linenumber" name="L1180" href="#L1180">1180</a>         }
-<a class="jxr_linenumber" name="L1181" href="#L1181">1181</a>         _local_remaining = save_limit;
-<a class="jxr_linenumber" name="L1182" href="#L1182">1182</a>         <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">new</strong> String(chars, 0, ii);
-<a class="jxr_linenumber" name="L1183" href="#L1183">1183</a>     }
-<a class="jxr_linenumber" name="L1184" href="#L1184">1184</a>     <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">int</strong> readUnicodeScalar() <strong class="jxr_keyword">throws</strong> IOException
-<a class="jxr_linenumber" name="L1185" href="#L1185">1185</a>     {
-<a class="jxr_linenumber" name="L1186" href="#L1186">1186</a>         <strong class="jxr_keyword">int</strong> c = -1, b;
-<a class="jxr_linenumber" name="L1187" href="#L1187">1187</a>         b = read();
-<a class="jxr_linenumber" name="L1188" href="#L1188">1188</a>         <em class="jxr_comment">// ascii is all good, even -1 (eof)</em>
-<a class="jxr_linenumber" name="L1189" href="#L1189">1189</a>         <strong class="jxr_keyword">if</strong> (IonUTF8.isOneByteUTF8(b)) {
-<a class="jxr_linenumber" name="L1190" href="#L1190">1190</a>             <strong class="jxr_keyword">return</strong> b;
-<a class="jxr_linenumber" name="L1191" href="#L1191">1191</a>         }
-<a class="jxr_linenumber" name="L1192" href="#L1192">1192</a>         <strong class="jxr_keyword">switch</strong>(IonUTF8.getUTF8LengthFromFirstByte(b)) {
-<a class="jxr_linenumber" name="L1193" href="#L1193">1193</a>         <strong class="jxr_keyword">case</strong> 2:
-<a class="jxr_linenumber" name="L1194" href="#L1194">1194</a>             <em class="jxr_comment">// now we start gluing the multi-byte value together</em>
-<a class="jxr_linenumber" name="L1195" href="#L1195">1195</a>             assert((b &amp; 0xe0) == 0xc0);
-<a class="jxr_linenumber" name="L1196" href="#L1196">1196</a>             <em class="jxr_comment">// for values from 0x80 to 0x7FF (all legal)</em>
-<a class="jxr_linenumber" name="L1197" href="#L1197">1197</a>             <strong class="jxr_keyword">int</strong> b2 = read();
-<a class="jxr_linenumber" name="L1198" href="#L1198">1198</a>             <strong class="jxr_keyword">if</strong> (!IonUTF8.isContinueByteUTF8(b2)) throwUTF8Exception();
-<a class="jxr_linenumber" name="L1199" href="#L1199">1199</a>             c = IonUTF8.twoByteScalar(b, b2);
-<a class="jxr_linenumber" name="L1200" href="#L1200">1200</a>             <strong class="jxr_keyword">break</strong>;
-<a class="jxr_linenumber" name="L1201" href="#L1201">1201</a>         <strong class="jxr_keyword">case</strong> 3:
-<a class="jxr_linenumber" name="L1202" href="#L1202">1202</a>             assert((b &amp; 0xf0) == 0xe0);
-<a class="jxr_linenumber" name="L1203" href="#L1203">1203</a>             <em class="jxr_comment">// for values from 0x800 to 0xFFFFF (NOT all legal)</em>
-<a class="jxr_linenumber" name="L1204" href="#L1204">1204</a>             b2 = read();
-<a class="jxr_linenumber" name="L1205" href="#L1205">1205</a>             <strong class="jxr_keyword">if</strong> (!IonUTF8.isContinueByteUTF8(b2)) throwUTF8Exception();
-<a class="jxr_linenumber" name="L1206" href="#L1206">1206</a>             <strong class="jxr_keyword">int</strong> b3 = read();
-<a class="jxr_linenumber" name="L1207" href="#L1207">1207</a>             <strong class="jxr_keyword">if</strong> (!IonUTF8.isContinueByteUTF8(b3)) throwUTF8Exception();
-<a class="jxr_linenumber" name="L1208" href="#L1208">1208</a>             c = IonUTF8.threeByteScalar(b, b2, b3);
-<a class="jxr_linenumber" name="L1209" href="#L1209">1209</a>             <strong class="jxr_keyword">break</strong>;
-<a class="jxr_linenumber" name="L1210" href="#L1210">1210</a>         <strong class="jxr_keyword">case</strong> 4:
-<a class="jxr_linenumber" name="L1211" href="#L1211">1211</a>             assert((b &amp; 0xf8) == 0xf0);
-<a class="jxr_linenumber" name="L1212" href="#L1212">1212</a>             <em class="jxr_comment">// for values from 0x010000 to 0x1FFFFF (NOT all legal)</em>
-<a class="jxr_linenumber" name="L1213" href="#L1213">1213</a>             b2 = read();
-<a class="jxr_linenumber" name="L1214" href="#L1214">1214</a>             <strong class="jxr_keyword">if</strong> (!IonUTF8.isContinueByteUTF8(b2)) throwUTF8Exception();
-<a class="jxr_linenumber" name="L1215" href="#L1215">1215</a>             b3 = read();
-<a class="jxr_linenumber" name="L1216" href="#L1216">1216</a>             <strong class="jxr_keyword">if</strong> (!IonUTF8.isContinueByteUTF8(b3)) throwUTF8Exception();
-<a class="jxr_linenumber" name="L1217" href="#L1217">1217</a>             <strong class="jxr_keyword">int</strong> b4 = read();
-<a class="jxr_linenumber" name="L1218" href="#L1218">1218</a>             <strong class="jxr_keyword">if</strong> (!IonUTF8.isContinueByteUTF8(b4)) throwUTF8Exception();
-<a class="jxr_linenumber" name="L1219" href="#L1219">1219</a>             c = IonUTF8.fourByteScalar(b, b2, b3, b4);
-<a class="jxr_linenumber" name="L1220" href="#L1220">1220</a>             <strong class="jxr_keyword">if</strong> (c &gt; 0x10FFFF) {
-<a class="jxr_linenumber" name="L1221" href="#L1221">1221</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> <a name="IonException" href="../../../../software/amazon/ion/IonException.html#IonException">IonException</a>(<span class="jxr_string">"illegal utf value encountered in input utf-8 stream"</span>);
-<a class="jxr_linenumber" name="L1222" href="#L1222">1222</a>             }
-<a class="jxr_linenumber" name="L1223" href="#L1223">1223</a>             <strong class="jxr_keyword">break</strong>;
-<a class="jxr_linenumber" name="L1224" href="#L1224">1224</a>         <strong class="jxr_keyword">default</strong>:
-<a class="jxr_linenumber" name="L1225" href="#L1225">1225</a>             throwUTF8Exception();
-<a class="jxr_linenumber" name="L1226" href="#L1226">1226</a>         }
-<a class="jxr_linenumber" name="L1227" href="#L1227">1227</a>         <strong class="jxr_keyword">return</strong> c;
-<a class="jxr_linenumber" name="L1228" href="#L1228">1228</a>     }
-<a class="jxr_linenumber" name="L1229" href="#L1229">1229</a>     <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">void</strong> throwUTF8Exception() <strong class="jxr_keyword">throws</strong> IOException
-<a class="jxr_linenumber" name="L1230" href="#L1230">1230</a>     {
-<a class="jxr_linenumber" name="L1231" href="#L1231">1231</a>         throwErrorAt(<span class="jxr_string">"Invalid UTF-8 character encounter in a string at position "</span>);
-<a class="jxr_linenumber" name="L1232" href="#L1232">1232</a>     }
-<a class="jxr_linenumber" name="L1233" href="#L1233">1233</a>     <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">void</strong> throwUnexpectedEOFException() <strong class="jxr_keyword">throws</strong> IOException {
-<a class="jxr_linenumber" name="L1234" href="#L1234">1234</a>         throwErrorAt(<span class="jxr_string">"unexpected EOF in value"</span>);
-<a class="jxr_linenumber" name="L1235" href="#L1235">1235</a>     }
-<a class="jxr_linenumber" name="L1236" href="#L1236">1236</a>     <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">void</strong> throwVarIntOverflowException() <strong class="jxr_keyword">throws</strong> IOException {
-<a class="jxr_linenumber" name="L1237" href="#L1237">1237</a>         throwErrorAt(<span class="jxr_string">"int in stream is too long for a Java int 32"</span>);
+<a class="jxr_linenumber" name="L1139" href="#L1139">1139</a>                             <strong class="jxr_keyword">if</strong> (frac.compareTo(BigDecimal.ZERO) &lt; 0 || frac.compareTo(BigDecimal.ONE) &gt;= 0) {
+<a class="jxr_linenumber" name="L1140" href="#L1140">1140</a>                                 throwErrorAt(
+<a class="jxr_linenumber" name="L1141" href="#L1141">1141</a>                                     <span class="jxr_string">"The fractional seconds value in a timestamp must be greater than or "</span>
+<a class="jxr_linenumber" name="L1142" href="#L1142">1142</a>                                         + <span class="jxr_string">"equal to zero and less than one."</span>
+<a class="jxr_linenumber" name="L1143" href="#L1143">1143</a>                                 );
+<a class="jxr_linenumber" name="L1144" href="#L1144">1144</a>                             }
+<a class="jxr_linenumber" name="L1145" href="#L1145">1145</a>                         }
+<a class="jxr_linenumber" name="L1146" href="#L1146">1146</a>                     }
+<a class="jxr_linenumber" name="L1147" href="#L1147">1147</a>                 }
+<a class="jxr_linenumber" name="L1148" href="#L1148">1148</a>             }
+<a class="jxr_linenumber" name="L1149" href="#L1149">1149</a>         }
+<a class="jxr_linenumber" name="L1150" href="#L1150">1150</a>         <em class="jxr_comment">// restore out outer limit(s)</em>
+<a class="jxr_linenumber" name="L1151" href="#L1151">1151</a>         _local_remaining  = save_limit;
+<a class="jxr_linenumber" name="L1152" href="#L1152">1152</a>         <em class="jxr_comment">// now we let timestamp put it all together</em>
+<a class="jxr_linenumber" name="L1153" href="#L1153">1153</a>         <strong class="jxr_keyword">try</strong> {
+<a class="jxr_linenumber" name="L1154" href="#L1154">1154</a>             @SuppressWarnings(<span class="jxr_string">"deprecation"</span>)
+<a class="jxr_linenumber" name="L1155" href="#L1155">1155</a>             <a name="Timestamp" href="../../../../software/amazon/ion/Timestamp.html#Timestamp">Timestamp</a> val =
+<a class="jxr_linenumber" name="L1156" href="#L1156">1156</a>                 Timestamp.createFromUtcFields(p, year, month, day, hour,
+<a class="jxr_linenumber" name="L1157" href="#L1157">1157</a>                                               minute, second, frac, offset);
+<a class="jxr_linenumber" name="L1158" href="#L1158">1158</a>             <strong class="jxr_keyword">return</strong> val;
+<a class="jxr_linenumber" name="L1159" href="#L1159">1159</a>         }
+<a class="jxr_linenumber" name="L1160" href="#L1160">1160</a>         <strong class="jxr_keyword">catch</strong> (IllegalArgumentException e)
+<a class="jxr_linenumber" name="L1161" href="#L1161">1161</a>         {
+<a class="jxr_linenumber" name="L1162" href="#L1162">1162</a>             <em class="jxr_comment">// Rewrap to the expected type.</em>
+<a class="jxr_linenumber" name="L1163" href="#L1163">1163</a>             <strong class="jxr_keyword">throw</strong> newErrorAt(<span class="jxr_string">"Invalid timestamp encoding: "</span> + e.getMessage());
+<a class="jxr_linenumber" name="L1164" href="#L1164">1164</a>         }
+<a class="jxr_linenumber" name="L1165" href="#L1165">1165</a>     }
+<a class="jxr_linenumber" name="L1166" href="#L1166">1166</a> 
+<a class="jxr_linenumber" name="L1167" href="#L1167">1167</a>     <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">final</strong> String readString(<strong class="jxr_keyword">int</strong> len) <strong class="jxr_keyword">throws</strong> IOException
+<a class="jxr_linenumber" name="L1168" href="#L1168">1168</a>     {
+<a class="jxr_linenumber" name="L1169" href="#L1169">1169</a>         <em class="jxr_comment">// len is bytes, which is greater than or equal to java</em>
+<a class="jxr_linenumber" name="L1170" href="#L1170">1170</a>         <em class="jxr_comment">// chars even after utf8 to utf16 decoding nonsense</em>
+<a class="jxr_linenumber" name="L1171" href="#L1171">1171</a>         <em class="jxr_comment">// the char array is way faster than using string buffer</em>
+<a class="jxr_linenumber" name="L1172" href="#L1172">1172</a>         <strong class="jxr_keyword">char</strong>[] chars = <strong class="jxr_keyword">new</strong> <strong class="jxr_keyword">char</strong>[len];
+<a class="jxr_linenumber" name="L1173" href="#L1173">1173</a>         <strong class="jxr_keyword">int</strong>    c, ii = 0;
+<a class="jxr_linenumber" name="L1174" href="#L1174">1174</a>         <strong class="jxr_keyword">int</strong>    save_limit = _local_remaining - len;
+<a class="jxr_linenumber" name="L1175" href="#L1175">1175</a>         _local_remaining = len;
+<a class="jxr_linenumber" name="L1176" href="#L1176">1176</a>         <strong class="jxr_keyword">while</strong> (!isEOF()) {
+<a class="jxr_linenumber" name="L1177" href="#L1177">1177</a>             c = readUnicodeScalar();
+<a class="jxr_linenumber" name="L1178" href="#L1178">1178</a>             <strong class="jxr_keyword">if</strong> (c &lt; 0) throwUnexpectedEOFException();
+<a class="jxr_linenumber" name="L1179" href="#L1179">1179</a>             <strong class="jxr_keyword">if</strong> (c &lt; 0x10000) {
+<a class="jxr_linenumber" name="L1180" href="#L1180">1180</a>                 chars[ii++] = (<strong class="jxr_keyword">char</strong>)c;
+<a class="jxr_linenumber" name="L1181" href="#L1181">1181</a>             }
+<a class="jxr_linenumber" name="L1182" href="#L1182">1182</a>             <strong class="jxr_keyword">else</strong> { <em class="jxr_comment">// when c is &gt;= 0x10000 we need surrogate encoding</em>
+<a class="jxr_linenumber" name="L1183" href="#L1183">1183</a>                 chars[ii++] = (<strong class="jxr_keyword">char</strong>)PrivateIonConstants.makeHighSurrogate(c);
+<a class="jxr_linenumber" name="L1184" href="#L1184">1184</a>                 chars[ii++] = (<strong class="jxr_keyword">char</strong>)PrivateIonConstants.makeLowSurrogate(c);
+<a class="jxr_linenumber" name="L1185" href="#L1185">1185</a>             }
+<a class="jxr_linenumber" name="L1186" href="#L1186">1186</a>         }
+<a class="jxr_linenumber" name="L1187" href="#L1187">1187</a>         _local_remaining = save_limit;
+<a class="jxr_linenumber" name="L1188" href="#L1188">1188</a>         <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">new</strong> String(chars, 0, ii);
+<a class="jxr_linenumber" name="L1189" href="#L1189">1189</a>     }
+<a class="jxr_linenumber" name="L1190" href="#L1190">1190</a>     <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">int</strong> readUnicodeScalar() <strong class="jxr_keyword">throws</strong> IOException
+<a class="jxr_linenumber" name="L1191" href="#L1191">1191</a>     {
+<a class="jxr_linenumber" name="L1192" href="#L1192">1192</a>         <strong class="jxr_keyword">int</strong> c = -1, b;
+<a class="jxr_linenumber" name="L1193" href="#L1193">1193</a>         b = read();
+<a class="jxr_linenumber" name="L1194" href="#L1194">1194</a>         <em class="jxr_comment">// ascii is all good, even -1 (eof)</em>
+<a class="jxr_linenumber" name="L1195" href="#L1195">1195</a>         <strong class="jxr_keyword">if</strong> (IonUTF8.isOneByteUTF8(b)) {
+<a class="jxr_linenumber" name="L1196" href="#L1196">1196</a>             <strong class="jxr_keyword">return</strong> b;
+<a class="jxr_linenumber" name="L1197" href="#L1197">1197</a>         }
+<a class="jxr_linenumber" name="L1198" href="#L1198">1198</a>         <strong class="jxr_keyword">switch</strong>(IonUTF8.getUTF8LengthFromFirstByte(b)) {
+<a class="jxr_linenumber" name="L1199" href="#L1199">1199</a>         <strong class="jxr_keyword">case</strong> 2:
+<a class="jxr_linenumber" name="L1200" href="#L1200">1200</a>             <em class="jxr_comment">// now we start gluing the multi-byte value together</em>
+<a class="jxr_linenumber" name="L1201" href="#L1201">1201</a>             assert((b &amp; 0xe0) == 0xc0);
+<a class="jxr_linenumber" name="L1202" href="#L1202">1202</a>             <em class="jxr_comment">// for values from 0x80 to 0x7FF (all legal)</em>
+<a class="jxr_linenumber" name="L1203" href="#L1203">1203</a>             <strong class="jxr_keyword">int</strong> b2 = read();
+<a class="jxr_linenumber" name="L1204" href="#L1204">1204</a>             <strong class="jxr_keyword">if</strong> (!IonUTF8.isContinueByteUTF8(b2)) throwUTF8Exception();
+<a class="jxr_linenumber" name="L1205" href="#L1205">1205</a>             c = IonUTF8.twoByteScalar(b, b2);
+<a class="jxr_linenumber" name="L1206" href="#L1206">1206</a>             <strong class="jxr_keyword">break</strong>;
+<a class="jxr_linenumber" name="L1207" href="#L1207">1207</a>         <strong class="jxr_keyword">case</strong> 3:
+<a class="jxr_linenumber" name="L1208" href="#L1208">1208</a>             assert((b &amp; 0xf0) == 0xe0);
+<a class="jxr_linenumber" name="L1209" href="#L1209">1209</a>             <em class="jxr_comment">// for values from 0x800 to 0xFFFFF (NOT all legal)</em>
+<a class="jxr_linenumber" name="L1210" href="#L1210">1210</a>             b2 = read();
+<a class="jxr_linenumber" name="L1211" href="#L1211">1211</a>             <strong class="jxr_keyword">if</strong> (!IonUTF8.isContinueByteUTF8(b2)) throwUTF8Exception();
+<a class="jxr_linenumber" name="L1212" href="#L1212">1212</a>             <strong class="jxr_keyword">int</strong> b3 = read();
+<a class="jxr_linenumber" name="L1213" href="#L1213">1213</a>             <strong class="jxr_keyword">if</strong> (!IonUTF8.isContinueByteUTF8(b3)) throwUTF8Exception();
+<a class="jxr_linenumber" name="L1214" href="#L1214">1214</a>             c = IonUTF8.threeByteScalar(b, b2, b3);
+<a class="jxr_linenumber" name="L1215" href="#L1215">1215</a>             <strong class="jxr_keyword">break</strong>;
+<a class="jxr_linenumber" name="L1216" href="#L1216">1216</a>         <strong class="jxr_keyword">case</strong> 4:
+<a class="jxr_linenumber" name="L1217" href="#L1217">1217</a>             assert((b &amp; 0xf8) == 0xf0);
+<a class="jxr_linenumber" name="L1218" href="#L1218">1218</a>             <em class="jxr_comment">// for values from 0x010000 to 0x1FFFFF (NOT all legal)</em>
+<a class="jxr_linenumber" name="L1219" href="#L1219">1219</a>             b2 = read();
+<a class="jxr_linenumber" name="L1220" href="#L1220">1220</a>             <strong class="jxr_keyword">if</strong> (!IonUTF8.isContinueByteUTF8(b2)) throwUTF8Exception();
+<a class="jxr_linenumber" name="L1221" href="#L1221">1221</a>             b3 = read();
+<a class="jxr_linenumber" name="L1222" href="#L1222">1222</a>             <strong class="jxr_keyword">if</strong> (!IonUTF8.isContinueByteUTF8(b3)) throwUTF8Exception();
+<a class="jxr_linenumber" name="L1223" href="#L1223">1223</a>             <strong class="jxr_keyword">int</strong> b4 = read();
+<a class="jxr_linenumber" name="L1224" href="#L1224">1224</a>             <strong class="jxr_keyword">if</strong> (!IonUTF8.isContinueByteUTF8(b4)) throwUTF8Exception();
+<a class="jxr_linenumber" name="L1225" href="#L1225">1225</a>             c = IonUTF8.fourByteScalar(b, b2, b3, b4);
+<a class="jxr_linenumber" name="L1226" href="#L1226">1226</a>             <strong class="jxr_keyword">if</strong> (c &gt; 0x10FFFF) {
+<a class="jxr_linenumber" name="L1227" href="#L1227">1227</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> <a name="IonException" href="../../../../software/amazon/ion/IonException.html#IonException">IonException</a>(<span class="jxr_string">"illegal utf value encountered in input utf-8 stream"</span>);
+<a class="jxr_linenumber" name="L1228" href="#L1228">1228</a>             }
+<a class="jxr_linenumber" name="L1229" href="#L1229">1229</a>             <strong class="jxr_keyword">break</strong>;
+<a class="jxr_linenumber" name="L1230" href="#L1230">1230</a>         <strong class="jxr_keyword">default</strong>:
+<a class="jxr_linenumber" name="L1231" href="#L1231">1231</a>             throwUTF8Exception();
+<a class="jxr_linenumber" name="L1232" href="#L1232">1232</a>         }
+<a class="jxr_linenumber" name="L1233" href="#L1233">1233</a>         <strong class="jxr_keyword">return</strong> c;
+<a class="jxr_linenumber" name="L1234" href="#L1234">1234</a>     }
+<a class="jxr_linenumber" name="L1235" href="#L1235">1235</a>     <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">void</strong> throwUTF8Exception() <strong class="jxr_keyword">throws</strong> IOException
+<a class="jxr_linenumber" name="L1236" href="#L1236">1236</a>     {
+<a class="jxr_linenumber" name="L1237" href="#L1237">1237</a>         throwErrorAt(<span class="jxr_string">"Invalid UTF-8 character encounter in a string at position "</span>);
 <a class="jxr_linenumber" name="L1238" href="#L1238">1238</a>     }
-<a class="jxr_linenumber" name="L1239" href="#L1239">1239</a> 
-<a class="jxr_linenumber" name="L1240" href="#L1240">1240</a>     <strong class="jxr_keyword">protected</strong> <a name="IonException" href="../../../../software/amazon/ion/IonException.html#IonException">IonException</a> newErrorAt(String msg) {
-<a class="jxr_linenumber" name="L1241" href="#L1241">1241</a>         String msg2 = msg + <span class="jxr_string">" at position "</span> + getPosition();
-<a class="jxr_linenumber" name="L1242" href="#L1242">1242</a>         <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">new</strong> <a name="IonException" href="../../../../software/amazon/ion/IonException.html#IonException">IonException</a>(msg2);
-<a class="jxr_linenumber" name="L1243" href="#L1243">1243</a>     }
-<a class="jxr_linenumber" name="L1244" href="#L1244">1244</a>     <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">void</strong> throwErrorAt(String msg) {
-<a class="jxr_linenumber" name="L1245" href="#L1245">1245</a>         <strong class="jxr_keyword">throw</strong> newErrorAt(msg);
-<a class="jxr_linenumber" name="L1246" href="#L1246">1246</a>     }
-<a class="jxr_linenumber" name="L1247" href="#L1247">1247</a>     <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">void</strong> error(String msg) {
-<a class="jxr_linenumber" name="L1248" href="#L1248">1248</a>         <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> <a name="IonException" href="../../../../software/amazon/ion/IonException.html#IonException">IonException</a>(msg);
+<a class="jxr_linenumber" name="L1239" href="#L1239">1239</a>     <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">void</strong> throwUnexpectedEOFException() <strong class="jxr_keyword">throws</strong> IOException {
+<a class="jxr_linenumber" name="L1240" href="#L1240">1240</a>         throwErrorAt(<span class="jxr_string">"unexpected EOF in value"</span>);
+<a class="jxr_linenumber" name="L1241" href="#L1241">1241</a>     }
+<a class="jxr_linenumber" name="L1242" href="#L1242">1242</a>     <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">void</strong> throwVarIntOverflowException() <strong class="jxr_keyword">throws</strong> IOException {
+<a class="jxr_linenumber" name="L1243" href="#L1243">1243</a>         throwErrorAt(<span class="jxr_string">"int in stream is too long for a Java int 32"</span>);
+<a class="jxr_linenumber" name="L1244" href="#L1244">1244</a>     }
+<a class="jxr_linenumber" name="L1245" href="#L1245">1245</a> 
+<a class="jxr_linenumber" name="L1246" href="#L1246">1246</a>     <strong class="jxr_keyword">protected</strong> <a name="IonException" href="../../../../software/amazon/ion/IonException.html#IonException">IonException</a> newErrorAt(String msg) {
+<a class="jxr_linenumber" name="L1247" href="#L1247">1247</a>         String msg2 = msg + <span class="jxr_string">" at position "</span> + getPosition();
+<a class="jxr_linenumber" name="L1248" href="#L1248">1248</a>         <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">new</strong> <a name="IonException" href="../../../../software/amazon/ion/IonException.html#IonException">IonException</a>(msg2);
 <a class="jxr_linenumber" name="L1249" href="#L1249">1249</a>     }
-<a class="jxr_linenumber" name="L1250" href="#L1250">1250</a>     <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">void</strong> error(Exception e) {
-<a class="jxr_linenumber" name="L1251" href="#L1251">1251</a>         <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> <a name="IonException" href="../../../../software/amazon/ion/IonException.html#IonException">IonException</a>(e);
+<a class="jxr_linenumber" name="L1250" href="#L1250">1250</a>     <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">void</strong> throwErrorAt(String msg) {
+<a class="jxr_linenumber" name="L1251" href="#L1251">1251</a>         <strong class="jxr_keyword">throw</strong> newErrorAt(msg);
 <a class="jxr_linenumber" name="L1252" href="#L1252">1252</a>     }
-<a class="jxr_linenumber" name="L1253" href="#L1253">1253</a> }
+<a class="jxr_linenumber" name="L1253" href="#L1253">1253</a>     <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">void</strong> error(String msg) {
+<a class="jxr_linenumber" name="L1254" href="#L1254">1254</a>         <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> <a name="IonException" href="../../../../software/amazon/ion/IonException.html#IonException">IonException</a>(msg);
+<a class="jxr_linenumber" name="L1255" href="#L1255">1255</a>     }
+<a class="jxr_linenumber" name="L1256" href="#L1256">1256</a>     <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">void</strong> error(Exception e) {
+<a class="jxr_linenumber" name="L1257" href="#L1257">1257</a>         <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> <a name="IonException" href="../../../../software/amazon/ion/IonException.html#IonException">IonException</a>(e);
+<a class="jxr_linenumber" name="L1258" href="#L1258">1258</a>     }
+<a class="jxr_linenumber" name="L1259" href="#L1259">1259</a> }
 </pre>
 <hr/>
 <div id="footer">Copyright &#169; 2018. All rights reserved.</div>

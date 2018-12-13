@@ -1,0 +1,396 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonReaderBinaryUserX.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">software.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">software.amazon.ion.impl</a> &gt; <span class="el_source">IonReaderBinaryUserX.java</span></div><h1>IonReaderBinaryUserX.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2009-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at:
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
+ * language governing permissions and limitations under the License.
+ */
+
+package software.amazon.ion.impl;
+
+import static software.amazon.ion.SystemSymbols.ION_1_0_SID;
+import static software.amazon.ion.SystemSymbols.ION_SYMBOL_TABLE_SID;
+
+import java.io.IOException;
+import software.amazon.ion.IonCatalog;
+import software.amazon.ion.IonType;
+import software.amazon.ion.OffsetSpan;
+import software.amazon.ion.SeekableReader;
+import software.amazon.ion.Span;
+import software.amazon.ion.SpanProvider;
+import software.amazon.ion.SymbolTable;
+import software.amazon.ion.SymbolToken;
+import software.amazon.ion.UnknownSymbolException;
+import software.amazon.ion.impl.PrivateScalarConversions.AS_TYPE;
+import software.amazon.ion.impl.UnifiedInputStreamX.FromByteArray;
+import software.amazon.ion.impl.UnifiedSavePointManagerX.SavePoint;
+
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">final class IonReaderBinaryUserX</span>
+    extends IonReaderBinarySystemX
+    implements PrivateReaderWriter
+{
+    /**
+     * This is the physical start-of-stream offset when this reader was created.
+     * It must be subtracted from the logical offsets exposed by
+     * {@link OffsetSpan}s.
+     */
+    private final int _physical_start_offset;
+    private final PrivateLocalSymbolTableFactory _lstFactory;
+
+    IonCatalog  _catalog;
+
+    private static final class IonReaderBinarySpan
+        extends DowncastingFaceted
+        implements Span, OffsetSpan
+    {
+        long        _offset;
+        long        _limit;
+        SymbolTable _symbol_table;
+
+        public long getStartOffset()
+        {
+<span class="fc" id="L58">            return _offset;</span>
+        }
+
+        public long getFinishOffset()
+        {
+<span class="fc" id="L63">            return _limit;</span>
+        }
+    }
+
+    public IonReaderBinaryUserX(IonCatalog catalog,
+                                PrivateLocalSymbolTableFactory lstFactory,
+                                UnifiedInputStreamX userBytes,
+                                int physicalStartOffset)
+    {
+<span class="fc" id="L72">        super(userBytes);</span>
+<span class="fc" id="L73">        _physical_start_offset = physicalStartOffset;</span>
+<span class="fc" id="L74">        init_user(catalog);</span>
+<span class="fc" id="L75">        _lstFactory = lstFactory;</span>
+<span class="fc" id="L76">    }</span>
+
+    //FIXME: PERF_TEST was :private
+    final void init_user(IonCatalog catalog)
+    {
+        // TODO check IVM to determine version: amzn/ion-java#19, amzn/ion-java#24
+<span class="fc" id="L82">        _symbols = SharedSymbolTable.getSystemSymbolTable(1);</span>
+<span class="fc" id="L83">        _catalog = catalog;</span>
+<span class="fc" id="L84">    }</span>
+
+
+    /**
+     * Determines the abstract position of the reader, such that one can
+     * later {@link #seek} back to it.
+     * &lt;p&gt;
+     * The current implementation only works when the reader is positioned on
+     * a value (not before, between, or after values). In other words, one
+     * should only call this method when {@link #getType()} is non-null.
+     *
+     * @return the current position; not null.
+     *
+     * @throws IllegalStateException if the reader doesn't have a current
+     * value.
+     */
+    public Span getCurrentPosition()
+    {
+<span class="fc" id="L102">        IonReaderBinarySpan pos = new IonReaderBinarySpan();</span>
+
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (getType() == null)</span>
+        {
+<span class="fc" id="L106">            String message = &quot;IonReader isn't positioned on a value&quot;;</span>
+<span class="fc" id="L107">            throw new IllegalStateException(message);</span>
+        }
+
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (_position_start == -1)  // TODO remove? should be unreachable.</span>
+        {
+            // special case of the position before the first call to next
+<span class="nc" id="L113">            pos._offset = _input._pos;</span>
+<span class="nc" id="L114">            pos._limit = _input._limit;</span>
+<span class="nc" id="L115">            pos._symbol_table = _symbols;</span>
+        }
+        else
+        {
+<span class="fc" id="L119">            pos._offset = _position_start - _physical_start_offset;</span>
+<span class="fc" id="L120">            pos._limit = pos._offset + _position_len;</span>
+<span class="fc" id="L121">            pos._symbol_table = _symbols;</span>
+        }
+
+<span class="fc" id="L124">        return pos;</span>
+    }
+
+
+    public void seek(IonReaderBinarySpan position)
+    {
+<span class="fc" id="L130">        IonReaderBinarySpan pos = position;</span>
+
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (pos == null)</span>
+        {
+<span class="nc" id="L134">            throw new IllegalArgumentException(&quot;Position invalid for binary reader&quot;);</span>
+        }
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if (!(_input instanceof FromByteArray))</span>
+        {
+<span class="nc" id="L138">            throw new UnsupportedOperationException(&quot;Binary seek not implemented for non-byte array backed sources&quot;);</span>
+        }
+
+        // TODO test that span is within the bounds of the input byte[]
+
+        // manually reset the input specific type of input stream
+<span class="fc" id="L144">        FromByteArray input = (FromByteArray)_input;</span>
+<span class="fc" id="L145">        input._pos   = (int) (pos._offset + _physical_start_offset);</span>
+<span class="fc" id="L146">        input._limit = (int) (pos._limit  + _physical_start_offset);</span>
+
+        // TODO: these (eof and save points) should be put into
+        //       a re-init method on the input stream
+<span class="fc" id="L150">        input._eof = false;</span>
+        for (;;) {
+<span class="fc" id="L152">            SavePoint sp = input._save_points._active_stack;</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            if (sp == null) break;</span>
+<span class="nc" id="L154">            input._save_points.savePointPopActive(sp);</span>
+<span class="nc" id="L155">            sp.free();</span>
+<span class="nc" id="L156">        }</span>
+
+        // reset the raw reader
+<span class="fc" id="L159">        re_init_raw();</span>
+
+        // reset the system reader
+        // - nothing to do
+
+        // reset the user reader
+<span class="fc" id="L165">        init_user(this._catalog);</span>
+
+        // now we need to set our symbol table
+<span class="fc" id="L168">        _symbols = pos._symbol_table;</span>
+<span class="fc" id="L169">    }</span>
+
+
+    @Override
+    public IonType next()
+    {
+<span class="fc" id="L175">        IonType t = null;</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (hasNext()) {</span>
+<span class="fc" id="L177">            _has_next_needed = true;</span>
+<span class="fc" id="L178">            t = _value_type;</span>
+        }
+<span class="fc" id="L180">        return t;</span>
+    }
+
+    @Override
+    boolean hasNext()
+    {
+<span class="fc bfc" id="L186" title="All 4 branches covered.">        if (!_eof &amp;&amp; _has_next_needed) {</span>
+<span class="fc" id="L187">            clear_system_value_stack();</span>
+            try {
+<span class="fc bfc" id="L189" title="All 4 branches covered.">                while (!_eof &amp;&amp; _has_next_needed) {</span>
+<span class="fc" id="L190">                    has_next_helper_user();</span>
+                }
+            }
+<span class="nc" id="L193">            catch (IOException e) {</span>
+<span class="nc" id="L194">                error(e);</span>
+<span class="fc" id="L195">            }</span>
+        }
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        return !_eof;</span>
+    }
+
+
+    private final void has_next_helper_user() throws IOException
+    {
+<span class="fc" id="L203">        super.hasNext();</span>
+<span class="fc bfc" id="L204" title="All 4 branches covered.">        if (getDepth() == 0 &amp;&amp; !_value_is_null) {</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">            if (_value_tid == PrivateIonConstants.tidSymbol) {</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">                if (load_annotations() == 0) {</span>
+                    // $ion_1_0 is read as an IVM only if it is not annotated
+<span class="fc" id="L208">                    load_cached_value(AS_TYPE.int_value);</span>
+<span class="fc" id="L209">                    int sid = _v.getInt();</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">                    if (sid == ION_1_0_SID) {</span>
+<span class="fc" id="L211">                        _symbols = SharedSymbolTable.getSystemSymbolTable(1);</span>
+<span class="fc" id="L212">                        push_symbol_table(_symbols);</span>
+<span class="fc" id="L213">                        _has_next_needed = true;</span>
+                    }
+<span class="fc" id="L215">                }</span>
+            }
+<span class="fc bfc" id="L217" title="All 2 branches covered.">            else if (_value_tid == PrivateIonConstants.tidStruct) {</span>
+<span class="fc" id="L218">                int count = load_annotations();</span>
+<span class="fc bfc" id="L219" title="All 4 branches covered.">                if (count &gt; 0 &amp;&amp; _annotation_ids[0] == ION_SYMBOL_TABLE_SID) {</span>
+<span class="fc" id="L220">                    _symbols = _lstFactory.newLocalSymtab(_catalog, this, false);</span>
+<span class="fc" id="L221">                    push_symbol_table(_symbols);</span>
+<span class="fc" id="L222">                    _has_next_needed = true;</span>
+                }
+<span class="fc" id="L224">            }</span>
+            else {
+<span class="pc bpc" id="L226" title="2 of 4 branches missed.">                assert (_value_tid != PrivateIonConstants.tidTypedecl);</span>
+            }
+        }
+<span class="fc" id="L229">    }</span>
+
+    private void validateSymbolToken(SymbolToken symbol) {
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        if (symbol != null) {</span>
+<span class="fc bfc" id="L233" title="All 4 branches covered.">            if (symbol.getText() == null &amp;&amp; symbol.getSid() &gt; getSymbolTable().getMaxId()) {</span>
+<span class="fc" id="L234">                throw new UnknownSymbolException(symbol.getSid());</span>
+            }
+        }
+<span class="fc" id="L237">    }</span>
+
+    @Override
+    public SymbolToken[] getTypeAnnotationSymbols() {
+<span class="fc" id="L241">        SymbolToken[] annotations = super.getTypeAnnotationSymbols();</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        for (SymbolToken annotation : annotations) {</span>
+<span class="fc" id="L243">            validateSymbolToken(annotation);</span>
+        }
+<span class="fc" id="L245">        return annotations;</span>
+    }
+
+    @Override
+    public final SymbolToken getFieldNameSymbol() {
+<span class="fc" id="L250">        SymbolToken fieldName = super.getFieldNameSymbol();</span>
+<span class="fc" id="L251">        validateSymbolToken(fieldName);</span>
+<span class="fc" id="L252">        return fieldName;</span>
+    }
+
+    @Override
+    public final SymbolToken symbolValue() {
+<span class="fc" id="L257">        SymbolToken symbol = super.symbolValue();</span>
+<span class="fc" id="L258">        validateSymbolToken(symbol);</span>
+<span class="fc" id="L259">        return symbol;</span>
+    }
+
+    //
+    //  This code handles the skipped symbol table
+    //  support - it is cloned in IonReaderTextUserX,
+    //  IonReaderBinaryUserX and _Private_IonWriterBase
+    //
+    //  SO ANY FIXES HERE WILL BE NEEDED IN THOSE
+    //  THREE LOCATIONS AS WELL.
+    //
+<span class="fc" id="L270">    private int _symbol_table_top = 0;</span>
+<span class="fc" id="L271">    private SymbolTable[] _symbol_table_stack = new SymbolTable[3]; // 3 is rare, IVM followed by a local sym tab with open content</span>
+    private void clear_system_value_stack()
+    {
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        while (_symbol_table_top &gt; 0) {</span>
+<span class="fc" id="L275">            _symbol_table_top--;</span>
+<span class="fc" id="L276">            _symbol_table_stack[_symbol_table_top] = null;</span>
+        }
+<span class="fc" id="L278">    }</span>
+    private void push_symbol_table(SymbolTable symbols)
+    {
+<span class="pc bpc" id="L281" title="2 of 4 branches missed.">        assert(symbols != null);</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">        if (_symbol_table_top &gt;= _symbol_table_stack.length) {</span>
+<span class="nc" id="L283">            int new_len = _symbol_table_stack.length * 2;</span>
+<span class="nc" id="L284">            SymbolTable[] temp = new SymbolTable[new_len];</span>
+<span class="nc" id="L285">            System.arraycopy(_symbol_table_stack, 0, temp, 0, _symbol_table_stack.length);</span>
+<span class="nc" id="L286">            _symbol_table_stack = temp;</span>
+        }
+<span class="fc" id="L288">        _symbol_table_stack[_symbol_table_top++] = symbols;</span>
+<span class="fc" id="L289">    }</span>
+    @Override
+    public SymbolTable pop_passed_symbol_table()
+    {
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        if (_symbol_table_top &lt;= 0) {</span>
+<span class="fc" id="L294">            return null;</span>
+        }
+<span class="fc" id="L296">        _symbol_table_top--;</span>
+<span class="fc" id="L297">        SymbolTable symbols = _symbol_table_stack[_symbol_table_top];</span>
+<span class="fc" id="L298">        _symbol_table_stack[_symbol_table_top] = null;</span>
+<span class="fc" id="L299">        return symbols;</span>
+    }
+
+
+    //========================================================================
+    // Facet support
+
+
+    @Override
+    public &lt;T&gt; T asFacet(Class&lt;T&gt; facetType)
+    {
+<span class="fc bfc" id="L310" title="All 2 branches covered.">        if (facetType == SpanProvider.class)</span>
+        {
+<span class="fc" id="L312">            return facetType.cast(new SpanProviderFacet());</span>
+        }
+
+        // TODO amzn/ion-java#17 support seeking over InputStream
+<span class="fc bfc" id="L316" title="All 2 branches covered.">        if (_input instanceof FromByteArray)</span>
+        {
+<span class="fc bfc" id="L318" title="All 2 branches covered.">            if (facetType == SeekableReader.class)</span>
+            {
+<span class="fc" id="L320">                return facetType.cast(new SeekableReaderFacet());</span>
+            }
+        }
+
+<span class="fc bfc" id="L324" title="All 2 branches covered.">        if (facetType == PrivateByteTransferReader.class)</span>
+        {
+            // This is a rather sketchy use of Facets, since the availability
+            // of the facet depends upon the current state of this subject,
+            // and that can change over time.
+
+            // TODO amzn/ion-java#16 Our {@link #transferCurrentValue} doesn't handle
+            //  field names and annotations.
+
+            // Ensure there's a contiguous buffer we can copy.
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">            if (_input instanceof UnifiedInputStreamX.FromByteArray</span>
+<span class="fc bfc" id="L335" title="All 2 branches covered.">                &amp;&amp; getTypeAnnotationSymbols().length == 0</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">                &amp;&amp; ! isInStruct())</span>
+            {
+<span class="fc" id="L338">                return facetType.cast(new ByteTransferReaderFacet());</span>
+            }
+        }
+
+<span class="fc" id="L342">        return super.asFacet(facetType);</span>
+    }
+
+
+<span class="fc" id="L346">    private class SpanProviderFacet implements SpanProvider</span>
+    {
+        public Span currentSpan()
+        {
+<span class="fc" id="L350">            return getCurrentPosition();</span>
+        }
+    }
+
+
+<span class="fc" id="L355">    private class SeekableReaderFacet</span>
+        extends SpanProviderFacet
+        implements SeekableReader
+    {
+        public void hoist(Span span)
+        {
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">            if (! (span instanceof IonReaderBinarySpan))</span>
+            {
+<span class="nc" id="L363">                throw new IllegalArgumentException(&quot;Span isn't compatible with this reader.&quot;);</span>
+            }
+
+<span class="fc" id="L366">            seek((IonReaderBinarySpan) span);</span>
+<span class="fc" id="L367">        }</span>
+    }
+
+
+<span class="fc" id="L371">    private class ByteTransferReaderFacet implements PrivateByteTransferReader</span>
+    {
+        public void transferCurrentValue(PrivateByteTransferSink sink)
+            throws IOException
+        {
+            // Ensure there's a contiguous buffer we can copy.
+            // TODO Copy from a stream should also be possible.
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">            if (! (_input instanceof UnifiedInputStreamX.FromByteArray))</span>
+            {
+<span class="nc" id="L380">                throw new UnsupportedOperationException();</span>
+            }
+
+            // TODO amzn/ion-java#16 wrong if current value has a field name or
+            //   annotations since the position is in the wrong place.
+            // TODO when implementing that, be careful to handle the case where
+            //   the writer already holds a pending field name or annotations!
+            //   Meaning: the user has set it and then called writeValue().
+
+<span class="fc" id="L389">            int inOffset = (int) _position_start;</span>
+<span class="fc" id="L390">            int inLen    = (int) _position_len;</span>
+
+<span class="fc" id="L392">            sink.writeBytes(_input._bytes, inOffset, inLen);</span>
+<span class="fc" id="L393">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

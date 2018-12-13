@@ -1,0 +1,428 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Decimal.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">software.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">software.amazon.ion</a> &gt; <span class="el_source">Decimal.java</span></div><h1>Decimal.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2009-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at:
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
+ * language governing permissions and limitations under the License.
+ */
+
+package software.amazon.ion;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.math.MathContext;
+
+/**
+ * An extension of {@link BigDecimal} that can represent negative zeros.
+ * The primary change is the addition of {@link #isNegativeZero()}.
+ * &lt;p&gt;
+ * &lt;b&gt;WARNING:&lt;/b&gt; This class should not be extended by code outside of
+ * this library.
+ * &lt;p&gt;
+ * This class currently does not have any behavioral difference
+ * from {@link BigDecimal} except for the following:
+ * &lt;ul&gt;
+ *   &lt;li&gt;{@link #toString()}, {@link #toEngineeringString()}, and
+ *     {@link #toPlainString()} print a negative sign if necessary.
+ *   &lt;/li&gt;
+ *   &lt;li&gt;{@link #floatValue()} and {@link #doubleValue()} return negative zero
+ *     results.
+ *   &lt;/li&gt;
+ *   &lt;li&gt;{@link #abs} does the right thing.
+ * &lt;/ul&gt;
+ * This class does &lt;b&gt;NOT&lt;/b&gt; override {@link #equals} or {@link #compareTo}
+ * so those methods cannot distinguish positive and negative zeros.
+ * &lt;p&gt;
+ * It also does not currently override any of the numerical methods,
+ * &lt;em&gt;but it may do so in the future.&lt;/em&gt;  If you are concerned about
+ * consistent treatment of negative zeros in future releases, you may wish to
+ * use {@link #bigDecimalValue} before performing those operations.
+ */
+public class Decimal
+    extends BigDecimal
+{
+    private static final long serialVersionUID = 1L;
+
+    private static final class NegativeZero extends Decimal
+    {
+        private static final long serialVersionUID = 1L;
+
+        private NegativeZero(int scale)
+        {
+<span class="fc" id="L58">            super(BigInteger.ZERO, scale);</span>
+<span class="fc" id="L59">        }</span>
+
+        private NegativeZero(int scale, MathContext mc)
+        {
+<span class="fc" id="L63">            super(BigInteger.ZERO, scale, mc);</span>
+<span class="fc" id="L64">        }</span>
+
+
+        @Override
+        public float floatValue()
+        {
+<span class="fc" id="L70">            float v = super.floatValue();</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">            if (Float.compare(0f, v) &lt;= 0) v = -1 * v;</span>
+<span class="fc" id="L72">            return v;</span>
+        }
+
+        @Override
+        public double doubleValue()
+        {
+<span class="fc" id="L78">            double v = super.doubleValue();</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            if (Double.compare(0d, v) &lt;= 0) v = -1 * v;</span>
+<span class="fc" id="L80">            return v;</span>
+        }
+
+
+        @Override
+        public BigDecimal abs()
+        {
+<span class="fc" id="L87">            return new BigDecimal(unscaledValue(), scale());</span>
+        }
+
+        @Override
+        public BigDecimal abs(MathContext mc)
+        {
+<span class="fc" id="L93">            return new BigDecimal(unscaledValue(), scale(), mc);</span>
+        }
+
+        // TODO signum might break clients if -0 returns &lt;0 instead of 0
+        // TODO static negate(BigDecimal)
+        // TODO hashcode
+
+        // TODO some other things:
+        //   * byte/int/longValueExact throws?
+        //   * movePointLeft/Right
+        //   * round
+        //   * scaleByPowerOfTen
+        //   * setScale
+        //   * stripTrailingZeros
+        //   * toBigIntegerExact
+
+        @Override
+        public String toString()
+        {
+<span class="fc" id="L112">            return '-' + super.toString();</span>
+        }
+
+        @Override
+        public String toEngineeringString()
+        {
+<span class="fc" id="L118">            return '-' + super.toEngineeringString();</span>
+        }
+
+        @Override
+        public String toPlainString()
+        {
+<span class="fc" id="L124">            return '-' + super.toPlainString();</span>
+        }
+    }
+
+    /**
+     * The value 0, with a scale of 0.
+     */
+<span class="fc" id="L131">    public static final Decimal ZERO = new Decimal(0);</span>
+
+    /**
+     * The value -0, with a scale of 0.
+     */
+<span class="fc" id="L136">    public static final Decimal NEGATIVE_ZERO = new NegativeZero(0);</span>
+
+
+    /**
+     * Efficiently determines whether an arbitary decimal value is a negative
+     * zero.  This can only be true when the value is actually a
+     * {@link Decimal}.
+     *
+     * @return {@code true} if and only if the value is a negative zero.
+     *
+     * @throws NullPointerException if the value is {@code null}.
+     */
+    public static boolean isNegativeZero(BigDecimal val)
+    {
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        return (val.getClass() == NegativeZero.class);</span>
+    }
+
+    /**
+     * Returns a &quot;plain&quot; {@link BigDecimal} instance, never a {@link Decimal}
+     * subclass.  As a side effect, this strips any negative-zero information.
+     *
+     * @param val may be null.
+     * @return {@code null} if the given value is {@code null}.
+     */
+    public static BigDecimal bigDecimalValue(BigDecimal val)
+    {
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (val == null</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            || val.getClass() == BigDecimal.class)</span>
+        {
+<span class="fc" id="L165">            return val;</span>
+        }
+<span class="fc" id="L167">        return new BigDecimal(val.unscaledValue(), val.scale());</span>
+    }
+
+    /**
+     * Compares two decimal values for equality, observing both precision and
+     * negative zeros.  This differs from {@link BigDecimal#equals(Object)},
+     * which isn't aware of negative zeros, and from
+     * {@link BigDecimal#compareTo(BigDecimal)}, which ignores both precision
+     * and negative zeros.
+     *
+     * @return {@code true} if and only if the two {@link BigDecimal} objects
+     * have the same value, scale, and sign.
+     *
+     * @throws NullPointerException if either parameter is {@code null}.
+     */
+    public static boolean equals(BigDecimal v1, BigDecimal v2)
+    {
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        return (isNegativeZero(v1) == isNegativeZero(v2)</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">                &amp;&amp; v1.equals(v2));</span>
+    }
+
+
+    //=========================================================================
+
+    /**
+     * Returns a negative-zero decimal value, with the given number of
+     * significant digits (zeros).
+     *
+     * @param scale the number of significant digits (zeros) after the decimal
+     * point.
+     */
+    public static Decimal negativeZero(int scale)
+    {
+<span class="fc" id="L200">        return new NegativeZero(scale);</span>
+    }
+
+    /**
+     * Returns a negative-zero decimal value, with the given number of
+     * significant digits (zeros) and given context.
+     *
+     * @param scale the number of significant digits (zeros) after the decimal
+     * point.
+     */
+    public static Decimal negativeZero(int scale, MathContext mc)
+    {
+<span class="fc" id="L212">        return new NegativeZero(scale, mc);</span>
+    }
+
+
+    public static Decimal valueOf(BigInteger unscaledVal, int scale)
+    {
+<span class="nc" id="L218">        return new Decimal(unscaledVal, scale);</span>
+    }
+
+    public static Decimal valueOf(BigInteger unscaledVal, int scale,
+                                  MathContext mc)
+    {
+<span class="fc" id="L224">        return new Decimal(unscaledVal, scale, mc);</span>
+    }
+
+
+    public static Decimal valueOf(BigInteger val)
+    {
+<span class="nc" id="L230">        return new Decimal(val);</span>
+    }
+
+    public static Decimal valueOf(BigInteger val, MathContext mc)
+    {
+<span class="nc" id="L235">        return new Decimal(val, mc);</span>
+    }
+
+
+    public static Decimal valueOf(int val)
+    {
+<span class="fc" id="L241">        return new Decimal(val);</span>
+    }
+
+    public static Decimal valueOf(int val, MathContext mc)
+    {
+<span class="fc" id="L246">        return new Decimal(val, mc);</span>
+    }
+
+
+    public static Decimal valueOf(long val)
+    {
+<span class="fc" id="L252">        return new Decimal(val);</span>
+    }
+
+    public static Decimal valueOf(long val, MathContext mc)
+    {
+<span class="nc" id="L257">        return new Decimal(val, mc);</span>
+    }
+
+    public static Decimal valueOf(double val)
+    {
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        if (Double.compare(val, -0d) == 0)</span>
+        {
+            // Simulate BigDecimal.valueOf(0d) which has scale of 1
+<span class="fc" id="L265">            return new NegativeZero(1);</span>
+        }
+<span class="fc" id="L267">        return new Decimal(Double.toString(val));</span>
+    }
+
+    public static Decimal valueOf(double val, MathContext mc)
+    {
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        if (Double.compare(val, -0d) == 0)</span>
+        {
+<span class="fc" id="L274">            return new NegativeZero(1, mc);</span>
+        }
+<span class="fc" id="L276">        return new Decimal(Double.toString(val), mc);</span>
+    }
+
+    public static Decimal valueOf(BigDecimal val)
+    {
+<span class="fc bfc" id="L281" title="All 4 branches covered.">        if (val == null || val instanceof Decimal) return (Decimal) val;</span>
+<span class="fc" id="L282">        return new Decimal(val.unscaledValue(), val.scale());</span>
+    }
+
+    public static Decimal valueOf(BigDecimal val, MathContext mc)
+    {
+<span class="nc" id="L287">        return new Decimal(val.unscaledValue(), val.scale(), mc);</span>
+    }
+
+    public static Decimal valueOf(String val)
+    {
+<span class="fc" id="L292">        boolean negative = val.startsWith(&quot;-&quot;);</span>
+<span class="fc" id="L293">        Decimal ibd = new Decimal(val);</span>
+<span class="fc bfc" id="L294" title="All 4 branches covered.">        if (negative &amp;&amp; ibd.signum() == 0)</span>
+        {
+<span class="fc" id="L296">            ibd = new NegativeZero(ibd.scale());</span>
+        }
+<span class="fc" id="L298">        return ibd;</span>
+    }
+
+    public static Decimal valueOf(String val, MathContext mc)
+    {
+<span class="fc" id="L303">        boolean negative = val.startsWith(&quot;-&quot;);</span>
+<span class="fc" id="L304">        Decimal ibd = new Decimal(val, mc);</span>
+<span class="fc bfc" id="L305" title="All 4 branches covered.">        if (negative &amp;&amp; ibd.signum() == 0)</span>
+        {
+<span class="fc" id="L307">            ibd = new NegativeZero(ibd.scale(), mc);</span>
+        }
+<span class="fc" id="L309">        return ibd;</span>
+    }
+
+
+    //=========================================================================
+    // Constructors are private so we have flexibility in changing
+    // implementation of how we create negative zero.
+    // We force the user to call static valueOf() methods instead.
+
+    private Decimal(BigInteger unscaledVal, int scale)
+    {
+<span class="fc" id="L320">        super(unscaledVal, scale);</span>
+<span class="fc" id="L321">    }</span>
+
+    private Decimal(BigInteger unscaledVal, int scale, MathContext mc)
+    {
+<span class="fc" id="L325">        super(unscaledVal, scale, mc);</span>
+<span class="fc" id="L326">    }</span>
+
+
+    private Decimal(BigInteger val)
+    {
+<span class="nc" id="L331">        super(val);</span>
+<span class="nc" id="L332">    }</span>
+
+    private Decimal(BigInteger val, MathContext mc)
+    {
+<span class="nc" id="L336">        super(val, mc);</span>
+<span class="nc" id="L337">    }</span>
+
+
+    private Decimal(int val)
+    {
+<span class="fc" id="L342">        super(val);</span>
+<span class="fc" id="L343">    }</span>
+
+    private Decimal(int val, MathContext mc)
+    {
+<span class="fc" id="L347">        super(val, mc);</span>
+<span class="fc" id="L348">    }</span>
+
+    private Decimal(long val)
+    {
+<span class="fc" id="L352">        super(val);</span>
+<span class="fc" id="L353">    }</span>
+
+    private Decimal(long val, MathContext mc)
+    {
+<span class="nc" id="L357">        super(val, mc);</span>
+<span class="nc" id="L358">    }</span>
+
+
+    private Decimal(double val)
+    {
+<span class="nc" id="L363">        super(val);</span>
+<span class="nc" id="L364">    }</span>
+
+    private Decimal(double val, MathContext mc)
+    {
+<span class="nc" id="L368">        super(val, mc);</span>
+<span class="nc" id="L369">    }</span>
+
+
+    // TODO create static valueOf to check for -0
+    private Decimal(char[] in, int offset, int len)
+    {
+<span class="nc" id="L375">        super(in, offset, len);</span>
+<span class="nc" id="L376">    }</span>
+
+    // TODO create static valueOf to check for -0
+    private Decimal(char[] in, int offset, int len, MathContext mc)
+    {
+<span class="nc" id="L381">       super(in, offset, len, mc);</span>
+<span class="nc" id="L382">    }</span>
+
+
+    // TODO create static valueOf to check for -0
+    private Decimal(char[] in)
+    {
+<span class="nc" id="L388">        super(in);</span>
+<span class="nc" id="L389">    }</span>
+
+    // TODO create static valueOf to check for -0
+    private Decimal(char[] in, MathContext mc)
+    {
+<span class="nc" id="L394">        super(in, mc);</span>
+<span class="nc" id="L395">    }</span>
+
+
+    private Decimal(String val)
+    {
+<span class="fc" id="L400">        super(val);</span>
+<span class="fc" id="L401">    }</span>
+
+    private Decimal(String val, MathContext mc)
+    {
+<span class="fc" id="L405">        super(val, mc);</span>
+<span class="fc" id="L406">    }</span>
+
+
+    //========================================================================
+
+    public final boolean isNegativeZero()
+    {
+<span class="fc bfc" id="L413" title="All 2 branches covered.">        return (getClass() == NegativeZero.class);</span>
+    }
+
+    /**
+     * Converts this to a &quot;plain&quot; {@link BigDecimal} instance, losing any
+     * negative zeros in the process.
+     *
+     * @return a {@link BigDecimal}, never a {@link Decimal}.
+     */
+    public final BigDecimal bigDecimalValue()
+    {
+
+<span class="nc" id="L425">        return new BigDecimal(unscaledValue(), scale());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

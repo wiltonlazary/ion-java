@@ -1,0 +1,454 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ValueFactoryLite.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">software.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">software.amazon.ion.impl.lite</a> &gt; <span class="el_source">ValueFactoryLite.java</span></div><h1>ValueFactoryLite.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2010-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at:
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
+ * language governing permissions and limitations under the License.
+ */
+
+package software.amazon.ion.impl.lite;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import software.amazon.ion.ContainedValueException;
+import software.amazon.ion.Decimal;
+import software.amazon.ion.IonSequence;
+import software.amazon.ion.IonSexp;
+import software.amazon.ion.IonType;
+import software.amazon.ion.IonValue;
+import software.amazon.ion.SymbolToken;
+import software.amazon.ion.Timestamp;
+import software.amazon.ion.impl.PrivateLocalSymbolTableFactory;
+import software.amazon.ion.impl.PrivateUtils;
+import software.amazon.ion.impl.PrivateValueFactory;
+
+/**
+ *  This class handles all of the IonValueLite
+ *  instance construction.
+ *
+ */
+abstract class ValueFactoryLite
+    implements PrivateValueFactory
+{
+    protected final PrivateLocalSymbolTableFactory _lstFactory;
+    private ContainerlessContext _context;
+
+    ValueFactoryLite()
+<span class="fc" id="L47">    {</span>
+<span class="fc" id="L48">        _lstFactory = PrivateUtils.newLocalSymbolTableAsStructFactory(this);</span>
+<span class="fc" id="L49">    }</span>
+
+    protected void set_system(IonSystemLite system) {
+<span class="fc" id="L52">        _context = ContainerlessContext.wrap(system);</span>
+<span class="fc" id="L53">    }</span>
+
+    public IonBlobLite newBlob(byte[] value)
+    {
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        IonBlobLite ionValue = newBlob(value, 0, value == null ? 0 : value.length);</span>
+<span class="fc" id="L58">        return ionValue;</span>
+    }
+
+    public IonBlobLite newBlob(byte[] value, int offset, int length)
+    {
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        IonBlobLite ionValue = new IonBlobLite(_context, (value == null));</span>
+<span class="fc" id="L64">        ionValue.setBytes(value, offset, length);</span>
+<span class="fc" id="L65">        return ionValue;</span>
+    }
+
+    public IonBoolLite newBool(boolean value)
+    {
+<span class="fc" id="L70">        IonBoolLite ionValue = new IonBoolLite(_context, false);</span>
+<span class="fc" id="L71">        ionValue.setValue(value);</span>
+<span class="fc" id="L72">        return ionValue;</span>
+    }
+
+    public IonBoolLite newBool(Boolean value)
+    {
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        IonBoolLite ionValue = new IonBoolLite(_context, (value == null));</span>
+<span class="nc" id="L78">        ionValue.setValue(value);</span>
+<span class="nc" id="L79">        return ionValue;</span>
+    }
+
+    public IonClobLite newClob(byte[] value)
+    {
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        IonClobLite ionValue = newClob(value, 0, value == null ? 0 : value.length);</span>
+<span class="fc" id="L85">        return ionValue;</span>
+    }
+
+    public IonClobLite newClob(byte[] value, int offset, int length)
+    {
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        IonClobLite ionValue = new IonClobLite(_context, (value == null));</span>
+<span class="fc" id="L91">        ionValue.setBytes(value, offset, length);</span>
+<span class="fc" id="L92">        return ionValue;</span>
+    }
+
+    public IonDecimalLite newDecimal(long value)
+    {
+<span class="fc" id="L97">        IonDecimalLite ionValue = new IonDecimalLite(_context, false);</span>
+<span class="fc" id="L98">        ionValue.setValue(value);</span>
+<span class="fc" id="L99">        return ionValue;</span>
+    }
+
+    public IonDecimalLite newDecimal(double value)
+    {
+<span class="nc" id="L104">        IonDecimalLite ionValue = new IonDecimalLite(_context, false);</span>
+<span class="nc" id="L105">        ionValue.setValue(value);</span>
+<span class="nc" id="L106">        return ionValue;</span>
+    }
+
+    public IonDecimalLite newDecimal(BigInteger value)
+    {
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        boolean isNull = (value == null);</span>
+<span class="nc" id="L112">        IonDecimalLite ionValue = new IonDecimalLite(_context, isNull);</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        if (value != null) {</span>
+<span class="nc" id="L114">            ionValue.setValue(Decimal.valueOf(value));</span>
+        }
+<span class="nc" id="L116">        return ionValue;</span>
+    }
+
+    public IonDecimalLite newDecimal(BigDecimal value)
+    {
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        boolean isNull = (value == null);</span>
+<span class="fc" id="L122">        IonDecimalLite ionValue = new IonDecimalLite(_context, isNull);</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (value != null) {</span>
+<span class="fc" id="L124">            ionValue.setValue(value);</span>
+        }
+<span class="fc" id="L126">        return ionValue;</span>
+    }
+
+    public IonListLite newEmptyList()
+    {
+<span class="fc" id="L131">        IonListLite ionValue = new IonListLite(_context, false);</span>
+<span class="fc" id="L132">        return ionValue;</span>
+    }
+
+    public IonSexpLite newEmptySexp()
+    {
+<span class="fc" id="L137">        IonSexpLite ionValue = new IonSexpLite(_context, false);</span>
+<span class="fc" id="L138">        return ionValue;</span>
+    }
+
+    public IonStructLite newEmptyStruct()
+    {
+<span class="fc" id="L143">        IonStructLite ionValue = new IonStructLite(_context, false);</span>
+<span class="fc" id="L144">        return ionValue;</span>
+    }
+
+    public IonFloatLite newFloat(long value)
+    {
+<span class="nc" id="L149">        IonFloatLite ionValue = new IonFloatLite(_context, false);</span>
+<span class="nc" id="L150">        ionValue.setValue(value);</span>
+<span class="nc" id="L151">        return ionValue;</span>
+    }
+
+    public IonFloatLite newFloat(double value)
+    {
+<span class="fc" id="L156">        IonFloatLite ionValue = new IonFloatLite(_context, false);</span>
+<span class="fc" id="L157">        ionValue.setValue(value);</span>
+<span class="fc" id="L158">        return ionValue;</span>
+    }
+
+    public IonIntLite newInt(int value)
+    {
+<span class="fc" id="L163">        IonIntLite ionValue = new IonIntLite(_context, false);</span>
+<span class="fc" id="L164">        ionValue.setValue(value);</span>
+<span class="fc" id="L165">        return ionValue;</span>
+    }
+
+    public IonIntLite newInt(long value)
+    {
+<span class="fc" id="L170">        IonIntLite ionValue = new IonIntLite(_context, false);</span>
+<span class="fc" id="L171">        ionValue.setValue(value);</span>
+<span class="fc" id="L172">        return ionValue;</span>
+    }
+
+    public IonIntLite newInt(Number value)
+    {
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        boolean isNull = (value == null);</span>
+<span class="fc" id="L178">        IonIntLite ionValue = new IonIntLite(_context, isNull);</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        if (value != null) {</span>
+<span class="fc" id="L180">            ionValue.setValue(value);</span>
+        }
+<span class="fc" id="L182">        return ionValue;</span>
+    }
+
+    public IonListLite newList(Collection&lt;? extends IonValue&gt; values)
+        throws ContainedValueException, NullPointerException
+    {
+<span class="fc" id="L188">        IonListLite ionValue = newEmptyList();</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        if (values == null) {</span>
+<span class="fc" id="L190">            ionValue.makeNull();</span>
+        }
+        else {
+<span class="fc" id="L193">            ionValue.addAll(values);</span>
+        }
+<span class="fc" id="L195">        return ionValue;</span>
+    }
+
+    public IonListLite newList(IonSequence child)
+        throws ContainedValueException, NullPointerException
+    {
+<span class="fc" id="L201">        IonListLite ionValue = newEmptyList();</span>
+<span class="fc" id="L202">        ionValue.add(child);</span>
+<span class="fc" id="L203">        return ionValue;</span>
+    }
+
+    public IonListLite newList(IonValue... values)
+        throws ContainedValueException, NullPointerException
+    {
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        List&lt;IonValue&gt; e = (values == null ? null : Arrays.asList(values));</span>
+<span class="fc" id="L210">        IonListLite ionValue = newEmptyList();</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        if (e == null) {</span>
+<span class="fc" id="L212">            ionValue.makeNull();</span>
+        }
+        else {
+<span class="fc" id="L215">            ionValue.addAll(e);</span>
+        }
+<span class="fc" id="L217">        return ionValue;</span>
+    }
+
+    public IonListLite newList(int[] values)
+    {
+<span class="fc" id="L222">        ArrayList&lt;IonIntLite&gt; e = newInts(values);</span>
+<span class="fc" id="L223">        return newList(e);</span>
+    }
+
+    public IonListLite newList(long[] values)
+    {
+<span class="fc" id="L228">        ArrayList&lt;IonIntLite&gt; e = newInts(values);</span>
+<span class="fc" id="L229">        return newList(e);</span>
+    }
+
+    public IonNullLite newNull()
+    {
+<span class="fc" id="L234">        IonNullLite ionValue = new IonNullLite(_context);</span>
+<span class="fc" id="L235">        return ionValue;</span>
+    }
+
+    public IonValueLite newNull(IonType type)
+    {
+<span class="pc bpc" id="L240" title="1 of 14 branches missed.">        switch (type)</span>
+        {
+<span class="fc" id="L242">            case NULL:          return newNull();</span>
+<span class="fc" id="L243">            case BOOL:          return newNullBool();</span>
+<span class="fc" id="L244">            case INT:           return newNullInt();</span>
+<span class="fc" id="L245">            case FLOAT:         return newNullFloat();</span>
+<span class="fc" id="L246">            case DECIMAL:       return newNullDecimal();</span>
+<span class="fc" id="L247">            case TIMESTAMP:     return newNullTimestamp();</span>
+<span class="fc" id="L248">            case SYMBOL:        return newNullSymbol();</span>
+<span class="fc" id="L249">            case STRING:        return newNullString();</span>
+<span class="fc" id="L250">            case CLOB:          return newNullClob();</span>
+<span class="fc" id="L251">            case BLOB:          return newNullBlob();</span>
+<span class="fc" id="L252">            case LIST:          return newNullList();</span>
+<span class="fc" id="L253">            case SEXP:          return newNullSexp();</span>
+<span class="fc" id="L254">            case STRUCT:        return newNullStruct();</span>
+            default:
+<span class="nc" id="L256">                throw new IllegalArgumentException();</span>
+        }
+    }
+
+    public IonBlobLite newNullBlob()
+    {
+<span class="fc" id="L262">        IonBlobLite ionValue = new IonBlobLite(_context, true);</span>
+<span class="fc" id="L263">        return ionValue;</span>
+    }
+
+    public IonBoolLite newNullBool()
+    {
+<span class="fc" id="L268">        IonBoolLite ionValue = new IonBoolLite(_context, true);</span>
+<span class="fc" id="L269">        return ionValue;</span>
+    }
+
+    public IonClobLite newNullClob()
+    {
+<span class="fc" id="L274">        IonClobLite ionValue = new IonClobLite(_context, true);</span>
+<span class="fc" id="L275">        return ionValue;</span>
+    }
+
+    public IonDecimalLite newNullDecimal()
+    {
+<span class="fc" id="L280">        IonDecimalLite ionValue = new IonDecimalLite(_context, true);</span>
+<span class="fc" id="L281">        return ionValue;</span>
+    }
+
+    public IonFloatLite newNullFloat()
+    {
+<span class="fc" id="L286">        IonFloatLite ionValue = new IonFloatLite(_context, true);</span>
+<span class="fc" id="L287">        return ionValue;</span>
+    }
+
+    public IonIntLite newNullInt()
+    {
+<span class="fc" id="L292">        IonIntLite ionValue = new IonIntLite(_context, true);</span>
+<span class="fc" id="L293">        return ionValue;</span>
+    }
+
+    public IonListLite newNullList()
+    {
+<span class="fc" id="L298">        IonListLite ionValue = new IonListLite(_context, true);</span>
+<span class="fc" id="L299">        return ionValue;</span>
+    }
+
+    public IonSexpLite newNullSexp()
+    {
+<span class="fc" id="L304">        IonSexpLite ionValue = new IonSexpLite(_context, true);</span>
+<span class="fc" id="L305">        return ionValue;</span>
+    }
+
+    public IonStringLite newNullString()
+    {
+<span class="fc" id="L310">        IonStringLite ionValue = new IonStringLite(_context, true);</span>
+<span class="fc" id="L311">        return ionValue;</span>
+    }
+
+    public IonStructLite newNullStruct()
+    {
+<span class="fc" id="L316">        IonStructLite ionValue = new IonStructLite(_context, true);</span>
+<span class="fc" id="L317">        return ionValue;</span>
+    }
+
+    public IonSymbolLite newNullSymbol()
+    {
+<span class="fc" id="L322">        IonSymbolLite ionValue = new IonSymbolLite(_context, true);</span>
+<span class="fc" id="L323">        return ionValue;</span>
+    }
+
+    public IonTimestampLite newNullTimestamp()
+    {
+<span class="fc" id="L328">        IonTimestampLite ionValue = new IonTimestampLite(_context, true);</span>
+<span class="fc" id="L329">        return ionValue;</span>
+    }
+
+    public IonSexpLite newSexp(Collection&lt;? extends IonValue&gt; values)
+        throws ContainedValueException, NullPointerException
+    {
+<span class="fc" id="L335">        IonSexpLite ionValue = newEmptySexp();</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">        if (values == null) {</span>
+<span class="fc" id="L337">            ionValue.makeNull();</span>
+        }
+        else {
+<span class="fc" id="L340">            ionValue.addAll(values);</span>
+        }
+<span class="fc" id="L342">        return ionValue;</span>
+    }
+
+    public IonSexpLite newSexp(IonSequence child)
+        throws ContainedValueException, NullPointerException
+    {
+<span class="fc" id="L348">        IonSexpLite ionValue = newEmptySexp();</span>
+<span class="fc" id="L349">        ionValue.add(child);</span>
+<span class="fc" id="L350">        return ionValue;</span>
+    }
+
+    public IonSexp newSexp(IonValue... values)
+        throws ContainedValueException, NullPointerException
+    {
+<span class="fc bfc" id="L356" title="All 2 branches covered.">        List&lt;IonValue&gt; e = (values == null ? null : Arrays.asList(values));</span>
+<span class="fc" id="L357">        IonSexpLite ionValue = newEmptySexp();</span>
+<span class="fc bfc" id="L358" title="All 2 branches covered.">        if (e == null) {</span>
+<span class="fc" id="L359">            ionValue.makeNull();</span>
+        }
+        else {
+<span class="fc" id="L362">            ionValue.addAll(e);</span>
+        }
+<span class="fc" id="L364">        return ionValue;</span>
+    }
+
+    public IonSexpLite newSexp(int[] values)
+    {
+<span class="fc" id="L369">        ArrayList&lt;IonIntLite&gt; e = newInts(values);</span>
+<span class="fc" id="L370">        return newSexp(e);</span>
+    }
+
+    public IonSexpLite newSexp(long[] values)
+    {
+<span class="fc" id="L375">        ArrayList&lt;IonIntLite&gt; e = newInts(values);</span>
+<span class="fc" id="L376">        return newSexp(e);</span>
+    }
+
+    public IonStringLite newString(String value)
+    {
+<span class="fc bfc" id="L381" title="All 2 branches covered.">        boolean isNull = (value == null);</span>
+<span class="fc" id="L382">        IonStringLite ionValue = new IonStringLite(_context, isNull);</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">        if (value != null) {</span>
+<span class="fc" id="L384">            ionValue.setValue(value);</span>
+        }
+<span class="fc" id="L386">        return ionValue;</span>
+    }
+
+    public IonSymbolLite newSymbol(String value)
+    {
+<span class="fc bfc" id="L391" title="All 2 branches covered.">        boolean isNull = (value == null);</span>
+<span class="fc" id="L392">        IonSymbolLite ionValue = new IonSymbolLite(_context, isNull);</span>
+<span class="fc bfc" id="L393" title="All 2 branches covered.">        if (value != null) {</span>
+<span class="fc" id="L394">            ionValue.setValue(value);</span>
+        }
+<span class="fc" id="L396">        return ionValue;</span>
+    }
+
+    public IonSymbolLite newSymbol(SymbolToken value)
+    {
+<span class="fc" id="L401">        return new IonSymbolLite(_context, value);</span>
+    }
+
+    public IonTimestampLite newTimestamp(Timestamp value)
+    {
+<span class="fc bfc" id="L406" title="All 2 branches covered.">        boolean isNull = (value == null);</span>
+<span class="fc" id="L407">        IonTimestampLite ionValue = new IonTimestampLite(_context, isNull);</span>
+<span class="fc bfc" id="L408" title="All 2 branches covered.">        if (value != null) {</span>
+<span class="fc" id="L409">            ionValue.setValue(value);</span>
+        }
+<span class="fc" id="L411">        return ionValue;</span>
+    }
+
+    private ArrayList&lt;IonIntLite&gt; newInts(int[] elements)
+    {
+<span class="fc" id="L416">        ArrayList&lt;IonIntLite&gt; e = null;</span>
+
+<span class="fc bfc" id="L418" title="All 2 branches covered.">        if (elements != null)</span>
+        {
+<span class="fc" id="L420">            e = new ArrayList&lt;IonIntLite&gt;(elements.length);</span>
+<span class="fc bfc" id="L421" title="All 2 branches covered.">            for (int i = 0; i &lt; elements.length; i++)</span>
+            {
+<span class="fc" id="L423">                int value = elements[i];</span>
+<span class="fc" id="L424">                e.add(newInt(value));</span>
+            }
+        }
+
+<span class="fc" id="L428">        return e;</span>
+    }
+
+    private ArrayList&lt;IonIntLite&gt; newInts(long[] elements)
+    {
+<span class="fc" id="L433">        ArrayList&lt;IonIntLite&gt; e = null;</span>
+
+<span class="fc bfc" id="L435" title="All 2 branches covered.">        if (elements != null)</span>
+        {
+<span class="fc" id="L437">            e = new ArrayList&lt;IonIntLite&gt;(elements.length);</span>
+<span class="fc bfc" id="L438" title="All 2 branches covered.">            for (int i = 0; i &lt; elements.length; i++)</span>
+            {
+<span class="fc" id="L440">                long value = elements[i];</span>
+<span class="fc" id="L441">                e.add(newInt(value));</span>
+            }
+        }
+
+<span class="fc" id="L445">        return e;</span>
+    }
+
+    @Override
+    public PrivateLocalSymbolTableFactory getLstFactory()
+    {
+<span class="fc" id="L451">        return _lstFactory;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

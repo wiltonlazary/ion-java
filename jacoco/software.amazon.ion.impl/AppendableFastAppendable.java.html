@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AppendableFastAppendable.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">software.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">software.amazon.ion.impl</a> &gt; <span class="el_source">AppendableFastAppendable.java</span></div><h1>AppendableFastAppendable.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2013-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at:
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
+ * language governing permissions and limitations under the License.
+ */
+
+package software.amazon.ion.impl;
+
+import java.io.Closeable;
+import java.io.Flushable;
+import java.io.IOException;
+import software.amazon.ion.util.PrivateFastAppendable;
+
+/**
+ * Adapts an {@link Appendable} to implement {@link PrivateFastAppendable}.
+ */
+final class AppendableFastAppendable
+    implements PrivateFastAppendable, Closeable, Flushable
+{
+    private final Appendable _out;
+
+    AppendableFastAppendable(Appendable out)
+<span class="fc" id="L31">    {</span>
+<span class="fc" id="L32">        out.getClass(); // Efficient null check</span>
+
+<span class="fc" id="L34">        _out = out;</span>
+<span class="fc" id="L35">    }</span>
+
+    public Appendable append(CharSequence csq)
+        throws IOException
+    {
+<span class="nc" id="L40">        _out.append(csq);</span>
+<span class="nc" id="L41">        return this;</span>
+    }
+
+    public Appendable append(char c)
+        throws IOException
+    {
+<span class="nc" id="L47">        _out.append(c);</span>
+<span class="nc" id="L48">        return this;</span>
+    }
+
+    public Appendable append(CharSequence csq, int start, int end)
+        throws IOException
+    {
+<span class="nc" id="L54">        _out.append(csq, start, end);</span>
+<span class="nc" id="L55">        return this;</span>
+    }
+
+    public final void appendAscii(char c)
+        throws IOException
+    {
+<span class="fc" id="L61">        _out.append(c);</span>
+<span class="fc" id="L62">    }</span>
+
+    public final void appendAscii(CharSequence csq)
+        throws IOException
+    {
+<span class="fc" id="L67">        _out.append(csq);</span>
+<span class="fc" id="L68">    }</span>
+
+    public final void appendAscii(CharSequence csq, int start, int end)
+        throws IOException
+    {
+<span class="fc" id="L73">        _out.append(csq, start, end);</span>
+<span class="fc" id="L74">    }</span>
+
+    public final void appendUtf16(char c)
+        throws IOException
+    {
+<span class="fc" id="L79">        _out.append(c);</span>
+<span class="fc" id="L80">    }</span>
+
+    public final void appendUtf16Surrogate(char leadSurrogate,
+                                           char trailSurrogate)
+        throws IOException
+    {
+<span class="fc" id="L86">        _out.append(leadSurrogate);</span>
+<span class="fc" id="L87">        _out.append(trailSurrogate);</span>
+<span class="fc" id="L88">    }</span>
+
+    public void flush()
+        throws IOException
+    {
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (_out instanceof Flushable)</span>
+        {
+<span class="nc" id="L95">            ((Flushable)_out).flush();</span>
+        }
+<span class="fc" id="L97">    }</span>
+
+    public void close() throws IOException
+    {
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (_out instanceof Closeable)</span>
+        {
+<span class="nc" id="L103">            ((Closeable)_out).close();</span>
+        }
+<span class="fc" id="L105">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

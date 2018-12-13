@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SubstituteSymbolTable.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">software.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">software.amazon.ion.impl</a> &gt; <span class="el_source">SubstituteSymbolTable.java</span></div><h1>SubstituteSymbolTable.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2011-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at:
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
+ * language governing permissions and limitations under the License.
+ */
+
+package software.amazon.ion.impl;
+
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Iterator;
+import software.amazon.ion.IonReader;
+import software.amazon.ion.IonWriter;
+import software.amazon.ion.ReadOnlyValueException;
+import software.amazon.ion.SymbolTable;
+import software.amazon.ion.SymbolToken;
+
+/**
+ * A symbol table used for an import where no exact match could be found.
+ * This ensures that the declared max_id and version are exposed through the
+ * library.
+ * &lt;p&gt;
+ * Note that {@link #isSubstitute()} is always true for instances of this
+ * class.
+ */
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">final class SubstituteSymbolTable</span>
+    implements SymbolTable
+{
+    /**
+     * This is the original symbol table that is being substituted.
+     * Either null or a non-system shared table.
+     */
+    private final SymbolTable myOriginalSymTab;
+    private final String myName;
+    private final int myVersion;
+    private final int myMaxId;
+
+
+    /**
+     * @param name
+     * @param version
+     * @param maxId
+     */
+    SubstituteSymbolTable(String name, int version,
+                          int maxId)
+<span class="fc" id="L54">    {</span>
+<span class="fc" id="L55">        myOriginalSymTab = null;</span>
+<span class="fc" id="L56">        myName = name;</span>
+<span class="fc" id="L57">        myVersion = version;</span>
+<span class="fc" id="L58">        myMaxId = maxId;</span>
+<span class="fc" id="L59">    }</span>
+
+    SubstituteSymbolTable(SymbolTable original, int version, int maxId)
+<span class="fc" id="L62">    {</span>
+<span class="pc bpc" id="L63" title="3 of 6 branches missed.">        assert original.isSharedTable() &amp;&amp; ! original.isSystemTable();</span>
+<span class="pc bpc" id="L64" title="1 of 4 branches missed.">        assert (original.getVersion() != version</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">                || original.getMaxId() != maxId);</span>
+
+<span class="fc" id="L67">        myOriginalSymTab = original;</span>
+<span class="fc" id="L68">        myName = original.getName();</span>
+<span class="fc" id="L69">        myVersion = version;</span>
+<span class="fc" id="L70">        myMaxId = maxId;</span>
+<span class="fc" id="L71">    }</span>
+
+    public String getName()
+    {
+<span class="fc" id="L75">        return myName;</span>
+    }
+
+    public int getVersion()
+    {
+<span class="fc" id="L80">        return myVersion;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     * &lt;p&gt;
+     * This implementation always returns true.
+     */
+    public boolean isSubstitute()
+    {
+<span class="fc" id="L90">        return true;</span>
+    }
+
+    public boolean isLocalTable()
+    {
+<span class="fc" id="L95">        return false;</span>
+    }
+
+    public boolean isSharedTable()
+    {
+<span class="fc" id="L100">        return true;</span>
+    }
+
+    public boolean isSystemTable()
+    {
+<span class="fc" id="L105">        return false;</span>
+    }
+
+    public boolean isReadOnly()
+    {
+<span class="fc" id="L110">        return true;</span>
+    }
+
+    public void makeReadOnly()
+    {
+<span class="nc" id="L115">    }</span>
+
+    public SymbolTable getSystemSymbolTable()
+    {
+<span class="fc" id="L119">        return null;</span>
+    }
+
+    public String getIonVersionId()
+    {
+<span class="nc" id="L124">        return null;</span>
+    }
+
+    public SymbolTable[] getImportedTables()
+    {
+<span class="nc" id="L129">        return null;</span>
+    }
+
+    public int getImportedMaxId()
+    {
+<span class="fc" id="L134">        return 0;</span>
+    }
+
+    public int getMaxId()
+    {
+<span class="fc" id="L139">        return myMaxId;</span>
+    }
+
+    public SymbolToken intern(String text)
+    {
+<span class="fc" id="L144">        SymbolToken tok = find(text);</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (tok == null)</span>
+        {
+<span class="fc" id="L147">            throw new ReadOnlyValueException(SymbolTable.class);</span>
+        }
+<span class="fc" id="L149">        return tok;</span>
+    }
+
+    public SymbolToken find(String text)
+    {
+<span class="fc" id="L154">        SymbolToken tok = null;</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        if (myOriginalSymTab != null)</span>
+        {
+<span class="fc" id="L157">            tok = myOriginalSymTab.find(text);</span>
+            // If symbol token is found but its sid is beyond the correct max
+            // id of the substitute, then return null, as it should not be
+            // found at all.
+<span class="fc bfc" id="L161" title="All 4 branches covered.">            if (tok != null &amp;&amp; tok.getSid() &gt; myMaxId)</span>
+            {
+<span class="fc" id="L163">                tok = null;</span>
+            }
+        }
+<span class="fc" id="L166">        return tok;</span>
+    }
+
+    public int findSymbol(String text)
+    {
+<span class="fc" id="L171">        int sid = UNKNOWN_SYMBOL_ID;</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (myOriginalSymTab != null)</span>
+        {
+<span class="fc" id="L174">            sid = myOriginalSymTab.findSymbol(text);</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            if (sid &gt; myMaxId)</span>
+            {
+<span class="fc" id="L177">                sid = UNKNOWN_SYMBOL_ID;</span>
+            }
+        }
+<span class="fc" id="L180">        return sid;</span>
+    }
+
+    public String findKnownSymbol(int id)
+    {
+<span class="fc bfc" id="L185" title="All 4 branches covered.">        if (id &gt; myMaxId || myOriginalSymTab == null)</span>
+        {
+<span class="fc" id="L187">            return null;</span>
+        }
+<span class="fc" id="L189">        return myOriginalSymTab.findKnownSymbol(id);</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public Iterator&lt;String&gt; iterateDeclaredSymbolNames()
+    {
+        Iterator&lt;String&gt; originalIterator;
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        if (myOriginalSymTab != null)</span>
+        {
+<span class="fc" id="L198">            originalIterator = myOriginalSymTab.iterateDeclaredSymbolNames();</span>
+        }
+        else
+        {
+<span class="fc" id="L202">            originalIterator = Collections.EMPTY_LIST.iterator();</span>
+        }
+<span class="fc" id="L204">        return new SymbolIterator(originalIterator);</span>
+    }
+
+    public void writeTo(IonWriter writer) throws IOException
+    {
+<span class="nc" id="L209">        IonReader reader = new SymbolTableReader(this);</span>
+<span class="nc" id="L210">        writer.writeValues(reader);</span>
+<span class="nc" id="L211">    }</span>
+
+    private final class SymbolIterator implements Iterator&lt;String&gt;
+    {
+        private Iterator&lt;String&gt; myOriginalIterator;
+<span class="fc" id="L216">        private int myIndex = 0;</span>
+
+        SymbolIterator(Iterator&lt;String&gt; originalIterator)
+<span class="fc" id="L219">        {</span>
+<span class="fc" id="L220">            myOriginalIterator = originalIterator;</span>
+<span class="fc" id="L221">        }</span>
+
+        public boolean hasNext()
+        {
+<span class="fc bfc" id="L225" title="All 2 branches covered.">            if (myIndex &lt; myMaxId) {</span>
+<span class="fc" id="L226">                return true;</span>
+            }
+<span class="fc" id="L228">            return false;</span>
+        }
+
+        public String next()
+        {
+            // TODO bad failure mode if next() called beyond end
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">            if (myIndex &lt; myMaxId) {</span>
+<span class="fc" id="L235">                String name = null;</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">                if (myOriginalIterator.hasNext())</span>
+                {
+<span class="fc" id="L238">                    name = myOriginalIterator.next();</span>
+                }
+<span class="fc" id="L240">                myIndex++;</span>
+<span class="fc" id="L241">                return name;</span>
+            }
+<span class="nc" id="L243">            return null;</span>
+        }
+
+        public void remove()
+        {
+<span class="nc" id="L248">            throw new UnsupportedOperationException();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

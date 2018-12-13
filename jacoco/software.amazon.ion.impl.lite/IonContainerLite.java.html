@@ -1,0 +1,697 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonContainerLite.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">software.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">software.amazon.ion.impl.lite</a> &gt; <span class="el_source">IonContainerLite.java</span></div><h1>IonContainerLite.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2010-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at:
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
+ * language governing permissions and limitations under the License.
+ */
+
+package software.amazon.ion.impl.lite;
+
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.ListIterator;
+import java.util.NoSuchElementException;
+import software.amazon.ion.ContainedValueException;
+import software.amazon.ion.IonContainer;
+import software.amazon.ion.IonDatagram;
+import software.amazon.ion.IonException;
+import software.amazon.ion.IonValue;
+import software.amazon.ion.NullValueException;
+import software.amazon.ion.ReadOnlyValueException;
+import software.amazon.ion.SymbolTable;
+import software.amazon.ion.ValueVisitor;
+import software.amazon.ion.impl.PrivateIonConstants;
+import software.amazon.ion.impl.PrivateIonContainer;
+import software.amazon.ion.impl.PrivateUtils;
+
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">abstract class IonContainerLite</span>
+    extends IonValueLite
+    implements PrivateIonContainer, IonContext
+{
+
+    protected int            _child_count;
+    protected IonValueLite[] _children;
+
+    protected IonContainerLite(ContainerlessContext context, boolean isNull)
+    {
+        // we'll let IonValueLite handle this work as we always need to know
+        // our context and if we should start out as a null value or not
+<span class="fc" id="L46">        super(context, isNull);</span>
+<span class="fc" id="L47">    }</span>
+
+    IonContainerLite(IonContainerLite existing, IonContext context, boolean isStruct) {
+<span class="fc" id="L50">        super(existing, context);</span>
+<span class="fc" id="L51">        int childCount = existing._child_count;</span>
+<span class="fc" id="L52">        this._child_count = childCount;</span>
+        // when cloning the children we establish 'this' the cloned outer container as the context
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (existing._children != null) {</span>
+<span class="fc" id="L55">            boolean isDatagram = this instanceof IonDatagramLite;</span>
+<span class="fc" id="L56">            this._children = new IonValueLite[childCount];</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            for (int i = 0; i &lt; childCount; i++) {</span>
+<span class="fc" id="L58">                IonValueLite child = existing._children[i];</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">                IonContext childContext = isDatagram</span>
+<span class="fc" id="L60">                     ? TopLevelContext.wrap(child.getAssignedSymbolTable(), (IonDatagramLite)this)</span>
+<span class="fc" id="L61">                     : this;</span>
+
+<span class="fc" id="L63">                IonValueLite copy = child.clone(childContext);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">                if (isStruct) {</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">                    if(child.getFieldName() == null) {</span>
+                        // when name is null it could be a sid 0 so we need to perform the full symbol token lookup.
+                        // this is expensive so only do it when necessary
+                        // TODO profile `getKnownFieldNameSymbol` to see if we can improve its performance so branching
+                        // is not necessary. https://github.com/amzn/ion-java/issues/140
+<span class="fc" id="L70">                        copy.setFieldNameSymbol(child.getKnownFieldNameSymbol());</span>
+                    }
+                    else {
+                        // if we have a non null name copying it is sufficient
+<span class="fc" id="L74">                        copy.setFieldName(child.getFieldName());</span>
+                    }
+                }
+<span class="fc" id="L77">                this._children[i] = copy;</span>
+            }
+        }
+<span class="fc" id="L80">    }</span>
+
+    @Override
+    public abstract void accept(ValueVisitor visitor) throws Exception;
+
+    @Override
+    public abstract IonContainer clone();
+
+
+    public void clear()
+    {
+<span class="fc" id="L91">        checkForLock();</span>
+
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (_isNullValue())</span>
+        {
+<span class="pc bpc" id="L95" title="2 of 4 branches missed.">            assert _children == null;</span>
+<span class="pc bpc" id="L96" title="2 of 4 branches missed.">            assert _child_count == 0;</span>
+<span class="fc" id="L97">            _isNullValue(false);</span>
+        }
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        else if (!isEmpty())</span>
+        {
+<span class="fc" id="L101">            detachAllChildren();</span>
+<span class="fc" id="L102">            _child_count = 0;</span>
+        }
+<span class="fc" id="L104">    }</span>
+
+    private void detachAllChildren()
+    {
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        for (int ii=0; ii&lt;_child_count; ii++) {</span>
+<span class="fc" id="L109">            IonValueLite child = _children[ii];</span>
+<span class="fc" id="L110">            child.detachFromContainer();</span>
+<span class="fc" id="L111">            _children[ii] = null;</span>
+        }
+<span class="fc" id="L113">    }</span>
+
+    public boolean isEmpty() throws NullValueException
+    {
+<span class="fc" id="L117">        validateThisNotNull();</span>
+
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        return (size() == 0);</span>
+    }
+
+    public IonValue get(int index)
+        throws NullValueException
+    {
+<span class="fc" id="L125">        validateThisNotNull();</span>
+<span class="fc" id="L126">        IonValueLite value = get_child(index);</span>
+<span class="pc bpc" id="L127" title="2 of 4 branches missed.">        assert(value._isAutoCreated() == false);</span>
+<span class="fc" id="L128">        return value;</span>
+    }
+
+
+    public final Iterator&lt;IonValue&gt; iterator()
+    {
+<span class="fc" id="L134">        return listIterator(0);</span>
+    }
+
+    public final ListIterator&lt;IonValue&gt; listIterator()
+    {
+<span class="fc" id="L139">        return listIterator(0);</span>
+    }
+
+    public ListIterator&lt;IonValue&gt; listIterator(int index)
+    {
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        if (isNullValue())</span>
+        {
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            if (index != 0) throw new IndexOutOfBoundsException();</span>
+<span class="fc" id="L147">            return PrivateUtils.&lt;IonValue&gt; emptyIterator();</span>
+        }
+
+<span class="fc" id="L150">        return new SequenceContentIterator(index, isReadOnly());</span>
+    }
+
+    /** Encapsulates an iterator and implements a custom remove method */
+    /*  this is tied to the _child array of the IonSequenceImpl
+     *  through the _children and _child_count members which this
+     *  iterator directly uses.
+     *
+     *  TODO with the updated next and previous logic, particularly
+     *  the force_position_sync logic and lastMoveWasPrevious flag
+     *  we could implement add and set correctly.
+     *
+     *  NOTE this closely resembles the user and system iterators
+     *  defined in datagram, so changes here are likely to be needed
+     *  in datagram as well.
+     */
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">    protected class SequenceContentIterator</span>
+        implements ListIterator&lt;IonValue&gt;
+    {
+        protected final boolean  __readOnly;
+        protected       boolean  __lastMoveWasPrevious;
+        protected       int      __pos;
+        protected       IonValueLite __current;
+
+        public SequenceContentIterator(int index, boolean readOnly)
+<span class="fc" id="L175">        {</span>
+<span class="pc bpc" id="L176" title="1 of 4 branches missed.">            if (_isLocked() &amp;&amp; !readOnly) {</span>
+<span class="nc" id="L177">                throw new IllegalStateException(&quot;you can't open an updatable iterator on a read only value&quot;);</span>
+            }
+<span class="pc bpc" id="L179" title="1 of 4 branches missed.">            if (index &lt; 0 || index &gt; _child_count) {</span>
+<span class="fc" id="L180">                throw new IndexOutOfBoundsException(Integer.toString(index));</span>
+            }
+<span class="fc" id="L182">            __pos = index;</span>
+<span class="fc" id="L183">            __readOnly = readOnly;</span>
+<span class="fc" id="L184">        }</span>
+
+        // split to encourage the in-lining of the common
+        // case where we don't actually do anything
+        protected final void force_position_sync()
+        {
+<span class="pc bpc" id="L190" title="1 of 4 branches missed.">            if (__pos &lt;= 0 || __pos &gt; _child_count) {</span>
+<span class="fc" id="L191">                return;</span>
+            }
+<span class="fc bfc" id="L193" title="All 4 branches covered.">            if (__current == null || __current == _children[__pos - 1]) {</span>
+<span class="fc" id="L194">                return;</span>
+            }
+<span class="fc" id="L196">            force_position_sync_helper();</span>
+<span class="fc" id="L197">        }</span>
+        private final void force_position_sync_helper()
+        {
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">            if (__readOnly) {</span>
+<span class="nc" id="L201">                throw new IonException(&quot;read only sequence was changed&quot;);</span>
+            }
+
+            // look forward, which happens on insert
+            // notably insert of a local symbol table
+            // or a IVM if this is in a datagram
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">            for (int ii=__pos; ii&lt;_child_count; ii++) {</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">                if (_children[ii] == __current) {</span>
+<span class="fc" id="L209">                    __pos = ii;</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                    if (!__lastMoveWasPrevious) {</span>
+<span class="nc" id="L211">                        __pos++;</span>
+                    }
+<span class="fc" id="L213">                    return;</span>
+                }
+            }
+            // look backward, which happens on delete
+            // of a member preceding us, but should not
+            // happen if the delete is through this
+            // operator
+<span class="nc bnc" id="L220" title="All 2 branches missed.">            for (int ii=__pos-1; ii&gt;=0; ii--) {</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">                if (_children[ii] == __current) {</span>
+<span class="nc" id="L222">                    __pos = ii;</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">                    if (!__lastMoveWasPrevious) {</span>
+<span class="nc" id="L224">                        __pos++;</span>
+                    }
+<span class="nc" id="L226">                    return;</span>
+                }
+            }
+<span class="nc" id="L229">            throw new IonException(&quot;current member of iterator has been removed from the containing sequence&quot;);</span>
+        }
+
+        public void add(IonValue element)
+        {
+<span class="nc" id="L234">            throw new UnsupportedOperationException();</span>
+        }
+
+        public final boolean hasNext()
+        {
+            // called in nextIndex(): force_position_sync();
+<span class="fc bfc" id="L240" title="All 2 branches covered.">            return (nextIndex() &lt; _child_count);</span>
+        }
+
+        public final boolean hasPrevious()
+        {
+            // called in previousIndex(): force_position_sync();
+<span class="fc bfc" id="L246" title="All 2 branches covered.">            return (previousIndex() &gt;= 0);</span>
+        }
+
+        public IonValue next()
+        {
+<span class="fc" id="L251">            int next_idx = nextIndex();</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">            if (next_idx &gt;= _child_count) {</span>
+<span class="fc" id="L253">                throw new NoSuchElementException();</span>
+            }
+<span class="fc" id="L255">            __current = _children[next_idx];</span>
+<span class="fc" id="L256">            __pos = next_idx + 1; // after a next the pos will be past the current</span>
+<span class="fc" id="L257">            __lastMoveWasPrevious = false;</span>
+<span class="fc" id="L258">            return __current;</span>
+        }
+
+        public final int nextIndex()
+        {
+<span class="fc" id="L263">            force_position_sync();</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">            if (__pos &gt;= _child_count) {</span>
+<span class="fc" id="L265">                return _child_count;</span>
+            }
+<span class="fc" id="L267">            int next_idx = __pos;</span>
+            // whether we previous-ed to get here or
+            // next-ed to get here the next index is
+            // whatever the current position is
+<span class="fc" id="L271">            return next_idx;</span>
+        }
+
+        public IonValue previous()
+        {
+<span class="fc" id="L276">            force_position_sync();</span>
+<span class="fc" id="L277">            int prev_idx = previousIndex();</span>
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">            if (prev_idx &lt; 0) {</span>
+<span class="nc" id="L279">                throw new NoSuchElementException();</span>
+            }
+<span class="fc" id="L281">            __current = _children[prev_idx];</span>
+<span class="fc" id="L282">            __pos = prev_idx;</span>
+<span class="fc" id="L283">            __lastMoveWasPrevious = true;</span>
+<span class="fc" id="L284">            return __current;</span>
+        }
+
+        public final int previousIndex()
+        {
+<span class="fc" id="L289">            force_position_sync();</span>
+<span class="fc" id="L290">            int prev_idx = __pos - 1;</span>
+<span class="fc bfc" id="L291" title="All 2 branches covered.">            if (prev_idx &lt; 0) {</span>
+<span class="fc" id="L292">                return -1;</span>
+            }
+<span class="fc" id="L294">            return prev_idx;</span>
+        }
+
+        /**
+         * Sets the container to dirty after calling {@link Iterator#remove()}
+         * on the encapsulated iterator
+         */
+        public void remove()
+        {
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">            if (__readOnly) {</span>
+<span class="nc" id="L304">                throw new UnsupportedOperationException();</span>
+            }
+<span class="fc" id="L306">            force_position_sync();</span>
+
+<span class="fc" id="L308">            int idx = __pos;</span>
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">            if (!__lastMoveWasPrevious) {</span>
+                // position is 1 ahead of the array index
+<span class="fc" id="L311">                idx--;</span>
+            }
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">            if (idx &lt; 0) {</span>
+<span class="nc" id="L314">                throw new ArrayIndexOutOfBoundsException();</span>
+            }
+
+<span class="fc" id="L317">            IonValueLite concrete = __current;</span>
+<span class="fc" id="L318">            int concrete_idx = concrete._elementid();</span>
+<span class="pc bpc" id="L319" title="2 of 4 branches missed.">            assert(concrete_idx == idx);</span>
+
+            // here we remove the member from the container's list of elements
+<span class="fc" id="L322">            remove_child(idx);</span>
+<span class="fc" id="L323">            patch_elements_helper(concrete_idx);</span>
+
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">            if (!__lastMoveWasPrevious) {</span>
+                // if we next-ed onto this member we have to back up
+                // because the next member is now current (otherwise
+                // the position is fine where it is)
+<span class="fc" id="L329">                __pos--;</span>
+            }
+<span class="fc" id="L331">            __current = null;</span>
+<span class="fc" id="L332">        }</span>
+
+        public void set(IonValue element)
+        {
+<span class="nc" id="L336">            throw new UnsupportedOperationException();</span>
+        }
+    }
+
+    public void makeNull()
+    {
+<span class="fc" id="L342">        clear();            // this checks for the lock</span>
+<span class="fc" id="L343">        _isNullValue(true); // but clear() leaves the value non-null</span>
+<span class="fc" id="L344">    }</span>
+
+    public boolean remove(IonValue element)
+    {
+<span class="fc" id="L348">        checkForLock();</span>
+
+<span class="fc bfc" id="L350" title="All 2 branches covered.">        if (element.getContainer() != this) {</span>
+<span class="fc" id="L351">            return false;</span>
+        }
+
+        // Get all the data into the DOM, since the element will be losing
+        // its backing store.
+<span class="fc" id="L356">        IonValueLite concrete = (IonValueLite) element;</span>
+
+<span class="fc" id="L358">        int pos = concrete._elementid();</span>
+<span class="fc" id="L359">        IonValueLite child = get_child(pos);</span>
+<span class="pc bpc" id="L360" title="1 of 2 branches missed.">        if (child == concrete) // Yes, instance identity.</span>
+        {
+            // no, this is done in remove_child and will
+            // if called first it will corrupt the elementid
+            // no: concrete.detachFromContainer();
+<span class="fc" id="L365">            remove_child(pos);</span>
+<span class="fc" id="L366">            patch_elements_helper(pos);</span>
+
+<span class="fc" id="L368">            return true;</span>
+        }
+
+<span class="nc" id="L371">        throw new AssertionError(&quot;element's index is not correct&quot;);</span>
+    }
+
+    public int size()
+    {
+<span class="fc bfc" id="L376" title="All 2 branches covered.">        if (isNullValue()) {</span>
+<span class="fc" id="L377">            return 0;</span>
+        }
+<span class="fc" id="L379">        return get_child_count();</span>
+    }
+
+    @Override
+    void makeReadOnlyInternal()
+    {
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">        if (_isLocked()) return;</span>
+
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        if (_children != null) {</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">            for (int ii=0; ii&lt;_child_count; ii++) {</span>
+<span class="fc" id="L389">                IonValueLite child = _children[ii];</span>
+<span class="fc" id="L390">                child.makeReadOnlyInternal();</span>
+            }
+        }
+        // we don't need to call our copy of clear symbol ID's
+        // which recurses since the calls to child.makeReadOnly
+        // will have clear out the child symbol ID's already
+        // as the children were marked read only.  But we do need
+        // to call the base clear which will clear out the symbol
+        // table reference if one exists.
+<span class="fc" id="L399">        super.clearSymbolIDValues();</span>
+<span class="fc" id="L400">        _isLocked(true);</span>
+<span class="fc" id="L401">    }</span>
+
+    /*
+     * IonContext methods
+     *
+     * note that the various get* methods delegate
+     * to our context.
+     *
+     * However getParentThroughContext() returns
+     * our this pointer since we are the container.
+     *
+     * We always have a context.  Either a concrete
+     * context if we are a loose value or a container
+     * we are contained in.
+     *
+     */
+
+    public final IonContainerLite getContextContainer()
+    {
+<span class="fc" id="L420">        return this;</span>
+    }
+
+    /**
+     * @return {@code null}, since symbol tables are only directly assigned
+     *          to top-level values.
+     */
+    public final SymbolTable getContextSymbolTable()
+    {
+<span class="nc" id="L429">        return null;</span>
+    }
+
+    @Override
+    void clearSymbolIDValues()
+    {
+<span class="fc" id="L435">        super.clearSymbolIDValues();</span>
+<span class="fc bfc" id="L436" title="All 2 branches covered.">        for (int ii=0; ii&lt;get_child_count(); ii++) {</span>
+<span class="fc" id="L437">            IonValueLite child = get_child(ii);</span>
+<span class="fc" id="L438">            child.clearSymbolIDValues();</span>
+        }
+<span class="fc" id="L440">    }</span>
+
+    /**
+     * @param child
+     */
+    public boolean add(IonValue child)
+        throws NullPointerException, IllegalArgumentException,
+        ContainedValueException
+    {
+<span class="fc" id="L449">        int size = get_child_count();</span>
+
+<span class="fc" id="L451">        add(size, (IonValueLite) child);</span>
+
+        // updateElementIds - not needed since we're adding at the end
+        // this.patch_elements_helper(size);
+
+<span class="fc" id="L456">        return true;</span>
+    }
+
+    /**
+     * Ensures that a potential new child is non-null, has no container,
+     * is not read-only, and is not a datagram.
+     *
+     * @throws NullPointerException
+     *   if {@code child} is {@code null}.
+     * @throws ContainedValueException
+     *   if {@code child} is already part of a container.
+     * @throws ReadOnlyValueException
+     *   if {@code child} is read only.
+     * @throws IllegalArgumentException
+     *   if {@code child} is an {@link IonDatagram}.
+     */
+    void validateNewChild(IonValue child)
+        throws ContainedValueException, NullPointerException,
+               IllegalArgumentException
+    {
+<span class="fc bfc" id="L476" title="All 2 branches covered.">        if (child.getContainer() != null)            // Also checks for null.</span>
+        {
+<span class="fc" id="L478">            throw new ContainedValueException();</span>
+        }
+
+<span class="fc bfc" id="L481" title="All 2 branches covered.">        if (child.isReadOnly()) throw new ReadOnlyValueException();</span>
+
+<span class="fc bfc" id="L483" title="All 2 branches covered.">        if (child instanceof IonDatagram)</span>
+        {
+<span class="fc" id="L485">            String message =</span>
+                &quot;IonDatagram can not be inserted into another IonContainer.&quot;;
+<span class="fc" id="L487">            throw new IllegalArgumentException(message);</span>
+        }
+
+<span class="pc bpc" id="L490" title="2 of 4 branches missed.">        assert child instanceof IonValueLite</span>
+            : &quot;Child was not created by the same ValueFactory&quot;;
+
+<span class="pc bpc" id="L493" title="2 of 4 branches missed.">        assert getSystem() == child.getSystem()</span>
+<span class="nc bnc" id="L494" title="All 2 branches missed.">            || getSystem().getClass().equals(child.getSystem().getClass());</span>
+<span class="fc" id="L495">    }</span>
+
+    /**
+     * Validates the child and checks locks.
+     *
+     * @param child
+     *        must not be null.
+     * @throws NullPointerException
+     *         if the element is &lt;code&gt;null&lt;/code&gt;.
+     * @throws IndexOutOfBoundsException
+     *   if the index is out of range (index &lt; 0 || index &gt; size()).
+     */
+    void add(int index, IonValueLite child)
+        throws ContainedValueException, NullPointerException
+    {
+<span class="fc bfc" id="L510" title="All 4 branches covered.">        if ((index &lt; 0) || (index &gt; get_child_count()))</span>
+        {
+<span class="fc" id="L512">            throw new IndexOutOfBoundsException();</span>
+        }
+<span class="fc" id="L514">        checkForLock();</span>
+<span class="fc" id="L515">        validateNewChild(child);</span>
+
+<span class="fc" id="L517">        add_child(index, child);</span>
+<span class="fc" id="L518">        patch_elements_helper(index + 1);</span>
+
+<span class="pc bpc" id="L520" title="2 of 4 branches missed.">        assert((index &gt;= 0)</span>
+<span class="pc bpc" id="L521" title="1 of 2 branches missed.">               &amp;&amp; (index &lt; get_child_count())</span>
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">               &amp;&amp; (child == get_child(index))</span>
+<span class="pc bpc" id="L523" title="1 of 2 branches missed.">               &amp;&amp; (child._elementid() == index));</span>
+<span class="fc" id="L524">    }</span>
+
+    //////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////
+
+    // helper routines for managing the member children
+
+    //////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////
+
+
+    /**
+     * sizes for the various types of containers
+     * expected to be tuned.
+     */
+<span class="fc" id="L539">    static final int[] INITIAL_SIZE = make_initial_size_array();</span>
+    static int[] make_initial_size_array() {
+<span class="fc" id="L541">        int[] sizes = new int[PrivateIonConstants.tidDATAGRAM + 1];</span>
+<span class="fc" id="L542">        sizes[PrivateIonConstants.tidList]     = 1;</span>
+<span class="fc" id="L543">        sizes[PrivateIonConstants.tidSexp]     = 4;</span>
+<span class="fc" id="L544">        sizes[PrivateIonConstants.tidStruct]   = 5;</span>
+<span class="fc" id="L545">        sizes[PrivateIonConstants.tidDATAGRAM] = 3;</span>
+<span class="fc" id="L546">        return sizes;</span>
+    }
+<span class="fc" id="L548">    static final int[] NEXT_SIZE = make_next_size_array();</span>
+    static int[] make_next_size_array() {
+<span class="fc" id="L550">        int[] sizes = new int[PrivateIonConstants.tidDATAGRAM + 1];</span>
+<span class="fc" id="L551">        sizes[PrivateIonConstants.tidList]     = 4;</span>
+<span class="fc" id="L552">        sizes[PrivateIonConstants.tidSexp]     = 8;</span>
+<span class="fc" id="L553">        sizes[PrivateIonConstants.tidStruct]   = 8;</span>
+<span class="fc" id="L554">        sizes[PrivateIonConstants.tidDATAGRAM] = 10;</span>
+<span class="fc" id="L555">        return sizes;</span>
+    }
+    final protected int initialSize()
+    {
+<span class="pc bpc" id="L559" title="1 of 5 branches missed.">        switch (this.getType()) {</span>
+<span class="fc" id="L560">        case LIST:     return 1;</span>
+<span class="fc" id="L561">        case SEXP:     return 4;</span>
+<span class="fc" id="L562">        case STRUCT:   return 5;</span>
+<span class="fc" id="L563">        case DATAGRAM: return 3;</span>
+<span class="nc" id="L564">        default:       return 4;</span>
+        }
+    }
+    final protected int nextSize(int current_size, boolean call_transition)
+    {
+<span class="fc bfc" id="L569" title="All 2 branches covered.">        if (current_size == 0) {</span>
+<span class="fc" id="L570">            int new_size = initialSize();</span>
+<span class="fc" id="L571">            return new_size;</span>
+        }
+
+        int next_size;
+<span class="pc bpc" id="L575" title="1 of 5 branches missed.">        switch (this.getType()) {</span>
+<span class="fc" id="L576">            case LIST:     next_size =  4;      break;</span>
+<span class="fc" id="L577">            case SEXP:     next_size =  8;      break;</span>
+<span class="fc" id="L578">            case STRUCT:   next_size =  8;      break;</span>
+<span class="fc" id="L579">            case DATAGRAM: next_size = 10;      break;</span>
+<span class="nc" id="L580">            default:       return current_size * 2;</span>
+        }
+
+<span class="fc bfc" id="L583" title="All 2 branches covered.">        if (next_size &gt; current_size) {</span>
+            // note that unrecognized sizes, either due to unrecognized type id
+            // or some sort of custom size in the initial allocation, meh.
+<span class="pc bpc" id="L586" title="1 of 2 branches missed.">            if (call_transition) {</span>
+<span class="fc" id="L587">                transitionToLargeSize(next_size);</span>
+            }
+        }
+        else {
+<span class="fc" id="L591">            next_size = current_size * 2;</span>
+        }
+
+<span class="fc" id="L594">        return next_size;</span>
+    }
+
+    /**
+     * This is overriden in {@link IonStructLite} to add the {@link HashMap} of
+     * field names when the struct becomes moderately large.
+     *
+     * @param size
+     */
+    void transitionToLargeSize(int size)
+    {
+<span class="fc" id="L605">        return;</span>
+    }
+
+    public final int get_child_count() {
+<span class="fc" id="L609">        return _child_count;</span>
+    }
+
+    public final IonValueLite get_child(int idx) {
+<span class="pc bpc" id="L613" title="1 of 4 branches missed.">        if (idx &lt; 0 || idx &gt;= _child_count) {</span>
+<span class="fc" id="L614">            throw new IndexOutOfBoundsException(Integer.toString(idx));</span>
+        }
+<span class="fc" id="L616">        return _children[idx];</span>
+    }
+
+
+    final IonValueLite set_child(int idx, IonValueLite child)
+    {
+<span class="pc bpc" id="L622" title="2 of 4 branches missed.">        if (idx &lt; 0 || idx &gt;= _child_count) {</span>
+<span class="nc" id="L623">            throw new IndexOutOfBoundsException(Integer.toString(idx));</span>
+        }
+<span class="pc bpc" id="L625" title="1 of 2 branches missed.">        if (child == null) {</span>
+<span class="nc" id="L626">            throw new NullPointerException();</span>
+        }
+<span class="fc" id="L628">        IonValueLite prev = _children[idx];</span>
+<span class="fc" id="L629">        _children[idx] = child;</span>
+
+        // FIXME this doesn't update the child's context or index
+        // which is done by add_child() above
+<span class="fc" id="L633">        return prev;</span>
+    }
+
+    /**
+     * Does not validate the child or check locks.
+     */
+    protected int add_child(int idx, IonValueLite child)
+    {
+<span class="fc" id="L641">        _isNullValue(false); // if we add children we're not null anymore</span>
+<span class="fc" id="L642">        child.setContext(this.getContextForIndex(child, idx));</span>
+<span class="fc bfc" id="L643" title="All 4 branches covered.">        if (_children == null || _child_count &gt;= _children.length) {</span>
+<span class="fc bfc" id="L644" title="All 2 branches covered.">            int old_len = (_children == null) ? 0 : _children.length;</span>
+<span class="fc" id="L645">            int new_len = this.nextSize(old_len, true);</span>
+<span class="pc bpc" id="L646" title="2 of 4 branches missed.">            assert(new_len &gt; idx);</span>
+<span class="fc" id="L647">            IonValueLite[] temp = new IonValueLite[new_len];</span>
+<span class="fc bfc" id="L648" title="All 2 branches covered.">            if (old_len &gt; 0) {</span>
+<span class="fc" id="L649">                System.arraycopy(_children, 0, temp, 0, old_len);</span>
+            }
+<span class="fc" id="L651">            _children = temp;</span>
+        }
+<span class="fc bfc" id="L653" title="All 2 branches covered.">        if (idx &lt; _child_count) {</span>
+<span class="fc" id="L654">            System.arraycopy(_children, idx, _children, idx+1, _child_count-idx);</span>
+        }
+<span class="fc" id="L656">        _child_count++;</span>
+<span class="fc" id="L657">        _children[idx] = child;</span>
+
+<span class="fc" id="L659">        child._elementid(idx);</span>
+<span class="fc" id="L660">        return idx;</span>
+    }
+
+
+    IonContext getContextForIndex(IonValue element, int index){
+<span class="fc" id="L665">        return this;</span>
+    }
+
+    /**
+     * Does not check locks.
+     */
+    void remove_child(int idx)
+    {
+<span class="pc bpc" id="L673" title="2 of 4 branches missed.">        assert(idx &gt;=0);</span>
+<span class="pc bpc" id="L674" title="2 of 4 branches missed.">        assert(idx &lt; get_child_count()); // this also asserts child count &gt; 0</span>
+<span class="pc bpc" id="L675" title="2 of 4 branches missed.">        assert get_child(idx) != null : &quot;No child at index &quot; + idx;</span>
+
+<span class="fc" id="L677">        _children[idx].detachFromContainer();</span>
+<span class="fc" id="L678">        int children_to_move = _child_count - idx - 1;</span>
+<span class="fc bfc" id="L679" title="All 2 branches covered.">        if (children_to_move &gt; 0) {</span>
+<span class="fc" id="L680">            System.arraycopy(_children, idx+1, _children, idx, children_to_move);</span>
+        }
+<span class="fc" id="L682">        _child_count--;</span>
+<span class="fc" id="L683">        _children[_child_count] = null;</span>
+<span class="fc" id="L684">    }</span>
+
+    public final void patch_elements_helper(int lowest_bad_idx)
+    {
+        // patch the element Id's for all the children from
+        // the child who was earliest in the array (lowest index)
+<span class="fc bfc" id="L690" title="All 2 branches covered.">        for (int ii=lowest_bad_idx; ii&lt;get_child_count(); ii++) {</span>
+<span class="fc" id="L691">            IonValueLite child = get_child(ii);</span>
+<span class="fc" id="L692">            child._elementid(ii);</span>
+        }
+<span class="fc" id="L694">        return;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

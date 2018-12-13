@@ -1,0 +1,1254 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonReaderBinaryRawX.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">software.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">software.amazon.ion.impl</a> &gt; <span class="el_source">IonReaderBinaryRawX.java</span></div><h1>IonReaderBinaryRawX.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2009-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at:
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
+ * language governing permissions and limitations under the License.
+ */
+
+package software.amazon.ion.impl;
+
+import static software.amazon.ion.SystemSymbols.ION_1_0_SID;
+
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.math.MathContext;
+import software.amazon.ion.Decimal;
+import software.amazon.ion.IonException;
+import software.amazon.ion.IonReader;
+import software.amazon.ion.IonType;
+import software.amazon.ion.SymbolTable;
+import software.amazon.ion.Timestamp;
+import software.amazon.ion.Timestamp.Precision;
+import software.amazon.ion.impl.PrivateScalarConversions.AS_TYPE;
+import software.amazon.ion.impl.PrivateScalarConversions.ValueVariant;
+import software.amazon.ion.impl.UnifiedSavePointManagerX.SavePoint;
+
+
+/**
+ *  low level reader, base class, for reading Ion binary
+ *  input sources.  This using the UnifiedInputStream just
+ *  as the updated (july 2009) text reader does.  The
+ *  routines in this impl only include those needed to handle
+ *  field id's, annotation ids', and access to the value
+ *  headers.  In particular hasNext, next, stepIn and stepOut
+ *  are handled here.
+ *
+ *  scalar values are handled by IonReaderBinarySystem and
+ *  symbol tables (as well as field names and annotations as
+ *  strings) are handled by IonBinaryReaderUser.
+ */
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">abstract class IonReaderBinaryRawX</span>
+    implements IonReader
+{
+    static final int DEFAULT_CONTAINER_STACK_SIZE = 12; // a multiple of 3
+    static final int DEFAULT_ANNOTATION_SIZE = 10;
+    static final int NO_LIMIT = Integer.MIN_VALUE;
+
+<span class="fc" id="L55">    protected enum State {</span>
+<span class="fc" id="L56">        S_INVALID,</span>
+<span class="fc" id="L57">        S_BEFORE_FIELD, // only true in structs</span>
+<span class="fc" id="L58">        S_BEFORE_TID,</span>
+<span class="fc" id="L59">        S_BEFORE_VALUE,</span>
+<span class="fc" id="L60">        S_AFTER_VALUE,</span>
+<span class="fc" id="L61">        S_EOF</span>
+    }
+    State               _state;
+    UnifiedInputStreamX _input;
+    int                 _local_remaining;
+    boolean             _eof;
+    boolean             _has_next_needed;
+    ValueVariant        _v;
+    IonType             _value_type;
+    boolean             _value_is_null;
+    boolean             _value_is_true;   // cached boolean value (since we step on the length)
+
+    /**
+     * {@link SymbolTable#UNKNOWN_SYMBOL_ID} means &quot;not on a struct field&quot;
+     * since otherwise we always know the SID.
+     */
+    int                 _value_field_id;
+    int                 _value_tid;
+    int                 _value_len;
+    int                 _value_lob_remaining;
+    boolean             _value_lob_is_ready;
+
+    long                _position_start;
+    long                _position_len;
+
+
+    SavePoint           _annotations;
+    int[]               _annotation_ids;
+    int                 _annotation_count;
+
+    // local stack for stepInto() and stepOut()
+    boolean             _is_in_struct;
+    boolean             _struct_is_ordered;
+    int                 _parent_tid;
+    int                 _container_top;
+    long[]              _container_stack; // triples of: position, type, local_end
+
+<span class="fc" id="L98">    protected IonReaderBinaryRawX() {</span>
+<span class="fc" id="L99">    }</span>
+
+    /**
+     * @return This implementation always returns null.
+     */
+    public &lt;T&gt; T asFacet(Class&lt;T&gt; facetType)
+    {
+<span class="fc" id="L106">        return null;</span>
+    }
+
+    protected final void init_raw(UnifiedInputStreamX uis) {
+<span class="fc" id="L110">        _input = uis;</span>
+<span class="fc" id="L111">        _container_stack = new long[DEFAULT_CONTAINER_STACK_SIZE];</span>
+<span class="fc" id="L112">        _annotations = uis.savePointAllocate();</span>
+<span class="fc" id="L113">        _v = new ValueVariant();</span>
+<span class="fc" id="L114">        _annotation_ids = new int[DEFAULT_ANNOTATION_SIZE];</span>
+
+<span class="fc" id="L116">        re_init_raw();</span>
+
+<span class="fc" id="L118">        _position_start = -1;</span>
+<span class="fc" id="L119">    }</span>
+
+    final void re_init_raw() {
+<span class="fc" id="L122">        _local_remaining = NO_LIMIT;</span>
+<span class="fc" id="L123">        _parent_tid = PrivateIonConstants.tidDATAGRAM;</span>
+<span class="fc" id="L124">        _value_field_id = SymbolTable.UNKNOWN_SYMBOL_ID;</span>
+<span class="fc" id="L125">        _state = State.S_BEFORE_TID; // this is where we always start</span>
+<span class="fc" id="L126">        _has_next_needed = true;</span>
+
+<span class="fc" id="L128">        _eof = false;</span>
+<span class="fc" id="L129">        _value_type = null;</span>
+<span class="fc" id="L130">        _value_is_null = false;</span>
+<span class="fc" id="L131">        _value_is_true = false;</span>
+
+<span class="fc" id="L133">        _value_len = 0;</span>
+<span class="fc" id="L134">        _value_lob_remaining = 0;</span>
+<span class="fc" id="L135">        _value_lob_is_ready = false;</span>
+
+<span class="fc" id="L137">        _annotation_count = 0;</span>
+
+<span class="fc" id="L139">        _is_in_struct = false;</span>
+<span class="fc" id="L140">        _struct_is_ordered = false;</span>
+<span class="fc" id="L141">        _parent_tid = 0;</span>
+<span class="fc" id="L142">        _container_top = 0;</span>
+<span class="fc" id="L143">    }</span>
+
+    public void close()
+        throws IOException
+    {
+<span class="fc" id="L148">        _input.close();</span>
+<span class="fc" id="L149">    }</span>
+
+    static private final int  POS_OFFSET        = 0;
+    static private final int  TYPE_LIMIT_OFFSET = 1;
+    static private final long TYPE_MASK         = 0xffffffff;
+    static private final int  LIMIT_SHIFT       = 32;
+    static private final int  POS_STACK_STEP    = 2;
+
+    private final void push(int type, long position, int local_remaining)
+    {
+<span class="fc" id="L159">        int oldlen = _container_stack.length;</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        if ((_container_top + POS_STACK_STEP) &gt;= oldlen) {</span>
+<span class="fc" id="L161">            int newlen = oldlen * 2;</span>
+<span class="fc" id="L162">            long[] temp = new long[newlen];</span>
+<span class="fc" id="L163">            System.arraycopy(_container_stack, 0, temp, 0, oldlen);</span>
+<span class="fc" id="L164">            _container_stack = temp;</span>
+        }
+<span class="fc" id="L166">        _container_stack[_container_top + POS_OFFSET]  = position;</span>
+<span class="fc" id="L167">        long type_limit = local_remaining;</span>
+<span class="fc" id="L168">        type_limit &lt;&lt;= LIMIT_SHIFT;</span>
+<span class="fc" id="L169">        type_limit  |= (type &amp; TYPE_MASK);</span>
+<span class="fc" id="L170">        _container_stack[_container_top + TYPE_LIMIT_OFFSET] = type_limit;</span>
+<span class="fc" id="L171">        _container_top += POS_STACK_STEP;</span>
+<span class="fc" id="L172">    }</span>
+    private final long get_top_position() {
+<span class="pc bpc" id="L174" title="2 of 4 branches missed.">        assert(_container_top &gt; 0);</span>
+<span class="fc" id="L175">        long pos = _container_stack[(_container_top - POS_STACK_STEP) + POS_OFFSET];</span>
+<span class="fc" id="L176">        return pos;</span>
+    }
+    private final int get_top_type() {
+<span class="pc bpc" id="L179" title="2 of 4 branches missed.">        assert(_container_top &gt; 0);</span>
+<span class="fc" id="L180">        long type_limit = _container_stack[(_container_top - POS_STACK_STEP) + TYPE_LIMIT_OFFSET];</span>
+<span class="fc" id="L181">        int type = (int)(type_limit &amp; TYPE_MASK);</span>
+<span class="pc bpc" id="L182" title="2 of 4 branches missed.">        if (type &lt; 0 || type &gt; PrivateIonConstants.tidDATAGRAM) {</span>
+<span class="nc" id="L183">            throwErrorAt(&quot;invalid type id in parent stack&quot;);</span>
+        }
+<span class="fc" id="L185">        return type;</span>
+    }
+    private final int get_top_local_remaining() {
+<span class="pc bpc" id="L188" title="2 of 4 branches missed.">        assert(_container_top &gt; 0);</span>
+<span class="fc" id="L189">        long type_limit = _container_stack[_container_top - POS_STACK_STEP + TYPE_LIMIT_OFFSET];</span>
+<span class="fc" id="L190">        int  local_remaining = (int)((type_limit &gt;&gt; LIMIT_SHIFT) &amp; TYPE_MASK);</span>
+<span class="fc" id="L191">        return local_remaining;</span>
+    }
+    private final void pop() {
+<span class="pc bpc" id="L194" title="2 of 4 branches missed.">        assert(_container_top &gt; 0);</span>
+<span class="fc" id="L195">        _container_top -= POS_STACK_STEP;</span>
+<span class="fc" id="L196">    }</span>
+
+    boolean hasNext()
+    {
+<span class="pc bpc" id="L200" title="2 of 4 branches missed.">        if (!_eof &amp;&amp; _has_next_needed) {</span>
+            try {
+<span class="fc" id="L202">                has_next_helper_raw();</span>
+            }
+<span class="fc" id="L204">            catch (IOException e) {</span>
+<span class="nc" id="L205">                error(e);</span>
+<span class="fc" id="L206">            }</span>
+        }
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        return !_eof;</span>
+    }
+    public IonType next()
+    {
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (_eof) {</span>
+<span class="fc" id="L213">            return null;</span>
+        }
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">        if (_has_next_needed) {</span>
+            try {
+<span class="fc" id="L217">                has_next_helper_raw();</span>
+            }
+<span class="nc" id="L219">            catch (IOException e) {</span>
+<span class="nc" id="L220">                error(e);</span>
+<span class="fc" id="L221">            }</span>
+        }
+<span class="fc" id="L223">        _has_next_needed = true;</span>
+        // this should only be null here if we're at eof
+<span class="pc bpc" id="L225" title="2 of 6 branches missed.">        assert( _value_type != null || _eof == true);</span>
+<span class="fc" id="L226">        return _value_type;</span>
+    }
+    // from IonConstants
+    // public static final byte[] BINARY_VERSION_MARKER_1_0 =
+    //    { (byte) 0xE0,
+    //      (byte) 0x01,
+    //      (byte) 0x00,
+    //      (byte) 0xEA };
+<span class="fc" id="L234">    private static final int BINARY_VERSION_MARKER_TID = PrivateIonConstants.getTypeCode(PrivateIonConstants.BINARY_VERSION_MARKER_1_0[0] &amp; 0xff);</span>
+<span class="fc" id="L235">    private static final int BINARY_VERSION_MARKER_LEN = PrivateIonConstants.getLowNibble(PrivateIonConstants.BINARY_VERSION_MARKER_1_0[0] &amp; 0xff);</span>
+    private final void has_next_helper_raw() throws IOException
+    {
+<span class="fc" id="L238">        clear_value();</span>
+<span class="fc bfc" id="L239" title="All 4 branches covered.">        while (_value_tid == -1 &amp;&amp; !_eof) {</span>
+<span class="pc bpc" id="L240" title="2 of 6 branches missed.">            switch (_state) {</span>
+            case S_BEFORE_FIELD:
+<span class="pc bpc" id="L242" title="2 of 4 branches missed.">                assert _value_field_id == SymbolTable.UNKNOWN_SYMBOL_ID;</span>
+<span class="fc" id="L243">                _value_field_id = read_field_id();</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">                if (_value_field_id == UnifiedInputStreamX.EOF) {</span>
+                    // FIXME why is EOF ever okay in the middle of a struct?
+                    assert UnifiedInputStreamX.EOF == SymbolTable.UNKNOWN_SYMBOL_ID;
+<span class="fc" id="L247">                    _eof = true;</span>
+<span class="fc" id="L248">                    break;</span>
+                }
+                // fall through to try to read the type id right now
+            case S_BEFORE_TID:
+<span class="fc" id="L252">                _state = State.S_BEFORE_VALUE; // read_type_id may change this for null and bool values</span>
+<span class="fc" id="L253">                _value_tid = read_type_id();</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">                if (_value_tid == UnifiedInputStreamX.EOF) {</span>
+<span class="fc" id="L255">                    _state = State.S_EOF;</span>
+<span class="fc" id="L256">                    _eof = true;</span>
+<span class="fc" id="L257">                    break;</span>
+                }
+<span class="fc bfc" id="L259" title="All 2 branches covered.">                if (_value_tid == PrivateIonConstants.tidNopPad) {</span>
+                    // skips size of pad and resets State machine
+<span class="fc" id="L261">                    skip(_value_len);</span>
+<span class="fc" id="L262">                    clear_value();</span>
+<span class="fc" id="L263">                    break;</span>
+                }
+<span class="fc bfc" id="L265" title="All 2 branches covered.">                else if (_value_tid == PrivateIonConstants.tidTypedecl) {</span>
+<span class="pc bpc" id="L266" title="2 of 4 branches missed.">                    assert (_value_tid == (BINARY_VERSION_MARKER_TID &amp; 0xff)); // the bvm tid happens to be type decl</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">                    if (_value_len == BINARY_VERSION_MARKER_LEN ) {</span>
+                        // this isn't valid for any type descriptor except the first byte
+                        // of a 4 byte version marker - so lets read the rest
+<span class="fc" id="L270">                        load_version_marker();</span>
+<span class="fc" id="L271">                        _value_type = IonType.SYMBOL;</span>
+                    }
+                    else {
+                        // if it's not a bvm then it's an ordinary annotated value
+
+                        // The next call changes our positions to that of the
+                        // wrapped value, but we need to remember the overall
+                        // wrapper position.
+<span class="fc" id="L279">                        long wrapperStart = _position_start;</span>
+<span class="fc" id="L280">                        long wrapperLen   = _position_len;</span>
+
+<span class="fc" id="L282">                        _value_type = load_annotation_start_with_value_type();</span>
+
+                        // Wrapper and wrapped value should finish together!
+<span class="fc" id="L285">                        long wrapperFinish = wrapperStart + wrapperLen;</span>
+<span class="fc" id="L286">                        long wrappedValueFinish = _position_start + _position_len;</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">                        if (wrapperFinish != wrappedValueFinish) {</span>
+<span class="fc" id="L288">                            throw newErrorAt(String.format(&quot;Wrapper length mismatch: wrapper %s wrapped value %s&quot;, wrapperFinish, wrappedValueFinish));</span>
+                        }
+
+<span class="fc" id="L291">                        _position_start = wrapperStart;</span>
+<span class="fc" id="L292">                        _position_len   = wrapperLen;</span>
+<span class="fc" id="L293">                    }</span>
+                }
+                else {
+                    // if it's not a typedesc then we just get the IonType and we're done
+<span class="fc" id="L297">                    _value_type = get_iontype_from_tid(_value_tid);</span>
+                }
+<span class="fc" id="L299">                break;</span>
+            case S_BEFORE_VALUE:
+<span class="fc" id="L301">                skip(_value_len);</span>
+                // fall through to &quot;after value&quot;
+            case S_AFTER_VALUE:
+<span class="fc bfc" id="L304" title="All 2 branches covered.">                if (isInStruct()) {</span>
+<span class="fc" id="L305">                    _state = State.S_BEFORE_FIELD;</span>
+                }
+                else {
+<span class="fc" id="L308">                    _state = State.S_BEFORE_TID;</span>
+                }
+<span class="fc" id="L310">                break;</span>
+            case S_EOF:
+<span class="nc" id="L312">                break;</span>
+            default:
+<span class="nc" id="L314">                error(&quot;internal error: raw binary reader in invalid state!&quot;);</span>
+            }
+        }
+        // we always want to exit here
+<span class="fc" id="L318">        _has_next_needed = false;</span>
+<span class="fc" id="L319">        return;</span>
+    }
+    private final void load_version_marker() throws IOException
+    {
+<span class="fc bfc" id="L323" title="All 2 branches covered.">        for (int ii=1; ii&lt;PrivateIonConstants.BINARY_VERSION_MARKER_1_0.length; ii++) {</span>
+<span class="fc" id="L324">            int b = read();</span>
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">            if (b != (PrivateIonConstants.BINARY_VERSION_MARKER_1_0[ii] &amp; 0xff)) {</span>
+<span class="nc" id="L326">                throwErrorAt(&quot;invalid binary image&quot;);</span>
+            }
+        }
+        // so it's a 4 byte version marker - make it look like
+        // the symbol $ion_1_0 ...
+<span class="fc" id="L331">        _value_tid = PrivateIonConstants.tidSymbol;</span>
+<span class="fc" id="L332">        _value_len = 0; // so skip will go the right place - here</span>
+<span class="fc" id="L333">        _v.setValue(ION_1_0_SID);</span>
+<span class="fc" id="L334">        _v.setAuthoritativeType(AS_TYPE.int_value);</span>
+        // _value_type = IonType.SYMBOL;  we do this in the caller so it's easier to see
+<span class="fc" id="L336">        _value_is_null = false;</span>
+<span class="fc" id="L337">        _value_lob_is_ready = false;</span>
+<span class="fc" id="L338">        _annotations.clear();</span>
+<span class="fc" id="L339">        _value_field_id = SymbolTable.UNKNOWN_SYMBOL_ID;</span>
+<span class="fc" id="L340">        _state = State.S_AFTER_VALUE;</span>
+<span class="fc" id="L341">    }</span>
+    private final IonType load_annotation_start_with_value_type() throws IOException
+    {
+        IonType value_type;
+
+        // we need to skip over the annotations to read
+        // the actual type id byte for the value.  We'll
+        // save the annotations using a save point, which
+        // will pin the input buffers until we free this,
+        // not later than the next call to hasNext().
+
+<span class="fc" id="L352">        int alen = readVarUInt();</span>
+<span class="fc" id="L353">        _annotations.start(getPosition(), 0);</span>
+<span class="fc" id="L354">        skip(alen);</span>
+<span class="fc" id="L355">        _annotations.markEnd();</span>
+
+        // this will both get the type id and it will reset the
+        // length as well (over-writing the len + annotations value
+        // that is there now, before the call)
+<span class="fc" id="L360">        _value_tid = read_type_id();</span>
+<span class="fc bfc" id="L361" title="All 2 branches covered.">        if (_value_tid == PrivateIonConstants.tidNopPad) {</span>
+<span class="nc" id="L362">            throwErrorAt(&quot;NOP padding is not allowed within annotation wrappers.&quot;);</span>
+        }
+<span class="fc bfc" id="L364" title="All 2 branches covered.">        if (_value_tid == UnifiedInputStreamX.EOF) {</span>
+<span class="nc" id="L365">            throwErrorAt(&quot;unexpected EOF encountered where a type descriptor byte was expected&quot;);</span>
+        }
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        if (_value_tid == PrivateIonConstants.tidTypedecl) {</span>
+<span class="nc" id="L368">            throwErrorAt(&quot;An annotation wrapper may not contain another annotation wrapper.&quot;);</span>
+        }
+
+<span class="fc" id="L371">        value_type = get_iontype_from_tid(_value_tid);</span>
+<span class="pc bpc" id="L372" title="2 of 4 branches missed.">        assert( value_type != null );</span>
+
+<span class="fc" id="L374">        return value_type;</span>
+    }
+
+    protected final int load_annotations() {
+<span class="fc bfc" id="L378" title="All 2 branches covered.">        switch (_state) {</span>
+        case S_BEFORE_VALUE:
+        case S_AFTER_VALUE:
+<span class="fc bfc" id="L381" title="All 2 branches covered.">            if (_annotations.isDefined()) {</span>
+<span class="fc" id="L382">                int local_remaining_save = _local_remaining;</span>
+<span class="fc" id="L383">                _input._save_points.savePointPushActive(_annotations, getPosition(), 0);</span>
+<span class="fc" id="L384">                _local_remaining =  NO_LIMIT; // limit will be handled by the save point</span>
+<span class="fc" id="L385">                _annotation_count = 0;</span>
+
+                try {
+                    do {
+<span class="fc" id="L389">                        int a = readVarUIntOrEOF();</span>
+<span class="fc bfc" id="L390" title="All 2 branches covered.">                        if (a == UnifiedInputStreamX.EOF) {</span>
+<span class="fc" id="L391">                            break;</span>
+                        }
+<span class="fc" id="L393">                        load_annotation_append(a);</span>
+<span class="pc bpc" id="L394" title="1 of 2 branches missed.">                    } while (!isEOF());</span>
+                }
+<span class="nc" id="L396">                catch (IOException e) {</span>
+<span class="nc" id="L397">                    error(e);</span>
+<span class="fc" id="L398">                }</span>
+
+<span class="fc" id="L400">                _input._save_points.savePointPopActive(_annotations);</span>
+<span class="fc" id="L401">                _local_remaining = local_remaining_save;</span>
+<span class="fc" id="L402">                _annotations.clear();</span>
+<span class="fc" id="L403">            }</span>
+            // else the count stays zero (or it was previously set)
+            break;
+        default:
+<span class="fc" id="L407">            throw new IllegalStateException(&quot;annotations require the value to be ready&quot;);</span>
+        }
+<span class="fc" id="L409">        return _annotation_count;</span>
+    }
+
+    private final void load_annotation_append(int a)
+    {
+<span class="fc" id="L414">        int oldlen = _annotation_ids.length;</span>
+<span class="fc bfc" id="L415" title="All 2 branches covered.">        if (_annotation_count &gt;= oldlen) {</span>
+<span class="fc" id="L416">            int newlen = oldlen * 2;</span>
+<span class="fc" id="L417">            int[] temp = new int[newlen];</span>
+<span class="fc" id="L418">            System.arraycopy(_annotation_ids, 0, temp, 0, oldlen);</span>
+<span class="fc" id="L419">            _annotation_ids = temp;</span>
+        }
+<span class="fc" id="L421">        _annotation_ids[_annotation_count++] =  a;</span>
+<span class="fc" id="L422">    }</span>
+    private final void clear_value()
+    {
+<span class="fc" id="L425">        _value_type = null;</span>
+<span class="fc" id="L426">        _value_tid  = -1;</span>
+<span class="fc" id="L427">        _value_is_null = false;</span>
+<span class="fc" id="L428">        _value_lob_is_ready = false;</span>
+<span class="fc" id="L429">        _annotations.clear();</span>
+<span class="fc" id="L430">        _v.clear();</span>
+<span class="fc" id="L431">        _annotation_count = 0;</span>
+<span class="fc" id="L432">        _value_field_id = SymbolTable.UNKNOWN_SYMBOL_ID;</span>
+<span class="fc" id="L433">    }</span>
+
+    /**
+     * @return the field SID, or -1 if at EOF.
+     */
+    private final int read_field_id() throws IOException
+    {
+<span class="fc" id="L440">        int field_id = readVarUIntOrEOF();</span>
+<span class="fc" id="L441">        return field_id;</span>
+    }
+    private final int read_type_id() throws IOException
+    {
+<span class="fc" id="L445">        long start_of_tid   = _input.getPosition();</span>
+<span class="fc" id="L446">        long start_of_value = start_of_tid + 1;</span>
+
+<span class="fc" id="L448">        int td = read();</span>
+<span class="fc bfc" id="L449" title="All 2 branches covered.">        if (td &lt; 0) {</span>
+<span class="fc" id="L450">            return UnifiedInputStreamX.EOF;</span>
+        }
+<span class="fc" id="L452">        int tid = PrivateIonConstants.getTypeCode(td);</span>
+<span class="fc" id="L453">        int len = PrivateIonConstants.getLowNibble(td);</span>
+
+        // NOP Padding
+<span class="fc bfc" id="L456" title="All 4 branches covered.">        if (tid == PrivateIonConstants.tidNull &amp;&amp; len != PrivateIonConstants.lnIsNull) {</span>
+<span class="fc bfc" id="L457" title="All 2 branches covered.">            if (len == PrivateIonConstants.lnIsVarLen) {</span>
+<span class="fc" id="L458">                len = readVarUInt();</span>
+            }
+<span class="fc bfc" id="L460" title="All 2 branches covered.">            _state = _is_in_struct ? State.S_BEFORE_FIELD : State.S_BEFORE_TID;</span>
+<span class="fc" id="L461">            tid = PrivateIonConstants.tidNopPad; // override typeId to use Pad marker</span>
+        }
+<span class="fc bfc" id="L463" title="All 2 branches covered.">        else if (len == PrivateIonConstants.lnIsVarLen) {</span>
+<span class="fc" id="L464">            len = readVarUInt();</span>
+<span class="fc" id="L465">            start_of_value = _input.getPosition();</span>
+        }
+<span class="fc bfc" id="L467" title="All 2 branches covered.">        else if (tid == PrivateIonConstants.tidNull) {</span>
+<span class="fc" id="L468">            _value_is_null = true;</span>
+<span class="fc" id="L469">            len = 0;</span>
+<span class="fc" id="L470">            _state = State.S_AFTER_VALUE;</span>
+        }
+<span class="fc bfc" id="L472" title="All 2 branches covered.">        else if (len == PrivateIonConstants.lnIsNull) {</span>
+<span class="fc" id="L473">            _value_is_null = true;</span>
+<span class="fc" id="L474">            len = 0;</span>
+<span class="fc" id="L475">            _state = State.S_AFTER_VALUE;</span>
+        }
+<span class="fc bfc" id="L477" title="All 2 branches covered.">        else if (tid == PrivateIonConstants.tidBoolean) {</span>
+<span class="pc bpc" id="L478" title="1 of 3 branches missed.">            switch (len) {</span>
+                case PrivateIonConstants.lnBooleanFalse:
+<span class="fc" id="L480">                    _value_is_true = false;</span>
+<span class="fc" id="L481">                    break;</span>
+                case PrivateIonConstants.lnBooleanTrue:
+<span class="fc" id="L483">                    _value_is_true = true;</span>
+<span class="fc" id="L484">                    break;</span>
+                default:
+<span class="nc" id="L486">                    throwErrorAt(&quot;invalid length nibble in boolean value: &quot;+len);</span>
+                    break;
+            }
+<span class="fc" id="L489">            len = 0;</span>
+<span class="fc" id="L490">            _state = State.S_AFTER_VALUE;</span>
+        }
+<span class="fc bfc" id="L492" title="All 2 branches covered.">        else if (tid == PrivateIonConstants.tidStruct) {</span>
+<span class="fc bfc" id="L493" title="All 4 branches covered.">            if ((_struct_is_ordered = (len == 1))) {</span>
+                // special case of an ordered struct, it gets the
+                // otherwise impossible to have length of 1
+<span class="fc" id="L496">                len = readVarUInt();</span>
+<span class="fc bfc" id="L497" title="All 2 branches covered.">                if (len == 0) {</span>
+<span class="nc" id="L498">                    throwErrorAt(&quot;Structs flagged as having ordered keys must contain at least one key/value pair.&quot;);</span>
+                }
+<span class="fc" id="L500">                start_of_value = _input.getPosition();</span>
+            }
+        }
+<span class="fc" id="L503">        _value_tid = tid;</span>
+<span class="fc" id="L504">        _value_len = len;</span>
+<span class="fc" id="L505">        _position_len = len + (start_of_value - start_of_tid);</span>
+<span class="fc" id="L506">        _position_start = start_of_tid;</span>
+<span class="fc" id="L507">        return tid;</span>
+    }
+
+    private final IonType get_iontype_from_tid(int tid)
+    {
+<span class="fc" id="L512">        IonType t = null;</span>
+<span class="pc bpc" id="L513" title="2 of 15 branches missed.">        switch (tid) {</span>
+        case PrivateIonConstants.tidNull:      // 0
+<span class="fc" id="L515">            t = IonType.NULL;</span>
+<span class="fc" id="L516">            break;</span>
+        case PrivateIonConstants.tidBoolean:   // 1
+<span class="fc" id="L518">            t = IonType.BOOL;</span>
+<span class="fc" id="L519">            break;</span>
+        case PrivateIonConstants.tidPosInt:    // 2
+        case PrivateIonConstants.tidNegInt:    // 3
+<span class="fc" id="L522">            t = IonType.INT;</span>
+<span class="fc" id="L523">            break;</span>
+        case PrivateIonConstants.tidFloat:     // 4
+<span class="fc" id="L525">            t = IonType.FLOAT;</span>
+<span class="fc" id="L526">            break;</span>
+        case PrivateIonConstants.tidDecimal:   // 5
+<span class="fc" id="L528">            t = IonType.DECIMAL;</span>
+<span class="fc" id="L529">            break;</span>
+        case PrivateIonConstants.tidTimestamp: // 6
+<span class="fc" id="L531">            t = IonType.TIMESTAMP;</span>
+<span class="fc" id="L532">            break;</span>
+        case PrivateIonConstants.tidSymbol:    // 7
+<span class="fc" id="L534">            t = IonType.SYMBOL;</span>
+<span class="fc" id="L535">            break;</span>
+        case PrivateIonConstants.tidString:    // 8
+<span class="fc" id="L537">            t = IonType.STRING;</span>
+<span class="fc" id="L538">            break;</span>
+        case PrivateIonConstants.tidClob:      // 9
+<span class="fc" id="L540">            t = IonType.CLOB;</span>
+<span class="fc" id="L541">            break;</span>
+        case PrivateIonConstants.tidBlob:      // 10 A
+<span class="fc" id="L543">            t = IonType.BLOB;</span>
+<span class="fc" id="L544">            break;</span>
+        case PrivateIonConstants.tidList:      // 11 B
+<span class="fc" id="L546">            t = IonType.LIST;</span>
+<span class="fc" id="L547">            break;</span>
+        case PrivateIonConstants.tidSexp:      // 12 C
+<span class="fc" id="L549">            t = IonType.SEXP;</span>
+<span class="fc" id="L550">            break;</span>
+        case PrivateIonConstants.tidStruct:    // 13 D
+<span class="fc" id="L552">            t = IonType.STRUCT;</span>
+<span class="fc" id="L553">            break;</span>
+        case PrivateIonConstants.tidTypedecl:  // 14 E
+<span class="nc" id="L555">            t = null;  // we don't know yet</span>
+<span class="nc" id="L556">            break;</span>
+        default:
+<span class="nc" id="L558">            throw newErrorAt(&quot;unrecognized value type encountered: &quot;+tid);</span>
+        }
+<span class="fc" id="L560">        return t;</span>
+    }
+    public void stepIn()
+    {
+<span class="pc bpc" id="L564" title="2 of 4 branches missed.">        if (_value_type == null || _eof) {</span>
+<span class="nc" id="L565">            throw new IllegalStateException();</span>
+        }
+<span class="pc bpc" id="L567" title="1 of 2 branches missed.">        switch (_value_type) {</span>
+        case STRUCT:
+        case LIST:
+        case SEXP:
+<span class="fc" id="L571">            break;</span>
+        default:
+<span class="nc" id="L573">            throw new IllegalStateException();</span>
+        }
+<span class="fc bfc" id="L575" title="All 2 branches covered.">        if (_value_is_null) {</span>
+<span class="pc bpc" id="L576" title="1 of 2 branches missed.">            if (_state != State.S_AFTER_VALUE) {</span>
+<span class="nc bnc" id="L577" title="All 4 branches missed.">                assert( _state == State.S_AFTER_VALUE );</span>
+            }
+        }
+        else {
+<span class="pc bpc" id="L581" title="1 of 2 branches missed.">            if (_state != State.S_BEFORE_VALUE) {</span>
+<span class="nc bnc" id="L582" title="All 4 branches missed.">                assert( _state == State.S_BEFORE_VALUE );</span>
+            }
+        }
+        // first push place where we'll take up our next
+        // value processing when we step out
+<span class="fc" id="L587">        long curr_position = getPosition();</span>
+<span class="fc" id="L588">        long next_position = curr_position + _value_len;</span>
+<span class="fc" id="L589">        int  next_remaining = _local_remaining;</span>
+<span class="fc bfc" id="L590" title="All 2 branches covered.">        if (next_remaining != NO_LIMIT) {</span>
+<span class="fc" id="L591">            next_remaining -= _value_len;</span>
+<span class="pc bpc" id="L592" title="1 of 2 branches missed.">            if (next_remaining &lt; 0) {</span>
+<span class="nc" id="L593">                next_remaining = 0; // we'll see and EOF down the road  TODO: should we error now?</span>
+            }
+        }
+<span class="fc" id="L596">        push(_parent_tid, next_position, next_remaining);</span>
+<span class="fc bfc" id="L597" title="All 2 branches covered.">        _is_in_struct = (_value_tid == PrivateIonConstants.tidStruct);</span>
+<span class="fc" id="L598">        _local_remaining = _value_len;</span>
+<span class="fc bfc" id="L599" title="All 2 branches covered.">        _state = _is_in_struct ? State.S_BEFORE_FIELD : State.S_BEFORE_TID;</span>
+<span class="fc" id="L600">        _parent_tid = _value_tid;</span>
+<span class="fc" id="L601">        clear_value();</span>
+<span class="fc" id="L602">        _has_next_needed = true;</span>
+<span class="fc" id="L603">    }</span>
+    public void stepOut()
+    {
+<span class="fc bfc" id="L606" title="All 2 branches covered.">        if (getDepth() &lt; 1) {</span>
+<span class="fc" id="L607">            throw new IllegalStateException(IonMessages.CANNOT_STEP_OUT);</span>
+        }
+        // first we get the top values, then we
+        // pop them all off in one fell swoop.
+<span class="fc" id="L611">        long next_position   = get_top_position();</span>
+<span class="fc" id="L612">        int  local_remaining = get_top_local_remaining();</span>
+<span class="fc" id="L613">        int  parent_tid      = get_top_type();</span>
+<span class="fc" id="L614">        pop();</span>
+<span class="fc" id="L615">        _eof = false;</span>
+<span class="fc" id="L616">        _parent_tid = parent_tid;</span>
+        // later, only after we've skipped to our new location: _local_remaining = local_remaining;
+<span class="fc bfc" id="L618" title="All 2 branches covered.">        if (_parent_tid == PrivateIonConstants.tidStruct) {</span>
+<span class="fc" id="L619">            _is_in_struct = true;</span>
+<span class="fc" id="L620">            _state = State.S_BEFORE_FIELD;</span>
+        }
+        else {
+<span class="fc" id="L623">            _is_in_struct = false;</span>
+<span class="fc" id="L624">            _state = State.S_BEFORE_TID;</span>
+        }
+<span class="fc" id="L626">        _has_next_needed = true;</span>
+
+<span class="fc" id="L628">        clear_value();</span>
+
+<span class="fc" id="L630">        long curr_position = getPosition();</span>
+<span class="fc bfc" id="L631" title="All 2 branches covered.">        if (next_position &gt; curr_position) {</span>
+            try {
+<span class="fc" id="L633">                long distance = next_position - curr_position;</span>
+<span class="fc" id="L634">                int  max_skip = Integer.MAX_VALUE - 1; // -1 just in case</span>
+<span class="pc bpc" id="L635" title="1 of 2 branches missed.">                while (distance &gt; max_skip) {</span>
+<span class="nc" id="L636">                    skip(max_skip);</span>
+<span class="nc" id="L637">                    distance -= max_skip;</span>
+                }
+<span class="pc bpc" id="L639" title="1 of 2 branches missed.">                if (distance &gt; 0) {</span>
+<span class="pc bpc" id="L640" title="2 of 4 branches missed.">                    assert( distance &lt; Integer.MAX_VALUE );</span>
+<span class="fc" id="L641">                    skip((int)distance);</span>
+                }
+            }
+<span class="nc" id="L644">            catch (IOException e) {</span>
+<span class="nc" id="L645">                error(e);</span>
+<span class="pc" id="L646">            }</span>
+        }
+<span class="pc bpc" id="L648" title="1 of 2 branches missed.">        else if (next_position &lt; curr_position) {</span>
+<span class="nc" id="L649">            String message = &quot;invalid position during stepOut, current position &quot;</span>
+                           + curr_position
+                           + &quot; next value at &quot;
+                           + next_position;
+<span class="nc" id="L653">            error(message);</span>
+        }
+<span class="pc bpc" id="L655" title="2 of 4 branches missed.">        assert(next_position == getPosition());</span>
+<span class="fc" id="L656">        _local_remaining = local_remaining;</span>
+<span class="fc" id="L657">    }</span>
+    public int byteSize()
+    {
+        int len;
+<span class="pc bpc" id="L661" title="1 of 2 branches missed.">        switch (_value_type) {</span>
+        case BLOB:
+        case CLOB:
+<span class="fc" id="L664">            break;</span>
+        default:
+<span class="nc" id="L666">            throw new IllegalStateException(&quot;only valid for LOB values&quot;);</span>
+        }
+<span class="fc bfc" id="L668" title="All 2 branches covered.">        if (!_value_lob_is_ready) {</span>
+<span class="pc bpc" id="L669" title="1 of 2 branches missed.">            if (_value_is_null) {</span>
+<span class="nc" id="L670">                len = 0;</span>
+            }
+            else {
+<span class="fc" id="L673">                len = _value_len;</span>
+            }
+<span class="fc" id="L675">            _value_lob_remaining = len;</span>
+<span class="fc" id="L676">            _value_lob_is_ready = true;</span>
+        }
+<span class="fc" id="L678">        return _value_lob_remaining;</span>
+    }
+    public byte[] newBytes()
+    {
+<span class="fc" id="L682">        int len = byteSize(); // does out validation for us</span>
+        byte[] bytes;
+<span class="pc bpc" id="L684" title="1 of 2 branches missed.">        if (_value_is_null) {</span>
+<span class="nc" id="L685">            bytes = null;</span>
+        }
+        else {
+<span class="fc" id="L688">            bytes = new byte[len];</span>
+<span class="fc" id="L689">            getBytes(bytes, 0, len);</span>
+        }
+<span class="fc" id="L691">        return bytes;</span>
+    }
+    public int getBytes(byte[] buffer, int offset, int len)
+    {
+<span class="fc" id="L695">        int value_len = byteSize(); // again validation</span>
+<span class="pc bpc" id="L696" title="1 of 2 branches missed.">        if (value_len &gt; len) {</span>
+<span class="nc" id="L697">            value_len = len;</span>
+        }
+<span class="fc" id="L699">        int read_len = readBytes(buffer, offset, value_len);</span>
+<span class="fc" id="L700">        return read_len;</span>
+    }
+    public int readBytes(byte[] buffer, int offset, int len)
+    {
+<span class="pc bpc" id="L704" title="2 of 4 branches missed.">        if (offset &lt; 0 || len &lt; 0) {</span>
+<span class="nc" id="L705">            throw new IllegalArgumentException();</span>
+        }
+<span class="fc" id="L707">        int value_len = byteSize(); // again validation</span>
+<span class="pc bpc" id="L708" title="1 of 2 branches missed.">        if (_value_lob_remaining &gt; len) {</span>
+<span class="nc" id="L709">            len = _value_lob_remaining;</span>
+        }
+<span class="fc bfc" id="L711" title="All 2 branches covered.">        if (len &lt; 1) {</span>
+<span class="fc" id="L712">            return 0;</span>
+        }
+        int read_len;
+        try {
+<span class="fc" id="L716">            read_len = read(buffer, offset, value_len);</span>
+<span class="fc" id="L717">            _value_lob_remaining -= read_len;</span>
+        }
+<span class="nc" id="L719">        catch (IOException e) {</span>
+<span class="nc" id="L720">            read_len = -1;</span>
+<span class="nc" id="L721">            error(e);</span>
+<span class="fc" id="L722">        }</span>
+<span class="fc bfc" id="L723" title="All 2 branches covered.">        if (_value_lob_remaining == 0) {</span>
+<span class="fc" id="L724">            _state = State.S_AFTER_VALUE;</span>
+        }
+        else {
+<span class="fc" id="L727">            _value_len = _value_lob_remaining;</span>
+        }
+<span class="fc" id="L729">        return read_len;</span>
+    }
+    public int getDepth()
+    {
+<span class="fc" id="L733">        return (_container_top / POS_STACK_STEP);</span>
+    }
+    public IonType getType()
+    {
+        //if (_has_next_needed) {
+        //    throw new IllegalStateException(&quot;getType() isn't valid until you have called next()&quot;);
+        //}
+<span class="fc" id="L740">        return _value_type;</span>
+    }
+    public boolean isInStruct()
+    {
+<span class="fc" id="L744">        return _is_in_struct;</span>
+    }
+    public boolean isNullValue()
+    {
+<span class="nc" id="L748">        return _value_is_null;</span>
+    }
+    //
+    //  helper read routines - these were lifted
+    //  from SimpleByteBuffer.SimpleByteReader
+    //
+    private final int read() throws IOException
+    {
+<span class="fc bfc" id="L756" title="All 2 branches covered.">        if (_local_remaining != NO_LIMIT) {</span>
+<span class="fc bfc" id="L757" title="All 2 branches covered.">            if (_local_remaining &lt; 1) {</span>
+<span class="fc" id="L758">                return UnifiedInputStreamX.EOF;</span>
+            }
+<span class="fc" id="L760">            _local_remaining--;</span>
+        }
+<span class="fc" id="L762">        return _input.read();</span>
+    }
+    private final int read(byte[] dst, int start, int len) throws IOException
+    {
+<span class="pc bpc" id="L766" title="4 of 8 branches missed.">        if (dst == null || start &lt; 0 || len &lt; 0 || start + len &gt; dst.length) {</span>
+            // no need to test this start &gt;= dst.length ||
+            // since we test start+len &gt; dst.length which is the correct test
+<span class="nc" id="L769">            throw new IllegalArgumentException();</span>
+        }
+        int read;
+<span class="fc bfc" id="L772" title="All 2 branches covered.">        if (_local_remaining == NO_LIMIT) {</span>
+<span class="fc" id="L773">            read = _input.read(dst, start, len);</span>
+        }
+        else {
+<span class="pc bpc" id="L776" title="1 of 2 branches missed.">            if (len &gt; _local_remaining) {</span>
+<span class="nc bnc" id="L777" title="All 2 branches missed.">                if (_local_remaining &lt; 1) {</span>
+<span class="nc" id="L778">                    throwUnexpectedEOFException();</span>
+                }
+<span class="nc" id="L780">                len = _local_remaining;</span>
+            }
+<span class="fc" id="L782">            read = _input.read(dst, start, len);</span>
+<span class="fc" id="L783">            _local_remaining -= read;</span>
+        }
+<span class="fc" id="L785">        return read;</span>
+    }
+    /**
+     * Uses {@link #read(byte[], int, int)} until the entire length is read.
+     * This method will block until the request is satisfied.
+     *
+     * @param buf       The buffer to read to.
+     * @param offset    The offset of the buffer to read from.
+     * @param len       The length of the data to read.
+     */
+    public void readAll(byte[] buf, int offset, int len) throws IOException
+    {
+<span class="fc" id="L797">        int rem = len;</span>
+<span class="fc bfc" id="L798" title="All 2 branches covered.">        while (rem &gt; 0)</span>
+        {
+<span class="fc" id="L800">            int amount = read(buf, offset, rem);</span>
+<span class="fc bfc" id="L801" title="All 2 branches covered.">            if (amount &lt;= 0)</span>
+            {
+<span class="nc" id="L803">                throwUnexpectedEOFException();</span>
+            }
+<span class="fc" id="L805">            rem -= amount;</span>
+<span class="fc" id="L806">            offset += amount;</span>
+<span class="fc" id="L807">        }</span>
+<span class="fc" id="L808">    }</span>
+    private final boolean isEOF() {
+<span class="fc bfc" id="L810" title="All 2 branches covered.">        if (_local_remaining &gt; 0) return false;</span>
+<span class="fc bfc" id="L811" title="All 2 branches covered.">        if (_local_remaining == NO_LIMIT) {</span>
+<span class="fc" id="L812">            return _input.isEOF();</span>
+        }
+<span class="fc" id="L814">        return true;</span>
+    }
+    private final long getPosition() {
+<span class="fc" id="L817">        long pos = _input.getPosition();</span>
+<span class="fc" id="L818">        return pos;</span>
+    }
+    private final void skip(int len) throws IOException
+    {
+<span class="pc bpc" id="L822" title="1 of 2 branches missed.">        if (len &lt; 0) {</span>
+            // no need to test this start &gt;= dst.length ||
+            // since we test start+len &gt; dst.length which is the correct test
+<span class="nc" id="L825">            throw new IllegalArgumentException();</span>
+        }
+<span class="fc bfc" id="L827" title="All 2 branches covered.">        if (_local_remaining == NO_LIMIT) {</span>
+<span class="fc" id="L828">            _input.skip(len);</span>
+        }
+        else {
+<span class="pc bpc" id="L831" title="1 of 2 branches missed.">            if (len &gt; _local_remaining) {</span>
+<span class="nc bnc" id="L832" title="All 2 branches missed.">                if (_local_remaining &lt; 1) {</span>
+<span class="nc" id="L833">                    throwUnexpectedEOFException();</span>
+                }
+<span class="nc" id="L835">                len = _local_remaining;</span>
+            }
+<span class="fc" id="L837">            _input.skip(len);</span>
+<span class="fc" id="L838">            _local_remaining -= len;</span>
+        }
+<span class="fc" id="L840">        return;</span>
+    }
+    protected final long readULong(int len) throws IOException
+    {
+<span class="fc" id="L844">        long    retvalue = 0;</span>
+        int b;
+<span class="pc bpc" id="L846" title="1 of 10 branches missed.">        switch (len) {</span>
+        default:
+<span class="nc" id="L848">            throw new IonException(&quot;value too large for Java long&quot;);</span>
+        case 8:
+<span class="pc bpc" id="L850" title="1 of 2 branches missed.">            if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="fc" id="L851">            retvalue = (retvalue &lt;&lt; 8) | b;</span>
+        case 7:
+<span class="pc bpc" id="L853" title="1 of 2 branches missed.">            if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="fc" id="L854">            retvalue = (retvalue &lt;&lt; 8) | b;</span>
+        case 6:
+<span class="pc bpc" id="L856" title="1 of 2 branches missed.">            if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="fc" id="L857">            retvalue = (retvalue &lt;&lt; 8) | b;</span>
+        case 5:
+<span class="pc bpc" id="L859" title="1 of 2 branches missed.">            if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="fc" id="L860">            retvalue = (retvalue &lt;&lt; 8) | b;</span>
+        case 4:
+<span class="pc bpc" id="L862" title="1 of 2 branches missed.">            if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="fc" id="L863">            retvalue = (retvalue &lt;&lt; 8) | b;</span>
+        case 3:
+<span class="pc bpc" id="L865" title="1 of 2 branches missed.">            if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="fc" id="L866">            retvalue = (retvalue &lt;&lt; 8) | b;</span>
+        case 2:
+<span class="pc bpc" id="L868" title="1 of 2 branches missed.">            if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="fc" id="L869">            retvalue = (retvalue &lt;&lt; 8) | b;</span>
+        case 1:
+<span class="pc bpc" id="L871" title="1 of 2 branches missed.">            if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="fc" id="L872">            retvalue = (retvalue &lt;&lt; 8) | b;</span>
+        case 0:
+            // do nothing, it's just a 0 length is a 0 value
+        }
+<span class="fc" id="L876">        return retvalue;</span>
+    }
+    protected final BigInteger readBigInteger(int len, boolean is_negative) throws IOException
+    {
+        BigInteger value;
+<span class="pc bpc" id="L881" title="1 of 2 branches missed.">        if (len &gt; 0) {</span>
+<span class="fc" id="L882">            byte[] bits = new byte[len];</span>
+<span class="fc" id="L883">            readAll(bits, 0, len);</span>
+<span class="fc bfc" id="L884" title="All 2 branches covered.">            int signum = is_negative ? -1 : 1;</span>
+<span class="fc" id="L885">            value = new BigInteger(signum, bits);</span>
+<span class="fc" id="L886">        }</span>
+        else {
+<span class="nc" id="L888">            value = BigInteger.ZERO;</span>
+        }
+<span class="fc" id="L890">        return value;</span>
+    }
+
+    protected final int readVarInt() throws IOException
+    {
+<span class="fc" id="L895">        return readVarInt(read());</span>
+    }
+
+    /**
+     * Reads an integer value, returning null to mean -0.
+     * @throws IOException
+     */
+    protected final Integer readVarInteger() throws IOException
+    {
+<span class="fc" id="L904">        int firstByte = read();</span>
+
+        // if byte represents -0 returns null
+<span class="fc bfc" id="L907" title="All 2 branches covered.">        if (firstByte == 0xC0) {</span>
+<span class="fc" id="L908">            return null;</span>
+        }
+
+<span class="fc" id="L911">        return readVarInt(firstByte);</span>
+    }
+
+    /**
+     * reads a varInt after the first byte was read. The first byte is used to specify the sign and -0 has different
+     * representation on the protected API that was called
+     *
+     * @param firstByte last varInt octet
+     */
+    private int readVarInt(int firstByte) throws IOException {
+        // VarInt uses the high-order bit of the last octet as a marker; some (but not all) 5-byte VarInts can fit
+        // into a Java int.
+        // To validate overflows we accumulate the VarInt in a long and then check if it can be represented by an int
+        //
+        // see http://amzn.github.io/ion-docs/docs/binary.html#varuint-and-varint-fields
+
+<span class="fc" id="L927">        long retValue = 0;</span>
+<span class="fc" id="L928">        int b = firstByte;</span>
+<span class="fc" id="L929">        boolean isNegative = false;</span>
+
+        for (;;) {
+<span class="pc bpc" id="L932" title="1 of 2 branches missed.">            if (b &lt; 0) throwUnexpectedEOFException();</span>
+
+<span class="fc bfc" id="L934" title="All 2 branches covered.">            if ((b &amp; 0x40) != 0) {</span>
+<span class="fc" id="L935">                isNegative = true;</span>
+            }
+<span class="fc" id="L937">            retValue = (b &amp; 0x3F);</span>
+<span class="fc bfc" id="L938" title="All 2 branches covered.">            if ((b &amp; 0x80) != 0) break;</span>
+
+<span class="pc bpc" id="L940" title="1 of 2 branches missed.">            if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="fc" id="L941">            retValue = (retValue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="fc bfc" id="L942" title="All 2 branches covered.">            if ((b &amp; 0x80) != 0) break;</span>
+            // for the rest, they're all the same
+
+<span class="pc bpc" id="L945" title="1 of 2 branches missed.">            if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="fc" id="L946">            retValue = (retValue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="fc bfc" id="L947" title="All 2 branches covered.">            if ((b &amp; 0x80) != 0) break;</span>
+            // for the rest, they're all the same
+
+<span class="pc bpc" id="L950" title="1 of 2 branches missed.">            if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="fc" id="L951">            retValue = (retValue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="fc bfc" id="L952" title="All 2 branches covered.">            if ((b &amp; 0x80) != 0) break;</span>
+            // for the rest, they're all the same
+
+<span class="pc bpc" id="L955" title="1 of 2 branches missed.">            if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="fc" id="L956">            retValue = (retValue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="pc bpc" id="L957" title="1 of 2 branches missed.">            if ((b &amp; 0x80) != 0) break;</span>
+
+            // Don't support anything above a 5-byte VarInt for now, see https://github.com/amzn/ion-java/issues/146
+<span class="nc" id="L960">            throwVarIntOverflowException();</span>
+        }
+
+<span class="fc bfc" id="L963" title="All 2 branches covered.">        if (isNegative) {</span>
+<span class="fc" id="L964">            retValue = -retValue;</span>
+        }
+
+<span class="fc" id="L967">        int retValueAsInt = (int) retValue;</span>
+<span class="fc bfc" id="L968" title="All 2 branches covered.">        if (retValue != ((long) retValueAsInt)) {</span>
+<span class="nc" id="L969">            throwVarIntOverflowException();</span>
+        }
+
+<span class="fc" id="L972">        return retValueAsInt;</span>
+    }
+
+    protected final int readVarUIntOrEOF() throws IOException
+    {
+        // VarUInt uses the high-order bit of the last octet as a marker; some (but not all) 5-byte VarUInt can fit
+        // into a Java int.
+        // To validate overflows we accumulate the VarInt in a long and then check if it can be represented by an int
+        //
+        // see http://amzn.github.io/ion-docs/docs/binary.html#varuint-and-varint-fields
+
+<span class="fc" id="L983">        long retvalue = 0;</span>
+        int  b;
+        for (;;) { // fake loop to create a &quot;goto done&quot;
+<span class="fc bfc" id="L986" title="All 2 branches covered.">            if ((b = read()) &lt; 0) {</span>
+<span class="fc" id="L987">                return UnifiedInputStreamX.EOF;</span>
+            }
+<span class="fc" id="L989">            retvalue = (retvalue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="fc bfc" id="L990" title="All 2 branches covered.">            if ((b &amp; 0x80) != 0) break;</span>
+
+<span class="pc bpc" id="L992" title="1 of 2 branches missed.">            if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="fc" id="L993">            retvalue = (retvalue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="fc bfc" id="L994" title="All 2 branches covered.">            if ((b &amp; 0x80) != 0) break;</span>
+
+<span class="pc bpc" id="L996" title="1 of 2 branches missed.">            if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="fc" id="L997">            retvalue = (retvalue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="fc bfc" id="L998" title="All 2 branches covered.">            if ((b &amp; 0x80) != 0) break;</span>
+
+<span class="pc bpc" id="L1000" title="1 of 2 branches missed.">            if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="fc" id="L1001">            retvalue = (retvalue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="fc bfc" id="L1002" title="All 2 branches covered.">            if ((b &amp; 0x80) != 0) break;</span>
+
+<span class="pc bpc" id="L1004" title="1 of 2 branches missed.">            if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="fc" id="L1005">            retvalue = (retvalue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="pc bpc" id="L1006" title="1 of 2 branches missed.">            if ((b &amp; 0x80) != 0) break;</span>
+
+            // Don't support anything above a 5-byte VarUInt for now, see https://github.com/amzn/ion-java/issues/146
+<span class="nc" id="L1009">            throwVarIntOverflowException();</span>
+        }
+
+<span class="fc" id="L1012">        int retValueAsInt = (int) retvalue;</span>
+<span class="fc bfc" id="L1013" title="All 2 branches covered.">        if (retvalue != ((long) retValueAsInt)) {</span>
+<span class="nc" id="L1014">            throwVarIntOverflowException();</span>
+        }
+
+<span class="fc" id="L1017">        return retValueAsInt;</span>
+    }
+
+    protected final int readVarUInt() throws IOException
+    {
+<span class="fc" id="L1022">        int varUInt = readVarUIntOrEOF();</span>
+<span class="fc bfc" id="L1023" title="All 2 branches covered.">        if (varUInt == UnifiedInputStreamX.EOF) {</span>
+<span class="nc" id="L1024">            throwUnexpectedEOFException();</span>
+        }
+
+<span class="fc" id="L1027">        return varUInt;</span>
+    }
+    protected final double readFloat(int len) throws IOException
+    {
+<span class="pc bpc" id="L1031" title="1 of 2 branches missed.">        if (len == 0)</span>
+        {
+            // special case, return pos zero
+<span class="nc" id="L1034">            return 0.0d;</span>
+        }
+<span class="pc bpc" id="L1036" title="1 of 4 branches missed.">        if (len != 4 &amp;&amp; len != 8)</span>
+        {
+<span class="nc" id="L1038">            throw new IOException(&quot;Length of float read must be 0, 4, or 8&quot;);</span>
+        }
+
+<span class="fc" id="L1041">        long dBits = this.readULong(len);</span>
+
+<span class="fc bfc" id="L1043" title="All 2 branches covered.">        return len == 4</span>
+<span class="fc" id="L1044">            ? (double) Float.intBitsToFloat((int) (dBits &amp; 0xffffffffL))</span>
+<span class="fc" id="L1045">            : Double.longBitsToDouble(dBits);</span>
+    }
+
+    protected final Decimal readDecimal(int len) throws IOException
+    {
+<span class="fc" id="L1050">        MathContext mathContext = MathContext.UNLIMITED;</span>
+        Decimal bd;
+        // we only write out the '0' value as the nibble 0
+<span class="fc bfc" id="L1053" title="All 2 branches covered.">        if (len == 0) {</span>
+<span class="fc" id="L1054">            bd = Decimal.valueOf(0, mathContext);</span>
+        }
+        else {
+            // otherwise we to it the hard way ....
+<span class="fc" id="L1058">            int  save_limit = _local_remaining - len;</span>
+<span class="fc" id="L1059">            _local_remaining = len;</span>
+<span class="fc" id="L1060">            int  exponent = readVarInt();</span>
+            BigInteger value;
+            int signum;
+<span class="fc bfc" id="L1063" title="All 2 branches covered.">            if (_local_remaining &gt; 0)</span>
+            {
+<span class="fc" id="L1065">                byte[] bits = new byte[_local_remaining];</span>
+<span class="fc" id="L1066">                readAll(bits, 0, _local_remaining);</span>
+<span class="fc" id="L1067">                signum = 1;</span>
+<span class="fc bfc" id="L1068" title="All 2 branches covered.">                if (bits[0] &lt; 0)</span>
+                {
+                    // value is negative, clear the sign
+<span class="fc" id="L1071">                    bits[0] &amp;= 0x7F;</span>
+<span class="fc" id="L1072">                    signum = -1;</span>
+                }
+<span class="fc" id="L1074">                value = new BigInteger(signum, bits);</span>
+<span class="fc" id="L1075">            }</span>
+            else {
+<span class="fc" id="L1077">                signum = 0;</span>
+<span class="fc" id="L1078">                value = BigInteger.ZERO;</span>
+            }
+            // Ion stores exponent, BigDecimal uses the negation &quot;scale&quot;
+<span class="fc" id="L1081">            int scale = -exponent;</span>
+<span class="fc bfc" id="L1082" title="All 4 branches covered.">            if (value.signum() == 0 &amp;&amp; signum == -1)</span>
+            {
+<span class="pc bpc" id="L1084" title="2 of 4 branches missed.">                assert value.equals(BigInteger.ZERO);</span>
+<span class="fc" id="L1085">                bd = Decimal.negativeZero(scale, mathContext);</span>
+            }
+            else
+            {
+<span class="fc" id="L1089">                bd = Decimal.valueOf(value, scale, mathContext);</span>
+            }
+<span class="fc" id="L1091">            _local_remaining = save_limit;</span>
+        }
+<span class="fc" id="L1093">        return bd;</span>
+    }
+
+    protected final Timestamp readTimestamp(int len) throws IOException
+    {
+<span class="pc bpc" id="L1098" title="1 of 2 branches missed.">        if (len &lt; 1) {</span>
+            // nothing to do here - and the timestamp will be NULL
+<span class="nc" id="L1100">            return null;</span>
+        }
+
+<span class="fc" id="L1103">        int         year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0;</span>
+<span class="fc" id="L1104">        BigDecimal  frac = null;</span>
+<span class="fc" id="L1105">        int         save_limit = _local_remaining - len;</span>
+<span class="fc" id="L1106">        _local_remaining = len;  // &gt; 0</span>
+
+        // first up is the offset, which requires a special int reader
+        // to return the -0 as a null Integer
+<span class="fc" id="L1110">        Integer offset = readVarInteger();</span>
+        // now we'll read the struct values from the input stream
+
+        // year is from 0001 to 9999
+        // or 0x1 to 0x270F or 14 bits - 1 or 2 bytes
+<span class="fc" id="L1115">        year  = readVarUInt();</span>
+<span class="fc" id="L1116">        Precision p = Precision.YEAR; // our lowest significant option</span>
+
+        // now we look for hours and minutes
+<span class="fc bfc" id="L1119" title="All 2 branches covered.">        if (_local_remaining &gt; 0) {</span>
+<span class="fc" id="L1120">            month = readVarUInt();</span>
+<span class="fc" id="L1121">            p = Precision.MONTH;</span>
+
+            // now we look for hours and minutes
+<span class="fc bfc" id="L1124" title="All 2 branches covered.">            if (_local_remaining &gt; 0) {</span>
+<span class="fc" id="L1125">                day   = readVarUInt();</span>
+<span class="fc" id="L1126">                p = Precision.DAY; // our lowest significant option</span>
+
+                // now we look for hours and minutes
+<span class="fc bfc" id="L1129" title="All 2 branches covered.">                if (_local_remaining &gt; 0) {</span>
+<span class="fc" id="L1130">                    hour   = readVarUInt();</span>
+<span class="fc" id="L1131">                    minute = readVarUInt();</span>
+<span class="fc" id="L1132">                    p = Precision.MINUTE;</span>
+<span class="fc bfc" id="L1133" title="All 2 branches covered.">                    if (_local_remaining &gt; 0) {</span>
+<span class="fc" id="L1134">                        second = readVarUInt();</span>
+<span class="fc" id="L1135">                        p = Precision.SECOND;</span>
+<span class="fc bfc" id="L1136" title="All 2 branches covered.">                        if (_local_remaining &gt; 0) {</span>
+                            // now we read in our actual &quot;milliseconds since the epoch&quot;
+<span class="fc" id="L1138">                            frac = readDecimal(_local_remaining);</span>
+                        }
+                    }
+                }
+            }
+        }
+        // restore out outer limit(s)
+<span class="fc" id="L1145">        _local_remaining  = save_limit;</span>
+        // now we let timestamp put it all together
+        try {
+            @SuppressWarnings(&quot;deprecation&quot;)
+<span class="fc" id="L1149">            Timestamp val =</span>
+<span class="fc" id="L1150">                Timestamp.createFromUtcFields(p, year, month, day, hour,</span>
+                                              minute, second, frac, offset);
+<span class="fc" id="L1152">            return val;</span>
+        }
+<span class="fc" id="L1154">        catch (IllegalArgumentException e)</span>
+        {
+            // Rewrap to the expected type.
+<span class="fc" id="L1157">            throw newErrorAt(&quot;Invalid timestamp encoding: &quot; + e.getMessage());</span>
+        }
+    }
+
+    protected final String readString(int len) throws IOException
+    {
+        // len is bytes, which is greater than or equal to java
+        // chars even after utf8 to utf16 decoding nonsense
+        // the char array is way faster than using string buffer
+<span class="fc" id="L1166">        char[] chars = new char[len];</span>
+<span class="fc" id="L1167">        int    c, ii = 0;</span>
+<span class="fc" id="L1168">        int    save_limit = _local_remaining - len;</span>
+<span class="fc" id="L1169">        _local_remaining = len;</span>
+<span class="fc bfc" id="L1170" title="All 2 branches covered.">        while (!isEOF()) {</span>
+<span class="fc" id="L1171">            c = readUnicodeScalar();</span>
+<span class="pc bpc" id="L1172" title="1 of 2 branches missed.">            if (c &lt; 0) throwUnexpectedEOFException();</span>
+<span class="fc bfc" id="L1173" title="All 2 branches covered.">            if (c &lt; 0x10000) {</span>
+<span class="fc" id="L1174">                chars[ii++] = (char)c;</span>
+            }
+            else { // when c is &gt;= 0x10000 we need surrogate encoding
+<span class="fc" id="L1177">                chars[ii++] = (char)PrivateIonConstants.makeHighSurrogate(c);</span>
+<span class="fc" id="L1178">                chars[ii++] = (char)PrivateIonConstants.makeLowSurrogate(c);</span>
+            }
+        }
+<span class="fc" id="L1181">        _local_remaining = save_limit;</span>
+<span class="fc" id="L1182">        return new String(chars, 0, ii);</span>
+    }
+    private final int readUnicodeScalar() throws IOException
+    {
+<span class="fc" id="L1186">        int c = -1, b;</span>
+<span class="fc" id="L1187">        b = read();</span>
+        // ascii is all good, even -1 (eof)
+<span class="fc bfc" id="L1189" title="All 2 branches covered.">        if (IonUTF8.isOneByteUTF8(b)) {</span>
+<span class="fc" id="L1190">            return b;</span>
+        }
+<span class="pc bpc" id="L1192" title="1 of 4 branches missed.">        switch(IonUTF8.getUTF8LengthFromFirstByte(b)) {</span>
+        case 2:
+            // now we start gluing the multi-byte value together
+<span class="pc bpc" id="L1195" title="2 of 4 branches missed.">            assert((b &amp; 0xe0) == 0xc0);</span>
+            // for values from 0x80 to 0x7FF (all legal)
+<span class="fc" id="L1197">            int b2 = read();</span>
+<span class="pc bpc" id="L1198" title="1 of 2 branches missed.">            if (!IonUTF8.isContinueByteUTF8(b2)) throwUTF8Exception();</span>
+<span class="fc" id="L1199">            c = IonUTF8.twoByteScalar(b, b2);</span>
+<span class="fc" id="L1200">            break;</span>
+        case 3:
+<span class="pc bpc" id="L1202" title="2 of 4 branches missed.">            assert((b &amp; 0xf0) == 0xe0);</span>
+            // for values from 0x800 to 0xFFFFF (NOT all legal)
+<span class="fc" id="L1204">            b2 = read();</span>
+<span class="pc bpc" id="L1205" title="1 of 2 branches missed.">            if (!IonUTF8.isContinueByteUTF8(b2)) throwUTF8Exception();</span>
+<span class="fc" id="L1206">            int b3 = read();</span>
+<span class="pc bpc" id="L1207" title="1 of 2 branches missed.">            if (!IonUTF8.isContinueByteUTF8(b3)) throwUTF8Exception();</span>
+<span class="fc" id="L1208">            c = IonUTF8.threeByteScalar(b, b2, b3);</span>
+<span class="fc" id="L1209">            break;</span>
+        case 4:
+<span class="pc bpc" id="L1211" title="2 of 4 branches missed.">            assert((b &amp; 0xf8) == 0xf0);</span>
+            // for values from 0x010000 to 0x1FFFFF (NOT all legal)
+<span class="fc" id="L1213">            b2 = read();</span>
+<span class="pc bpc" id="L1214" title="1 of 2 branches missed.">            if (!IonUTF8.isContinueByteUTF8(b2)) throwUTF8Exception();</span>
+<span class="fc" id="L1215">            b3 = read();</span>
+<span class="pc bpc" id="L1216" title="1 of 2 branches missed.">            if (!IonUTF8.isContinueByteUTF8(b3)) throwUTF8Exception();</span>
+<span class="fc" id="L1217">            int b4 = read();</span>
+<span class="pc bpc" id="L1218" title="1 of 2 branches missed.">            if (!IonUTF8.isContinueByteUTF8(b4)) throwUTF8Exception();</span>
+<span class="fc" id="L1219">            c = IonUTF8.fourByteScalar(b, b2, b3, b4);</span>
+<span class="pc bpc" id="L1220" title="1 of 2 branches missed.">            if (c &gt; 0x10FFFF) {</span>
+<span class="nc" id="L1221">                throw new IonException(&quot;illegal utf value encountered in input utf-8 stream&quot;);</span>
+            }
+            break;
+        default:
+<span class="nc" id="L1225">            throwUTF8Exception();</span>
+        }
+<span class="fc" id="L1227">        return c;</span>
+    }
+    private final void throwUTF8Exception() throws IOException
+    {
+<span class="nc" id="L1231">        throwErrorAt(&quot;Invalid UTF-8 character encounter in a string at position &quot;);</span>
+<span class="nc" id="L1232">    }</span>
+    private final void throwUnexpectedEOFException() throws IOException {
+<span class="nc" id="L1234">        throwErrorAt(&quot;unexpected EOF in value&quot;);</span>
+<span class="nc" id="L1235">    }</span>
+    private final void throwVarIntOverflowException() throws IOException {
+<span class="nc" id="L1237">        throwErrorAt(&quot;int in stream is too long for a Java int 32&quot;);</span>
+<span class="nc" id="L1238">    }</span>
+
+    protected IonException newErrorAt(String msg) {
+<span class="fc" id="L1241">        String msg2 = msg + &quot; at position &quot; + getPosition();</span>
+<span class="fc" id="L1242">        return new IonException(msg2);</span>
+    }
+    protected void throwErrorAt(String msg) {
+<span class="fc" id="L1245">        throw newErrorAt(msg);</span>
+    }
+    protected void error(String msg) {
+<span class="nc" id="L1248">        throw new IonException(msg);</span>
+    }
+    protected void error(Exception e) {
+<span class="fc" id="L1251">        throw new IonException(e);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

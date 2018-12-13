@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonIteratorImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">software.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">software.amazon.ion.impl</a> &gt; <span class="el_source">IonIteratorImpl.java</span></div><h1>IonIteratorImpl.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at:
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
+ * language governing permissions and limitations under the License.
+ */
+
+package software.amazon.ion.impl;
+
+import java.util.Iterator;
+import java.util.NoSuchElementException;
+import software.amazon.ion.IonLob;
+import software.amazon.ion.IonReader;
+import software.amazon.ion.IonSequence;
+import software.amazon.ion.IonStruct;
+import software.amazon.ion.IonType;
+import software.amazon.ion.IonValue;
+import software.amazon.ion.SymbolTable;
+import software.amazon.ion.SymbolToken;
+import software.amazon.ion.ValueFactory;
+
+
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">final class IonIteratorImpl</span>
+    implements Iterator&lt;IonValue&gt;
+{
+    private final ValueFactory _valueFactory;
+    private final IonReader _reader;
+    private boolean  _at_eof;
+    private IonValue _curr;
+    private IonValue _next;
+
+
+
+    /**
+     * @throws NullPointerException if any parameter is null.
+     */
+    public IonIteratorImpl(ValueFactory valueFactory,
+                           IonReader input)
+<span class="fc" id="L46">    {</span>
+<span class="pc bpc" id="L47" title="2 of 4 branches missed.">        if (valueFactory == null || input == null)</span>
+        {
+<span class="nc" id="L49">            throw new NullPointerException();</span>
+        }
+
+<span class="fc" id="L52">        _valueFactory = valueFactory;</span>
+<span class="fc" id="L53">        _reader = input;</span>
+<span class="fc" id="L54">    }</span>
+
+
+    /**
+     * Returns true if the iteration has more elements.
+     * here we actually walk ahead and get the next value (it's
+     * the only way we know if there are more and clear out the
+     * various $ion noise out of the way
+     */
+    public boolean hasNext() {
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (_at_eof) return false;</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (_next != null) return true;</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        return (prefetch() != null);</span>
+    }
+
+    private IonValue prefetch()
+    {
+<span class="pc bpc" id="L71" title="3 of 6 branches missed.">        assert !_at_eof &amp;&amp; _next == null;</span>
+
+<span class="fc" id="L73">        IonType type = _reader.next();</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (type == null)</span>
+        {
+<span class="fc" id="L76">            _at_eof = true;</span>
+        }
+        else
+        {
+<span class="fc" id="L80">            _next = readValue();</span>
+        }
+
+<span class="fc" id="L83">        return _next;</span>
+    }
+
+
+    private IonValue readValue()
+    {
+<span class="fc" id="L89">        IonType type = _reader.getType();</span>
+
+<span class="fc" id="L91">        SymbolToken[] annotations = _reader.getTypeAnnotationSymbols();</span>
+
+        IonValue v;
+
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (_reader.isNullValue())</span>
+        {
+<span class="fc" id="L97">            v = _valueFactory.newNull(type);</span>
+        }
+        else
+        {
+<span class="pc bpc" id="L101" title="9 of 14 branches missed.">            switch (type) {</span>
+                case NULL:
+                    // Handled above
+<span class="nc" id="L104">                    throw new IllegalStateException();</span>
+                case BOOL:
+<span class="nc" id="L106">                    v = _valueFactory.newBool(_reader.booleanValue());</span>
+<span class="nc" id="L107">                    break;</span>
+                case INT:
+<span class="fc" id="L109">                    v = _valueFactory.newInt(_reader.bigIntegerValue());</span>
+<span class="fc" id="L110">                    break;</span>
+                case FLOAT:
+<span class="nc" id="L112">                    v = _valueFactory.newFloat(_reader.doubleValue());</span>
+<span class="nc" id="L113">                    break;</span>
+                case DECIMAL:
+<span class="nc" id="L115">                    v = _valueFactory.newDecimal(_reader.decimalValue());</span>
+<span class="nc" id="L116">                    break;</span>
+                case TIMESTAMP:
+<span class="nc" id="L118">                    v = _valueFactory.newTimestamp(_reader.timestampValue());</span>
+<span class="nc" id="L119">                    break;</span>
+                case STRING:
+<span class="fc" id="L121">                    v = _valueFactory.newString(_reader.stringValue());</span>
+<span class="fc" id="L122">                    break;</span>
+                case SYMBOL:
+                    // TODO always pass the SID?  Is it correct?
+<span class="fc" id="L125">                    v = _valueFactory.newSymbol(_reader.symbolValue());</span>
+<span class="fc" id="L126">                    break;</span>
+                case BLOB:
+                {
+<span class="nc" id="L129">                    IonLob lob = _valueFactory.newNullBlob();</span>
+<span class="nc" id="L130">                    lob.setBytes(_reader.newBytes());</span>
+<span class="nc" id="L131">                    v = lob;</span>
+<span class="nc" id="L132">                    break;</span>
+                }
+                case CLOB:
+                {
+<span class="nc" id="L136">                    IonLob lob = _valueFactory.newNullClob();</span>
+<span class="nc" id="L137">                    lob.setBytes(_reader.newBytes());</span>
+<span class="nc" id="L138">                    v = lob;</span>
+<span class="nc" id="L139">                    break;</span>
+                }
+                case STRUCT:
+                {
+<span class="fc" id="L143">                    IonStruct struct = _valueFactory.newEmptyStruct();</span>
+<span class="fc" id="L144">                    _reader.stepIn();</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">                    while (_reader.next() != null)</span>
+                    {
+<span class="fc" id="L147">                        SymbolToken name = _reader.getFieldNameSymbol();</span>
+<span class="fc" id="L148">                        IonValue child = readValue();</span>
+<span class="fc" id="L149">                        struct.add(name, child);</span>
+<span class="fc" id="L150">                    }</span>
+<span class="fc" id="L151">                    _reader.stepOut();</span>
+<span class="fc" id="L152">                    v = struct;</span>
+<span class="fc" id="L153">                    break;</span>
+                }
+                case LIST:
+                {
+<span class="fc" id="L157">                    IonSequence seq = _valueFactory.newEmptyList();</span>
+<span class="fc" id="L158">                    _reader.stepIn();</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">                    while (_reader.next() != null)</span>
+                    {
+<span class="fc" id="L161">                        IonValue child = readValue();</span>
+<span class="fc" id="L162">                        seq.add(child);</span>
+<span class="fc" id="L163">                    }</span>
+<span class="fc" id="L164">                    _reader.stepOut();</span>
+<span class="fc" id="L165">                    v = seq;</span>
+<span class="fc" id="L166">                    break;</span>
+                }
+                case SEXP:
+                {
+<span class="nc" id="L170">                    IonSequence seq = _valueFactory.newEmptySexp();</span>
+<span class="nc" id="L171">                    _reader.stepIn();</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">                    while (_reader.next() != null)</span>
+                    {
+<span class="nc" id="L174">                        IonValue child = readValue();</span>
+<span class="nc" id="L175">                        seq.add(child);</span>
+<span class="nc" id="L176">                    }</span>
+<span class="nc" id="L177">                    _reader.stepOut();</span>
+<span class="nc" id="L178">                    v = seq;</span>
+<span class="nc" id="L179">                    break;</span>
+                }
+                default:
+<span class="nc" id="L182">                    throw new IllegalStateException();</span>
+            }
+        }
+
+        // TODO this is too late in the case of system reading
+        // when v is a local symtab (it will get itself, not the prior symtab)
+<span class="fc" id="L188">        SymbolTable symtab = _reader.getSymbolTable();</span>
+<span class="fc" id="L189">        ((PrivateIonValue)v).setSymbolTable(symtab);</span>
+
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (annotations.length != 0) {</span>
+<span class="fc" id="L192">            ((PrivateIonValue)v).setTypeAnnotationSymbols(annotations);</span>
+        }
+
+<span class="fc" id="L195">        return v;</span>
+    }
+
+
+    public IonValue next() {
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">        if (! _at_eof) {</span>
+<span class="fc" id="L201">            _curr = null;</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">            if (_next == null) {</span>
+<span class="fc" id="L203">                prefetch();</span>
+            }
+<span class="fc bfc" id="L205" title="All 2 branches covered.">            if (_next != null) {</span>
+<span class="fc" id="L206">                _curr = _next;</span>
+<span class="fc" id="L207">                _next = null;</span>
+<span class="fc" id="L208">                return _curr;</span>
+            }
+        }
+<span class="fc" id="L211">        throw new NoSuchElementException();</span>
+    }
+
+
+    public void remove() {
+<span class="nc" id="L216">        throw new UnsupportedOperationException();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

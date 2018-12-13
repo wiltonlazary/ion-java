@@ -1,0 +1,402 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonSequenceLite.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">software.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">software.amazon.ion.impl.lite</a> &gt; <span class="el_source">IonSequenceLite.java</span></div><h1>IonSequenceLite.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2010-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at:
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
+ * language governing permissions and limitations under the License.
+ */
+
+package software.amazon.ion.impl.lite;
+
+import java.io.IOException;
+import java.lang.reflect.Array;
+import java.util.Collection;
+import java.util.IdentityHashMap;
+import java.util.Iterator;
+import java.util.List;
+import software.amazon.ion.ContainedValueException;
+import software.amazon.ion.IonSequence;
+import software.amazon.ion.IonType;
+import software.amazon.ion.IonValue;
+import software.amazon.ion.IonWriter;
+import software.amazon.ion.ValueFactory;
+import software.amazon.ion.impl.PrivateCurriedValueFactory;
+import software.amazon.ion.impl.PrivateIonValue;
+
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">abstract class IonSequenceLite</span>
+    extends IonContainerLite
+    implements IonSequence
+{
+    /**
+     * A zero-length array.
+     */
+<span class="fc" id="L39">    protected static final IonValueLite[] EMPTY_VALUE_ARRAY = new IonValueLite[0];</span>
+
+    IonSequenceLite(ContainerlessContext context, boolean isNull)
+    {
+<span class="fc" id="L43">        super(context, isNull);</span>
+<span class="fc" id="L44">    }</span>
+
+    IonSequenceLite(IonSequenceLite existing, IonContext context) {
+<span class="fc" id="L47">        super(existing, context, false);</span>
+<span class="fc" id="L48">    }</span>
+
+    /**
+     * Constructs a sequence value &lt;em&gt;not&lt;/em&gt; backed by binary.
+     *
+     * @param elements
+     *   the initial set of child elements.  If &lt;code&gt;null&lt;/code&gt;, then the new
+     *   instance will have &lt;code&gt;{@link #isNullValue()} == true&lt;/code&gt;.
+     *
+     * @throws ContainedValueException if any value in &lt;code&gt;elements&lt;/code&gt;
+     * has &lt;code&gt;{@link IonValue#getContainer()} != null&lt;/code&gt;.
+     * @throws IllegalArgumentException
+     * @throws NullPointerException
+     */
+    IonSequenceLite(ContainerlessContext context,
+                    Collection&lt;? extends IonValue&gt; elements)
+        throws ContainedValueException, NullPointerException,
+            IllegalArgumentException
+    {
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        this(context, (elements == null));</span>
+<span class="nc bnc" id="L68" title="All 4 branches missed.">        assert _children == null;</span>
+
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        if (elements != null)</span>
+        {
+<span class="nc" id="L72">            _children = new IonValueLite[elements.size()];</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">            for (Iterator i = elements.iterator(); i.hasNext();)</span>
+            {
+<span class="nc" id="L75">                IonValueLite element = (IonValueLite) i.next();</span>
+<span class="nc" id="L76">                super.add(element);</span>
+<span class="nc" id="L77">            }</span>
+        }
+<span class="nc" id="L79">    }</span>
+
+    //=========================================================================
+
+    @Override
+    public abstract IonSequenceLite clone();
+
+    protected int sequenceHashCode(int seed, SymbolTableProvider symbolTableProvider)
+    {
+<span class="fc" id="L88">        final int prime = 8191;</span>
+<span class="fc" id="L89">        int result = seed;</span>
+
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (!isNullValue()) {</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            for (IonValue v : this) {</span>
+<span class="fc" id="L93">                IonValueLite vLite = (IonValueLite) v;</span>
+<span class="fc" id="L94">                result = prime * result + vLite.hashCode(symbolTableProvider);</span>
+                // mixing at each step to make the hash code order-dependent
+<span class="fc" id="L96">                result ^= (result &lt;&lt; 29) ^ (result &gt;&gt; 3);</span>
+<span class="fc" id="L97">            }</span>
+        }
+
+<span class="fc" id="L100">        return hashTypeAnnotations(result, symbolTableProvider);</span>
+    }
+
+
+    @Override
+    // Increasing visibility
+    public boolean add(IonValue element)
+        throws ContainedValueException, NullPointerException
+    {
+        // super.add will check for the lock
+<span class="fc" id="L110">        return super.add(element);</span>
+    }
+
+    public boolean addAll(Collection&lt;? extends IonValue&gt; c)
+    {
+<span class="fc" id="L115">        checkForLock();</span>
+
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (c == null) {</span>
+<span class="fc" id="L118">            throw new NullPointerException();</span>
+        }
+
+<span class="fc" id="L121">        boolean changed = false;</span>
+
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        for (IonValue v : c)</span>
+        {
+<span class="pc bpc" id="L125" title="3 of 4 branches missed.">            changed = add(v) || changed;</span>
+<span class="fc" id="L126">        }</span>
+
+<span class="fc" id="L128">        return changed;</span>
+    }
+
+    public boolean addAll(int index, Collection&lt;? extends IonValue&gt; c)
+    {
+<span class="fc" id="L133">        checkForLock();</span>
+
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (c == null) {</span>
+<span class="fc" id="L136">            throw new NullPointerException();</span>
+        }
+<span class="pc bpc" id="L138" title="1 of 4 branches missed.">        if (index &lt; 0 || index &gt; size())</span>
+        {
+<span class="fc" id="L140">            throw new IndexOutOfBoundsException();</span>
+        }
+
+        // TODO optimize to avoid n^2 shifting and renumbering of elements.
+<span class="fc" id="L144">        boolean changed = false;</span>
+
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        for (IonValue v : c)</span>
+        {
+<span class="fc" id="L148">            add(index++, v);</span>
+<span class="fc" id="L149">            changed = true;</span>
+<span class="fc" id="L150">        }</span>
+
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (changed) {</span>
+<span class="fc" id="L153">            patch_elements_helper(index);</span>
+        }
+
+<span class="fc" id="L156">        return changed;</span>
+    }
+
+
+    public ValueFactory add()
+    {
+<span class="fc" id="L162">        return new PrivateCurriedValueFactory(this.getSystem())</span>
+<span class="fc" id="L163">        {</span>
+            @Override
+            protected void handle(IonValue newValue)
+            {
+<span class="fc" id="L167">                add(newValue);</span>
+<span class="fc" id="L168">            }</span>
+        };
+    }
+
+
+    public void add(int index, IonValue element)
+        throws ContainedValueException, NullPointerException
+    {
+<span class="fc" id="L176">        add(index, (IonValueLite) element);</span>
+<span class="fc" id="L177">    }</span>
+
+    public ValueFactory add(final int index)
+    {
+<span class="nc" id="L181">        return new PrivateCurriedValueFactory(getSystem())</span>
+<span class="nc" id="L182">        {</span>
+            @Override
+            protected void handle(IonValue newValue)
+            {
+<span class="nc" id="L186">                add(index, newValue);</span>
+<span class="nc" id="L187">                patch_elements_helper(index + 1);</span>
+<span class="nc" id="L188">            }</span>
+        };
+    }
+
+    public IonValue set(int index, IonValue element)
+    {
+<span class="fc" id="L194">        checkForLock();</span>
+<span class="fc" id="L195">        final IonValueLite concrete = ((IonValueLite) element);</span>
+
+        // NOTE: size calls makeReady() so we don't have to
+<span class="fc bfc" id="L198" title="All 4 branches covered.">        if (index &lt; 0 || index &gt;= size())</span>
+        {
+<span class="fc" id="L200">            throw new IndexOutOfBoundsException(&quot;&quot; + index);</span>
+        }
+
+<span class="fc" id="L203">        validateNewChild(element);</span>
+
+<span class="pc bpc" id="L205" title="2 of 4 branches missed.">        assert _children != null; // else index would be out of bounds above.</span>
+<span class="fc" id="L206">        concrete._context = getContextForIndex(element, index);</span>
+<span class="fc" id="L207">        IonValueLite removed = set_child(index, concrete);</span>
+<span class="fc" id="L208">        concrete._elementid(index);</span>
+
+<span class="fc" id="L210">        removed.detachFromContainer();</span>
+        // calls setDirty(), UNLESS it hits an IOException
+
+<span class="fc" id="L213">        return removed;</span>
+    }
+
+    public IonValue remove(int index)
+    {
+<span class="fc" id="L218">        checkForLock();</span>
+
+<span class="fc bfc" id="L220" title="All 4 branches covered.">        if (index &lt; 0 || index &gt;= get_child_count()) {</span>
+<span class="fc" id="L221">            throw new IndexOutOfBoundsException(&quot;&quot; + index);</span>
+        }
+
+<span class="fc" id="L224">        IonValueLite v = get_child(index);</span>
+<span class="pc bpc" id="L225" title="2 of 4 branches missed.">        assert(v._elementid() == index);</span>
+<span class="fc" id="L226">        remove_child(index);</span>
+<span class="fc" id="L227">        patch_elements_helper(index);</span>
+<span class="fc" id="L228">        return v;</span>
+    }
+
+    public boolean remove(Object o)
+    {
+<span class="fc" id="L233">        checkForLock();</span>
+
+<span class="nc" id="L235">        int idx = lastIndexOf(o);</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">        if (idx &lt; 0) {</span>
+<span class="nc" id="L237">            return false;</span>
+        }
+<span class="nc bnc" id="L239" title="All 4 branches missed.">        assert(o instanceof IonValueLite); // since it's in our current array</span>
+<span class="nc bnc" id="L240" title="All 4 branches missed.">        assert( ((IonValueLite)o)._elementid() == idx );</span>
+
+<span class="nc" id="L242">        remove_child(idx);</span>
+<span class="nc" id="L243">        patch_elements_helper(idx);</span>
+<span class="nc" id="L244">        return true;</span>
+    }
+
+    public boolean removeAll(Collection&lt;?&gt; c)
+    {
+<span class="fc" id="L249">        boolean changed = false;</span>
+
+<span class="fc" id="L251">        checkForLock();</span>
+
+        // remove the collection member if it is a
+        // member of our child array keep track of
+        // the lowest array index for later patching
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        for (Object o : c) {</span>
+<span class="fc" id="L257">            int idx = lastIndexOf(o);</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">            if (idx &gt;= 0) {</span>
+<span class="pc bpc" id="L259" title="2 of 4 branches missed.">                assert(o == get_child(idx));</span>
+<span class="fc" id="L260">                remove_child(idx);</span>
+<span class="fc" id="L261">                patch_elements_helper(idx);</span>
+<span class="fc" id="L262">                changed = true;</span>
+            }
+<span class="fc" id="L264">        }</span>
+<span class="fc" id="L265">        return changed;</span>
+    }
+
+    public boolean retainAll(Collection&lt;?&gt; c)
+    {
+<span class="fc" id="L270">        checkForLock();</span>
+
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        if (get_child_count() &lt; 1) return false;</span>
+
+        // TODO this method (and probably several others) needs optimization.
+<span class="fc" id="L275">        IdentityHashMap&lt;IonValue, IonValue&gt; keepers =</span>
+            new IdentityHashMap&lt;IonValue, IonValue&gt;();
+
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        for (Object o : c)</span>
+        {
+<span class="fc" id="L280">            IonValue v = (IonValue) o;</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">            if (this == v.getContainer()) keepers.put(v, v);</span>
+<span class="fc" id="L282">        }</span>
+
+<span class="fc" id="L284">        boolean changed = false;</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">        for (int ii = get_child_count(); ii &gt; 0; )</span>
+        {
+<span class="fc" id="L287">            ii--;</span>
+<span class="fc" id="L288">            IonValue v = get_child(ii);</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">            if (! keepers.containsKey(v))</span>
+            {
+<span class="fc" id="L291">                remove(v);</span>
+<span class="fc" id="L292">                patch_elements_helper(ii);</span>
+<span class="fc" id="L293">                changed = true;</span>
+            }
+<span class="fc" id="L295">        }</span>
+
+<span class="fc" id="L297">        return changed;</span>
+    }
+
+    public boolean contains(Object o)
+    {
+<span class="fc bfc" id="L302" title="All 2 branches covered.">        if (o == null) {</span>
+<span class="fc" id="L303">            throw new NullPointerException();</span>
+        }
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        if (!(o instanceof IonValue)) {</span>
+<span class="fc" id="L306">            throw new ClassCastException();</span>
+        }
+<span class="fc bfc" id="L308" title="All 2 branches covered.">        return ((IonValue)o).getContainer() == this;</span>
+    }
+
+    public boolean containsAll(Collection&lt;?&gt; c)
+    {
+<span class="fc bfc" id="L313" title="All 2 branches covered.">        for (Object o : c)</span>
+        {
+<span class="fc bfc" id="L315" title="All 2 branches covered.">            if (! contains(o)) return false;</span>
+<span class="fc" id="L316">        }</span>
+<span class="fc" id="L317">        return true;</span>
+    }
+
+    public int indexOf(Object o)
+    {
+<span class="fc bfc" id="L322" title="All 2 branches covered.">        if (o == null) {</span>
+<span class="fc" id="L323">            throw new NullPointerException();</span>
+        }
+<span class="fc" id="L325">        PrivateIonValue v = (PrivateIonValue) o;</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">        if (this != v.getContainer()) return -1;</span>
+<span class="fc" id="L327">        return v.getElementId();</span>
+    }
+
+    public int lastIndexOf(Object o)
+    {
+<span class="fc" id="L332">        return indexOf(o);</span>
+    }
+
+    public List&lt;IonValue&gt; subList(int fromIndex, int toIndex)
+    {
+        // TODO amzn/ion-java#52
+<span class="nc" id="L338">        throw new UnsupportedOperationException(&quot;issue amzn/ion-java#52&quot;);</span>
+    }
+
+    public IonValue[] toArray()
+    {
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        if (get_child_count() &lt; 1) return EMPTY_VALUE_ARRAY;</span>
+
+<span class="fc" id="L345">        IonValue[] array = new IonValue[get_child_count()];</span>
+<span class="fc" id="L346">        System.arraycopy(_children, 0, array, 0, get_child_count());</span>
+<span class="fc" id="L347">        return array;</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public &lt;T&gt; T[] toArray(T[] a)
+    {
+<span class="fc" id="L353">        int size = get_child_count();</span>
+<span class="fc bfc" id="L354" title="All 2 branches covered.">        if (a.length &lt; size)</span>
+        {
+            // TODO JDK 1.6 this could use Arrays.copyOf
+<span class="fc" id="L357">            Class&lt;?&gt; type = a.getClass().getComponentType();</span>
+            // generates unchecked warning
+<span class="fc" id="L359">            a = (T[]) Array.newInstance(type, size);</span>
+        }
+<span class="fc bfc" id="L361" title="All 2 branches covered.">        if (size &gt; 0) {</span>
+<span class="fc" id="L362">            System.arraycopy(_children, 0, a, 0, size);</span>
+        }
+<span class="fc bfc" id="L364" title="All 2 branches covered.">        if (size &lt; a.length) {</span>
+            // A surprising bit of spec.
+            // this is required even with a 0 entries
+<span class="fc" id="L367">            a[size] = null;</span>
+        }
+<span class="fc" id="L369">        return a;</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public &lt;T extends IonValue&gt; T[] extract(Class&lt;T&gt; type)
+    {
+<span class="nc" id="L375">        checkForLock();</span>
+
+<span class="nc bnc" id="L377" title="All 2 branches missed.">        if (isNullValue()) return null;</span>
+<span class="nc" id="L378">        T[] array = (T[]) Array.newInstance(type, size());</span>
+<span class="nc" id="L379">        toArray(array);</span>
+<span class="nc" id="L380">        clear();</span>
+<span class="nc" id="L381">        return array;</span>
+    }
+
+
+    @Override
+    void writeBodyTo(IonWriter writer, SymbolTableProvider symbolTableProvider)
+        throws IOException
+    {
+<span class="fc" id="L389">        IonType type = getType();</span>
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        if (isNullValue())</span>
+        {
+<span class="fc" id="L392">            writer.writeNull(type);</span>
+        }
+        else
+        {
+<span class="fc" id="L396">            writer.stepIn(type);</span>
+<span class="fc" id="L397">            writeChildren(writer, this, symbolTableProvider);</span>
+<span class="fc" id="L398">            writer.stepOut();</span>
+        }
+<span class="fc" id="L400">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

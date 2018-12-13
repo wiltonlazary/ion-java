@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonSymbolLite.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">software.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">software.amazon.ion.impl.lite</a> &gt; <span class="el_source">IonSymbolLite.java</span></div><h1>IonSymbolLite.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2010-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at:
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
+ * language governing permissions and limitations under the License.
+ */
+
+package software.amazon.ion.impl.lite;
+
+import static software.amazon.ion.SymbolTable.UNKNOWN_SYMBOL_ID;
+import static software.amazon.ion.SystemSymbols.ION_1_0;
+import static software.amazon.ion.SystemSymbols.ION_1_0_SID;
+
+import java.io.IOException;
+import software.amazon.ion.IonType;
+import software.amazon.ion.IonWriter;
+import software.amazon.ion.SymbolTable;
+import software.amazon.ion.SymbolToken;
+import software.amazon.ion.UnknownSymbolException;
+import software.amazon.ion.ValueVisitor;
+import software.amazon.ion.impl.PrivateIonSymbol;
+import software.amazon.ion.impl.PrivateUtils;
+
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">final class IonSymbolLite</span>
+    extends IonTextLite
+    implements PrivateIonSymbol
+{
+<span class="fc" id="L35">    private static final int HASH_SIGNATURE =</span>
+<span class="fc" id="L36">        IonType.SYMBOL.toString().hashCode();</span>
+
+<span class="fc" id="L38">    private int _sid = UNKNOWN_SYMBOL_ID;</span>
+
+    /**
+     * @param isNull if {@code true}, constructs a {@code null.symbol} value.
+     */
+    IonSymbolLite(ContainerlessContext context, boolean isNull)
+    {
+<span class="fc" id="L45">        super(context, isNull);</span>
+<span class="fc" id="L46">    }</span>
+
+    IonSymbolLite(IonSymbolLite existing, IonContext context) throws UnknownSymbolException
+    {
+<span class="fc" id="L50">        super(existing, context);</span>
+<span class="fc" id="L51">    }</span>
+
+    IonSymbolLite(ContainerlessContext context, SymbolToken sym)
+    {
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        super(context, sym == null);</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (sym != null)</span>
+        {
+<span class="fc" id="L58">            String text = sym.getText();</span>
+<span class="fc" id="L59">            int sid = sym.getSid();</span>
+<span class="pc bpc" id="L60" title="2 of 6 branches missed.">            assert text != null || sid &gt;= 0;</span>
+
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            if (text != null)</span>
+            {
+<span class="fc" id="L64">                super.setValue(text);</span>
+
+                // TODO why is the sid ignored in this case?
+                // Probably because we don't trust our ability to change the
+                // sid if this value gets recontextualized.
+                // BUT: we retain the sid on field names and annotations,
+                // so one or the other is buggy.
+            }
+            else
+            {
+<span class="fc" id="L74">                _sid = sid;</span>
+            }
+        }
+<span class="fc" id="L77">    }</span>
+
+    @Override
+    IonSymbolLite clone(IonContext context)
+    {
+<span class="fc" id="L82">        IonSymbolLite clone = new IonSymbolLite(this, context);</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if(this._sid == 0) {</span>
+<span class="fc" id="L84">            clone._sid = 0;</span>
+        }
+<span class="fc" id="L86">        return clone;</span>
+    }
+
+    @Override
+    public IonSymbolLite clone() throws UnknownSymbolException
+    {
+        // If this symbol has unknown text but known Sid, this symbol has no
+        // semantic meaning, as such cloning should throw an exception.
+<span class="fc bfc" id="L94" title="All 6 branches covered.">        if (!isNullValue()</span>
+            &amp;&amp; _sid != UNKNOWN_SYMBOL_ID &amp;&amp; _sid != 0
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            &amp;&amp; _stringValue() == null) {</span>
+<span class="fc" id="L97">            throw new UnknownSymbolException(_sid);</span>
+        }
+<span class="fc" id="L99">        return clone(ContainerlessContext.wrap(getSystem()));</span>
+    }
+
+    @Override
+    int hashCode(SymbolTableProvider symbolTableProvider)
+    {
+<span class="fc" id="L105">        final int sidHashSalt   = 127;      // prime to salt sid</span>
+<span class="fc" id="L106">        final int textHashSalt  = 31;       // prime to salt text</span>
+<span class="fc" id="L107">        int result = HASH_SIGNATURE;</span>
+
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (!isNullValue())</span>
+        {
+<span class="fc" id="L111">            SymbolToken token = symbolValue(symbolTableProvider);</span>
+<span class="fc" id="L112">            String text = token.getText();</span>
+
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            int tokenHashCode = text == null</span>
+<span class="fc" id="L115">                ? token.getSid()  * sidHashSalt</span>
+<span class="fc" id="L116">                : text.hashCode() * textHashSalt;</span>
+
+            // mixing to account for small text and sid deltas
+<span class="fc" id="L119">            tokenHashCode ^= (tokenHashCode &lt;&lt; 29) ^ (tokenHashCode &gt;&gt; 3);</span>
+
+<span class="fc" id="L121">            result ^= tokenHashCode;</span>
+        }
+
+<span class="fc" id="L124">        return hashTypeAnnotations(result, symbolTableProvider);</span>
+    }
+
+    @Override
+    public IonType getType()
+    {
+<span class="fc" id="L130">        return IonType.SYMBOL;</span>
+    }
+
+    /**
+     * Get's the text of this NON-NULL symbol, finding it from our symbol
+     * table if it's not yet known (and caching the result if possible).
+     * &lt;p&gt;
+     * Caller must check {@link #isNullValue()}
+     *
+     * @return null if symbol text is unknown.
+     */
+    private String _stringValue()
+    {
+<span class="fc" id="L143">        return _stringValue(new LazySymbolTableProvider(this));</span>
+    }
+
+    private String _stringValue(SymbolTableProvider symbolTableProvider)
+    {
+<span class="fc" id="L148">        String name = _get_value();</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (name == null)</span>
+        {
+<span class="pc bpc" id="L151" title="2 of 4 branches missed.">            assert _sid &gt;= 0;</span>
+
+<span class="fc" id="L153">            SymbolTable symbols = symbolTableProvider.getSymbolTable();</span>
+<span class="fc" id="L154">            name = symbols.findKnownSymbol(_sid);</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">            if (name != null)</span>
+            {
+                // if this is a mutable value we'll hang onto
+                // our now known symbol table so we don't have
+                // to look it up again.
+                // If the value is immutable, honor that contract.
+<span class="nc bnc" id="L161" title="All 2 branches missed.">                if (_isLocked() == false) {</span>
+<span class="nc" id="L162">                    _set_value(name);</span>
+                }
+            }
+        }
+<span class="fc" id="L166">        return name;</span>
+    }
+
+    public SymbolToken symbolValue()
+    {
+<span class="fc" id="L171">        return symbolValue(new LazySymbolTableProvider(this));</span>
+    }
+
+    private int resolveSymbolId(SymbolTableProvider symbolTableProvider)
+    {
+<span class="fc" id="L176">        validateThisNotNull();</span>
+
+<span class="fc bfc" id="L178" title="All 4 branches covered.">        if (_sid != UNKNOWN_SYMBOL_ID || isReadOnly()) {</span>
+<span class="fc" id="L179">            return _sid;</span>
+        }
+
+<span class="fc" id="L182">        SymbolTable symtab = symbolTableProvider.getSymbolTable();</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (symtab == null) {</span>
+<span class="nc" id="L184">            symtab = getSystem().getSystemSymbolTable();</span>
+        }
+<span class="pc bpc" id="L186" title="2 of 4 branches missed.">        assert(symtab != null);</span>
+
+<span class="fc" id="L188">        String name = _get_value();</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        if (!symtab.isLocalTable())</span>
+        {
+<span class="fc" id="L191">            _sid = symtab.findSymbol(name);</span>
+<span class="pc bpc" id="L192" title="1 of 4 branches missed.">            if (_sid &gt; 0 || isReadOnly()) {</span>
+<span class="fc" id="L193">                return _sid;</span>
+            }
+        }
+<span class="fc" id="L196">        SymbolToken tok = symtab.find(name);</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (tok != null)</span>
+        {
+<span class="fc" id="L199">            _sid = tok.getSid();</span>
+<span class="fc" id="L200">            _set_value(tok.getText()); // Use the interned instance of the text</span>
+        }
+<span class="fc" id="L202">        return _sid;</span>
+    }
+
+    public SymbolToken symbolValue(SymbolTableProvider symbolTableProvider)
+    {
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        if (isNullValue()) return null;</span>
+
+<span class="fc" id="L209">        int sid = resolveSymbolId(symbolTableProvider);</span>
+<span class="fc" id="L210">        String text = _stringValue(symbolTableProvider);</span>
+<span class="fc" id="L211">        return PrivateUtils.newSymbolToken(text, sid);</span>
+    }
+
+
+    @Override
+    public void setValue(String value)
+    {
+<span class="fc" id="L218">        super.setValue(value);  // Calls checkForLock and _isNullValue</span>
+<span class="fc" id="L219">        _sid = UNKNOWN_SYMBOL_ID;</span>
+<span class="fc" id="L220">    }</span>
+
+    protected boolean isIonVersionMarker() {
+<span class="nc" id="L223">        return _isIVM();</span>
+    }
+
+    @Override
+    void clearSymbolIDValues()
+    {
+<span class="fc" id="L229">        super.clearSymbolIDValues();</span>
+
+        // Don't lose the sid if that's all we have!
+<span class="fc bfc" id="L232" title="All 4 branches covered.">        if (! isNullValue() &amp;&amp; _stringValue() != null)</span>
+        {
+<span class="fc" id="L234">            _sid = UNKNOWN_SYMBOL_ID;</span>
+        }
+<span class="fc" id="L236">    }</span>
+
+    protected void setIsIonVersionMarker(boolean isIVM)
+    {
+<span class="nc bnc" id="L240" title="All 4 branches missed.">        assert (ION_1_0.equals(this._get_value()) == isIVM);</span>
+
+        //_is_IonVersionMarker = isIVM;
+<span class="nc" id="L243">        _isIVM(isIVM);</span>
+<span class="nc" id="L244">        _isSystemValue(isIVM);</span>
+
+<span class="nc" id="L246">        _sid = ION_1_0_SID;</span>
+<span class="nc" id="L247">    }</span>
+
+
+    @Override
+    final void writeBodyTo(IonWriter writer, SymbolTableProvider symbolTableProvider)
+        throws IOException
+    {
+        // TODO amzn/ion-java#27 Fix symbol handling
+        // A million-dollar question is - if text is missing, do
+        // we throw (cannot serialize) or do we pass the sid thru???
+
+<span class="fc" id="L258">        SymbolToken symbol = symbolValue(symbolTableProvider);</span>
+<span class="fc" id="L259">        writer.writeSymbolToken(symbol);</span>
+<span class="fc" id="L260">    }</span>
+
+    @Override
+    public String stringValue()
+        throws UnknownSymbolException
+    {
+<span class="fc" id="L266">        return stringValue(new LazySymbolTableProvider(this));</span>
+    }
+
+    private String stringValue(SymbolTableProvider symbolTableProvider)
+        throws UnknownSymbolException
+    {
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        if (isNullValue()) {</span>
+<span class="fc" id="L273">            return null;</span>
+        }
+<span class="fc" id="L275">        String name = _stringValue(symbolTableProvider);</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        if (name == null) {</span>
+<span class="pc bpc" id="L277" title="2 of 4 branches missed.">            assert(_sid &gt; 0);</span>
+<span class="fc" id="L278">            throw new UnknownSymbolException(_sid);</span>
+        }
+<span class="fc" id="L280">        return name;</span>
+    }
+
+    @Override
+    public void accept(ValueVisitor visitor) throws Exception
+    {
+<span class="nc" id="L286">        visitor.visit(this);</span>
+<span class="nc" id="L287">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

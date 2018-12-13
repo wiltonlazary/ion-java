@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PrivateIonReaderFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">software.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">software.amazon.ion.impl</a> &gt; <span class="el_source">PrivateIonReaderFactory.java</span></div><h1>PrivateIonReaderFactory.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2009-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at:
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
+ * language governing permissions and limitations under the License.
+ */
+
+package software.amazon.ion.impl;
+
+import static software.amazon.ion.impl.PrivateIonConstants.BINARY_VERSION_MARKER_SIZE;
+import static software.amazon.ion.impl.UnifiedInputStreamX.makeStream;
+import static software.amazon.ion.util.IonStreamUtils.isIonBinary;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.Reader;
+import java.util.zip.GZIPInputStream;
+import software.amazon.ion.IonCatalog;
+import software.amazon.ion.IonException;
+import software.amazon.ion.IonReader;
+import software.amazon.ion.IonSystem;
+import software.amazon.ion.IonValue;
+import software.amazon.ion.util.IonStreamUtils;
+
+/**
+ * @deprecated This is an internal API that is subject to change without notice.
+ */
+@Deprecated
+<span class="nc" id="L37">public final class PrivateIonReaderFactory</span>
+{
+    public static final IonReader makeReader(IonCatalog catalog,
+                                             byte[] bytes)
+    {
+<span class="fc" id="L42">        return makeReader(catalog, bytes, 0, bytes.length);</span>
+    }
+
+    public static final IonReader makeReader(IonCatalog catalog,
+                                             byte[] bytes,
+                                             PrivateLocalSymbolTableFactory lstFactory)
+   {
+<span class="fc" id="L49">       return makeReader(catalog, bytes, 0, bytes.length, lstFactory);</span>
+   }
+
+    public static IonReader makeSystemReader(byte[] bytes)
+    {
+<span class="fc" id="L54">        return makeSystemReader(bytes, 0, bytes.length);</span>
+    }
+
+
+    public static final IonReader makeReader(IonCatalog catalog,
+                                             byte[] bytes,
+                                             int offset,
+                                             int length)
+    {
+        try
+        {
+<span class="fc" id="L65">            UnifiedInputStreamX uis = makeUnifiedStream(bytes, offset, length);</span>
+<span class="fc" id="L66">            return makeReader(catalog, uis, offset, LocalSymbolTable.DEFAULT_LST_FACTORY);</span>
+        }
+<span class="nc" id="L68">        catch (IOException e)</span>
+        {
+<span class="nc" id="L70">            throw new IonException(e);</span>
+        }
+    }
+
+    public static final IonReader makeReader(IonCatalog catalog,
+                                             byte[] bytes,
+                                             int offset,
+                                             int length,
+                                             PrivateLocalSymbolTableFactory lstFactory)
+    {
+        try
+        {
+<span class="fc" id="L82">            UnifiedInputStreamX uis = makeUnifiedStream(bytes, offset, length);</span>
+<span class="fc" id="L83">            return makeReader(catalog, uis, offset, lstFactory);</span>
+        }
+<span class="nc" id="L85">        catch (IOException e)</span>
+        {
+<span class="nc" id="L87">            throw new IonException(e);</span>
+        }
+    }
+
+    public static IonReader makeSystemReader(byte[] bytes,
+                                             int offset,
+                                             int length)
+    {
+        try
+        {
+<span class="fc" id="L97">            UnifiedInputStreamX uis = makeUnifiedStream(bytes, offset, length);</span>
+<span class="fc" id="L98">            return makeSystemReader(uis, offset);</span>
+        }
+<span class="nc" id="L100">        catch (IOException e)</span>
+        {
+<span class="nc" id="L102">            throw new IonException(e);</span>
+        }
+    }
+
+
+    public static final IonReader makeReader(IonCatalog catalog,
+                                             char[] chars)
+    {
+<span class="nc" id="L110">        return makeReader(catalog, chars, 0, chars.length);</span>
+    }
+
+    public static final IonReader makeSystemReader(char[] chars)
+    {
+<span class="nc" id="L115">        UnifiedInputStreamX in = makeStream(chars);</span>
+<span class="nc" id="L116">        return new IonReaderTextSystemX(in);</span>
+    }
+
+
+    public static final IonReader makeReader(IonCatalog catalog,
+                                             char[] chars,
+                                             int offset,
+                                             int length)
+    {
+<span class="nc" id="L125">        UnifiedInputStreamX in = makeStream(chars, offset, length);</span>
+<span class="nc" id="L126">        return new IonReaderTextUserX(catalog, LocalSymbolTable.DEFAULT_LST_FACTORY, in, offset);</span>
+    }
+
+    public static final IonReader makeSystemReader(char[] chars,
+                                                   int offset,
+                                                   int length)
+    {
+<span class="nc" id="L133">        UnifiedInputStreamX in = makeStream(chars, offset, length);</span>
+<span class="nc" id="L134">        return new IonReaderTextSystemX(in);</span>
+    }
+
+
+    public static final IonReader makeReader(IonCatalog catalog,
+                                             CharSequence chars)
+    {
+<span class="fc" id="L141">        return makeReader(catalog, chars, LocalSymbolTable.DEFAULT_LST_FACTORY);</span>
+    }
+
+    public static final IonReader makeReader(IonCatalog catalog,
+                                             CharSequence chars,
+                                             PrivateLocalSymbolTableFactory lstFactory)
+    {
+<span class="fc" id="L148">        UnifiedInputStreamX in = makeStream(chars);</span>
+<span class="fc" id="L149">        return new IonReaderTextUserX(catalog, lstFactory, in);</span>
+    }
+
+    public static final IonReader makeSystemReader(CharSequence chars)
+    {
+<span class="fc" id="L154">        UnifiedInputStreamX in = makeStream(chars);</span>
+<span class="fc" id="L155">        return new IonReaderTextSystemX(in);</span>
+    }
+
+
+    public static final IonReader makeReader(IonCatalog catalog,
+                                             CharSequence chars,
+                                             int offset,
+                                             int length)
+    {
+<span class="nc" id="L164">        UnifiedInputStreamX in = makeStream(chars, offset, length);</span>
+<span class="nc" id="L165">        return new IonReaderTextUserX(catalog, LocalSymbolTable.DEFAULT_LST_FACTORY, in, offset);</span>
+    }
+
+    public static final IonReader makeSystemReader(CharSequence chars,
+                                                   int offset,
+                                                   int length)
+    {
+<span class="nc" id="L172">        UnifiedInputStreamX in = makeStream(chars, offset, length);</span>
+<span class="nc" id="L173">        return new IonReaderTextSystemX(in);</span>
+    }
+
+    public static final IonReader makeReader(IonCatalog catalog,
+                                             InputStream is)
+    {
+<span class="fc" id="L179">        return makeReader(catalog, is, LocalSymbolTable.DEFAULT_LST_FACTORY);</span>
+    }
+
+    public static final IonReader makeReader(IonCatalog catalog,
+                                             InputStream is,
+                                             PrivateLocalSymbolTableFactory lstFactory)
+    {
+        try {
+<span class="fc" id="L187">            UnifiedInputStreamX uis = makeUnifiedStream(is);</span>
+<span class="fc" id="L188">            return makeReader(catalog, uis, 0, lstFactory);</span>
+        }
+<span class="fc" id="L190">        catch (IOException e) {</span>
+<span class="fc" id="L191">            throw new IonException(e);</span>
+        }
+    }
+
+    public static IonReader makeSystemReader(InputStream is)
+    {
+        try {
+<span class="fc" id="L198">            UnifiedInputStreamX uis = makeUnifiedStream(is);</span>
+<span class="fc" id="L199">            return makeSystemReader(uis, 0);</span>
+        }
+<span class="nc" id="L201">        catch (IOException e) {</span>
+<span class="nc" id="L202">            throw new IonException(e);</span>
+        }
+    }
+
+    public static final IonReader makeReader(IonCatalog catalog,
+                                             Reader chars)
+    {
+<span class="fc" id="L209">        return makeReader(catalog, chars, LocalSymbolTable.DEFAULT_LST_FACTORY);</span>
+    }
+
+    public static final IonReader makeReader(IonCatalog catalog,
+                                             Reader chars,
+                                             PrivateLocalSymbolTableFactory lstFactory)
+    {
+        try {
+<span class="fc" id="L217">            UnifiedInputStreamX in = makeStream(chars);</span>
+<span class="fc" id="L218">            return new IonReaderTextUserX(catalog, lstFactory, in);</span>
+        }
+<span class="fc" id="L220">        catch (IOException e) {</span>
+<span class="fc" id="L221">            throw new IonException(e);</span>
+        }
+    }
+
+    public static final IonReader makeSystemReader(Reader chars)
+    {
+        try {
+<span class="fc" id="L228">            UnifiedInputStreamX in = makeStream(chars);</span>
+<span class="fc" id="L229">            return new IonReaderTextSystemX(in);</span>
+        }
+<span class="nc" id="L231">        catch (IOException e) {</span>
+<span class="nc" id="L232">            throw new IonException(e);</span>
+        }
+    }
+
+
+    public static final IonReader makeReader(IonCatalog catalog,
+                                             IonValue value)
+    {
+<span class="fc" id="L240">        return new IonReaderTreeUserX(value, catalog, LocalSymbolTable.DEFAULT_LST_FACTORY);</span>
+    }
+
+    public static final IonReader makeSystemReader(IonSystem system,
+                                                   IonValue value)
+    {
+<span class="pc bpc" id="L246" title="2 of 4 branches missed.">        if (system != null &amp;&amp; system != value.getSystem()) {</span>
+<span class="nc" id="L247">            throw new IonException(&quot;you can't mix values from different systems&quot;);</span>
+        }
+<span class="fc" id="L249">        return new IonReaderTreeSystem(value);</span>
+    }
+
+
+    //=========================================================================
+
+
+
+    private static IonReader makeReader(IonCatalog catalog,
+                                        UnifiedInputStreamX uis,
+                                        int offset,
+                                        PrivateLocalSymbolTableFactory lstFactory)
+        throws IOException
+    {
+        IonReader r;
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        if (has_binary_cookie(uis)) {</span>
+<span class="fc" id="L265">            r = new IonReaderBinaryUserX(catalog, lstFactory, uis, offset);</span>
+        }
+        else {
+<span class="fc" id="L268">            r = new IonReaderTextUserX(catalog, lstFactory, uis, offset);</span>
+        }
+<span class="fc" id="L270">        return r;</span>
+    }
+
+    private static IonReader makeSystemReader(UnifiedInputStreamX uis,
+                                              int offset)
+        throws IOException
+    {
+        IonReader r;
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        if (has_binary_cookie(uis)) {</span>
+            // TODO pass offset, or spans will be incorrect
+<span class="fc" id="L280">            r = new IonReaderBinarySystemX(uis);</span>
+        }
+        else {
+            // TODO pass offset, or spans will be incorrect
+<span class="fc" id="L284">            r = new IonReaderTextSystemX(uis);</span>
+        }
+<span class="fc" id="L286">        return r;</span>
+    }
+
+    //
+    //  helper functions
+    //
+
+    private static UnifiedInputStreamX makeUnifiedStream(byte[] bytes,
+                                                         int offset,
+                                                         int length)
+        throws IOException
+    {
+        UnifiedInputStreamX uis;
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        if (IonStreamUtils.isGzip(bytes, offset, length))</span>
+        {
+<span class="fc" id="L301">            ByteArrayInputStream baos =</span>
+                new ByteArrayInputStream(bytes, offset, length);
+<span class="fc" id="L303">            GZIPInputStream gzip = new GZIPInputStream(baos);</span>
+<span class="fc" id="L304">            uis = UnifiedInputStreamX.makeStream(gzip);</span>
+<span class="fc" id="L305">        }</span>
+        else
+        {
+<span class="fc" id="L308">            uis = UnifiedInputStreamX.makeStream(bytes, offset, length);</span>
+        }
+<span class="fc" id="L310">        return uis;</span>
+    }
+
+    private static UnifiedInputStreamX makeUnifiedStream(InputStream in)
+        throws IOException
+    {
+<span class="fc" id="L316">        in.getClass(); // Force NPE</span>
+
+        // TODO avoid multiple wrapping streams, use the UIS for the pushback
+<span class="fc" id="L319">        in = IonStreamUtils.unGzip(in);</span>
+<span class="fc" id="L320">        UnifiedInputStreamX uis = UnifiedInputStreamX.makeStream(in);</span>
+<span class="fc" id="L321">        return uis;</span>
+    }
+
+    private static final boolean has_binary_cookie(UnifiedInputStreamX uis)
+        throws IOException
+    {
+<span class="fc" id="L327">        byte[] bytes = new byte[BINARY_VERSION_MARKER_SIZE];</span>
+
+        // try to read the first 4 bytes and unread them (we want
+        // the data stream undisturbed by our peeking ahead)
+        int len;
+<span class="fc bfc" id="L332" title="All 2 branches covered.">        for (len = 0; len &lt; BINARY_VERSION_MARKER_SIZE; len++) {</span>
+<span class="fc" id="L333">            int c = uis.read();</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">            if (c == UnifiedInputStreamX.EOF) {</span>
+<span class="fc" id="L335">                break;</span>
+            }
+<span class="fc" id="L337">            bytes[len] = (byte)c;</span>
+        }
+<span class="fc bfc" id="L339" title="All 2 branches covered.">        for (int ii=len; ii&gt;0; ) {</span>
+<span class="fc" id="L340">            ii--;</span>
+<span class="fc" id="L341">            uis.unread(bytes[ii] &amp; 0xff);</span>
+        }
+<span class="fc" id="L343">        boolean is_cookie = isIonBinary(bytes, 0, len);</span>
+<span class="fc" id="L344">        return is_cookie;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

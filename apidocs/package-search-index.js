@@ -1,0 +1,1 @@
+packageSearchIndex = [{"l":"All Packages","url":"allpackages-index.html"},{"l":"software.amazon.ion"},{"l":"software.amazon.ion.facet"},{"l":"software.amazon.ion.system"},{"l":"software.amazon.ion.util"}]

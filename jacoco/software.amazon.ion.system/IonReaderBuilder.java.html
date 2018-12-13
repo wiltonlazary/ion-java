@@ -1,0 +1,308 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonReaderBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">software.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">software.amazon.ion.system</a> &gt; <span class="el_source">IonReaderBuilder.java</span></div><h1>IonReaderBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at:
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
+ * language governing permissions and limitations under the License.
+ */
+
+package software.amazon.ion.system;
+
+import static software.amazon.ion.impl.PrivateIonReaderFactory.makeReader;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.Reader;
+import software.amazon.ion.IonCatalog;
+import software.amazon.ion.IonException;
+import software.amazon.ion.IonReader;
+import software.amazon.ion.IonStruct;
+import software.amazon.ion.IonSystem;
+import software.amazon.ion.IonValue;
+
+/**
+ * Build a new {@link IonReader} from the given {@link IonCatalog} and data
+ * source. A data source is required, while an IonCatalog is optional. If no
+ * IonCatalog is provided, an empty {@link SimpleCatalog} will be used.
+ * &lt;p&gt;
+ * {@link IonReader}s parse incrementally, so syntax errors in the input data
+ * will not be detected as side effects of any of the {@code build} methods
+ * in this class.
+ */
+@SuppressWarnings(&quot;deprecation&quot;)
+public class IonReaderBuilder
+{
+
+<span class="fc" id="L42">    private IonCatalog catalog = null;</span>
+
+    private IonReaderBuilder()
+<span class="fc" id="L45">    {</span>
+<span class="fc" id="L46">    }</span>
+
+    private IonReaderBuilder(IonReaderBuilder that)
+<span class="fc" id="L49">    {</span>
+<span class="fc" id="L50">        this.catalog = that.catalog;</span>
+<span class="fc" id="L51">    }</span>
+
+    /**
+     * The standard builder of {@link IonReader}s, with all configuration
+     * properties having their default values.
+     *
+     * @return a new, mutable builder instance.
+     */
+    public static IonReaderBuilder standard()
+    {
+<span class="fc" id="L61">        return new Mutable();</span>
+    }
+
+    /**
+     * Creates a mutable copy of this builder.
+     *
+     * @return a new builder with the same configuration as {@code this}.
+     */
+    public IonReaderBuilder copy()
+    {
+<span class="fc" id="L71">        return new Mutable(this);</span>
+    }
+
+    /**
+     * Returns an immutable builder configured exactly like this one.
+     *
+     * @return this builder instance, if immutable;
+     * otherwise an immutable copy of this builder.
+     */
+    public IonReaderBuilder immutable()
+    {
+<span class="fc" id="L82">        return this;</span>
+    }
+
+    /**
+     * Returns a mutable builder configured exactly like this one.
+     *
+     * @return this instance, if mutable;
+     * otherwise a mutable copy of this instance.
+     */
+    public IonReaderBuilder mutable()
+    {
+<span class="nc" id="L93">        return copy();</span>
+    }
+
+    /** NOT FOR APPLICATION USE! */
+    protected void mutationCheck()
+    {
+<span class="fc" id="L99">        throw new UnsupportedOperationException(&quot;This builder is immutable&quot;);</span>
+    }
+
+    /**
+     * Declares the catalog to use when building an {@link IonReader},
+     * returning a new mutable builder the current one is immutable.
+     *
+     * @param catalog the catalog to use in built readers.
+     *  If null, a new {@link SimpleCatalog} will be used.
+     *
+     * @return this builder instance, if mutable;
+     * otherwise a mutable copy of this builder.
+     *
+     * @see #setCatalog(IonCatalog)
+     * @see #withCatalog(IonCatalog)
+     */
+    public IonReaderBuilder withCatalog(IonCatalog catalog)
+    {
+<span class="fc" id="L117">        IonReaderBuilder b = mutable();</span>
+<span class="fc" id="L118">        b.setCatalog(catalog);</span>
+<span class="fc" id="L119">        return b;</span>
+    }
+
+    /**
+     * Sets the catalog to use when building an {@link IonReader}.
+     *
+     * @param catalog the catalog to use in built readers.
+     *  If null, a new {@link SimpleCatalog} will be used.
+     *
+     * @see #getCatalog()
+     * @see #withCatalog(IonCatalog)
+     *
+     * @throws UnsupportedOperationException if this builder is immutable.
+     */
+    public void setCatalog(IonCatalog catalog)
+    {
+<span class="fc" id="L135">        mutationCheck();</span>
+<span class="fc" id="L136">        this.catalog = catalog;</span>
+<span class="fc" id="L137">    }</span>
+
+    /**
+     * Gets the catalog to use when building an {@link IonReader}, or null
+     * if none has been manually set. The catalog is needed to resolve shared
+     * symbol table imports.
+     *
+     * @see #setCatalog(IonCatalog)
+     * @see #withCatalog(IonCatalog)
+     */
+    public IonCatalog getCatalog()
+    {
+<span class="fc" id="L149">        return catalog;</span>
+    }
+
+    private IonCatalog validateCatalog()
+    {
+        // matches behavior in IonSystemBuilder when no catalog provided
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        return catalog != null ? catalog : new SimpleCatalog();</span>
+    }
+
+    /**
+     * Based on the builder's configuration properties, creates a new IonReader
+     * instance over the given block of Ion data, detecting whether it's text or
+     * binary data.
+     * &lt;p&gt;
+     * This method will auto-detect and uncompress GZIPped Ion data.
+     *
+     * @param ionData the source of the Ion data, which may be either Ion binary
+     * data or UTF-8 Ion text. The reader retains a reference to the array, so
+     * its data must not be modified while the reader is active. Must not be
+     * null.
+     *
+     * @return a new {@link IonReader} instance; not {@code null}.
+     *
+     * @see IonSystem#newReader(byte[])
+     */
+    public IonReader build(byte[] ionData)
+    {
+<span class="fc" id="L176">        return makeReader(validateCatalog(), ionData);</span>
+    }
+
+    /**
+     * Based on the builder's configuration properties, creates a new IonReader
+     * instance over the given block of Ion data, detecting whether it's text or
+     * binary data.
+     * &lt;p&gt;
+     * This method will auto-detect and uncompress GZIPped Ion data.
+     *
+     * @param ionData the source of the Ion data, which is used only within the
+     * range of bytes starting at {@code offset} for {@code len} bytes.
+     * The data in that range may be either Ion binary data or UTF-8 Ion text.
+     * The reader retains a reference to the array, so its data must not be
+     * modified while the reader is active. Must not be null.
+     * @param offset must be non-negative and less than {@code ionData.length}.
+     * @param length must be non-negative and {@code offset+length} must not
+     * exceed {@code ionData.length}.
+     *
+     * @see IonSystem#newReader(byte[], int, int)
+     */
+    public IonReader build(byte[] ionData, int offset, int length)
+    {
+<span class="fc" id="L199">        return makeReader(validateCatalog(), ionData, offset, length);</span>
+    }
+
+    /**
+     * Based on the builder's configuration properties, creates a new IonReader
+     * instance over the given stream of Ion data, detecting whether it's text or
+     * binary data.
+     * &lt;p&gt;
+     * This method will auto-detect and uncompress GZIPped Ion data.
+     * &lt;p&gt;
+     * Because this library performs its own buffering, it's recommended that
+     * users avoid adding additional buffering to the given stream.
+     *
+     * @param ionData the source of the Ion data, which may be either Ion binary
+     * data or UTF-8 Ion text. Must not be null.
+     *
+     * @return a new reader instance.
+     * Callers must call {@link IonReader#close()} when finished with it.
+     *
+     * @throws IonException if the source throws {@link IOException}.
+     *
+     * @see IonSystem#newReader(InputStream)
+     */
+    public IonReader build(InputStream ionData)
+    {
+<span class="fc" id="L224">        return makeReader(validateCatalog(), ionData);</span>
+    }
+
+    /**
+     * Based on the builder's configuration properties, creates a new
+     * {@link IonReader} instance over Ion text data.
+     * &lt;p&gt;
+     * Applications should generally use {@link #build(InputStream)}
+     * whenever possible, since this library has much faster Unicode decoding
+     * than the Java IO framework.
+     * &lt;p&gt;
+     * Because this library performs its own buffering, it's recommended that
+     * you avoid adding additional buffering to the given stream.
+     *
+     * @param ionText the source of the Ion text data. Must not be null.
+     *
+     * @throws IonException if the source throws {@link IOException}.
+     *
+     * @see IonSystem#newReader(Reader)
+     */
+    public IonReader build(Reader ionText)
+    {
+<span class="fc" id="L246">        return makeReader(validateCatalog(), ionText);</span>
+    }
+
+    /**
+     * Based on the builder's configuration properties, creates a new
+     * {@link IonReader} instance over an {@link IonValue} data model. Typically
+     * this is used to iterate over a collection, such as an {@link IonStruct}.
+     *
+     * @param value must not be null.
+     *
+     * @see IonSystem#newReader(IonValue)
+     */
+    public IonReader build(IonValue value)
+    {
+<span class="fc" id="L260">        return makeReader(validateCatalog(), value);</span>
+    }
+
+    /**
+     * Based on the builder's configuration properties, creates an new
+     * {@link IonReader} instance over Ion text data.
+     *
+     * @param ionText the source of the Ion text data. Must not be null.
+     *
+     * @see IonSystem#newReader(String)
+     */
+    public IonReader build(String ionText)
+    {
+<span class="fc" id="L273">        return makeReader(validateCatalog(), ionText);</span>
+    }
+
+    private static class Mutable extends IonReaderBuilder
+    {
+
+        private Mutable()
+<span class="fc" id="L280">        {</span>
+<span class="fc" id="L281">        }</span>
+
+        private Mutable(IonReaderBuilder that)
+        {
+<span class="fc" id="L285">            super(that);</span>
+<span class="fc" id="L286">        }</span>
+
+        @Override
+        public IonReaderBuilder immutable()
+        {
+<span class="fc" id="L291">            return new IonReaderBuilder(this);</span>
+        }
+
+        @Override
+        public IonReaderBuilder mutable()
+        {
+<span class="fc" id="L297">            return this;</span>
+        }
+
+        @Override
+        protected void mutationCheck()
+        {
+<span class="fc" id="L303">        }</span>
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

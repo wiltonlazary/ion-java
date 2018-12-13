@@ -1,0 +1,572 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonUTF8.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">software.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">software.amazon.ion.impl</a> &gt; <span class="el_source">IonUTF8.java</span></div><h1>IonUTF8.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2008-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at:
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
+ * language governing permissions and limitations under the License.
+ */
+
+package software.amazon.ion.impl;
+
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.OutputStream;
+import software.amazon.ion.IonException;
+
+/**
+ * this class holds the various constants and helper functions Ion uses
+ * to &quot;understand&quot; UTF-8 encoded input.  This may duplicate values that
+ * are available in Java's Character class, but the goal is to fully
+ * control and isolate the UTF-8 conversion here.
+ *
+ * The helper functions are intended to avoid the various bit twiddling
+ * errors that can easily occur when working with bits.  As these functions
+ * are all static final methods, and very short, the Java compilers should
+ * find them very easy to in-line.  (in previous testing I have observed
+ * that the Sun JVM heavily in-lines such methods).
+ */
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">class IonUTF8 {</span>
+    private final static int UNICODE_MAX_ONE_BYTE_SCALAR       = 0x0000007F; // 7 bits     =  7 / 1 = 7    bits per byte
+    private final static int UNICODE_MAX_TWO_BYTE_SCALAR       = 0x000007FF; // 5 + 6 bits = 11 / 2 = 5.50 bits per byte
+    private final static int UNICODE_MAX_THREE_BYTE_SCALAR     = 0x0000FFFF; // 4 + 6+6    = 16 / 3 = 5.33 bits per byte
+    private final static int UNICODE_MAX_FOUR_BYTE_SCALAR      = 0x0010FFFF; // 3 + 6+6+6  = 21 / 4 = 5.25 bits per byte
+    private final static int UNICODE_THREE_BYTES_OR_FEWER_MASK = 0xFFFF0000; // if any bits under the f's are set the scalar is either 4 bytes long, or invalid (negative or too large)
+    private final static int UNICODE_TWO_BYTE_HEADER           = 0xC0;       // 8 + 4 = 12 = 0xC0
+    private final static int UNICODE_THREE_BYTE_HEADER         = 0xE0;       // 8+4+2 = 14 = 0xE0
+    private final static int UNICODE_FOUR_BYTE_HEADER          = 0xF0;       // 8+4+2+1 = 15 = 0xF0
+    private final static int UNICODE_CONTINUATION_BYTE_HEADER  = 0x80;
+    private final static int UNICODE_TWO_BYTE_MASK             = 0x1F;       // 8-3 = 5 bits
+    private final static int UNICODE_THREE_BYTE_MASK           = 0x0F;       // 4 bits
+    private final static int UNICODE_FOUR_BYTE_MASK            = 0x07;       // 3 bits
+    private final static int UNICODE_CONTINUATION_BYTE_MASK    = 0x3F;       // 6 bits in each continuation char
+
+    private final static int MAXIMUM_UTF16_1_CHAR_CODE_POINT   = 0x0000FFFF;
+    private final static int SURROGATE_OFFSET                  = 0x00010000;
+    private final static int SURROGATE_MASK                    = 0xFFFFFC00;  // 0b 1111 1100 0000 0000
+    private final static int HIGH_SURROGATE                    = 0x0000D800;  // 0b 1101 1000 0000 0000
+    private final static int LOW_SURROGATE                     = 0x0000DC00;  // 0b 1101 1100 0000 0000
+
+    public final static boolean isHighSurrogate(int b) {
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        return ((b &amp; SURROGATE_MASK) == HIGH_SURROGATE);</span>
+    }
+    public final static boolean isLowSurrogate(int b) {
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        return ((b &amp; SURROGATE_MASK) == LOW_SURROGATE);</span>
+    }
+    public final static boolean isSurrogate(int b) {
+<span class="nc bnc" id="L62" title="All 4 branches missed.">        return (b &gt;= 0xD800 &amp;&amp; b &lt;= 0xDFFF);  // 55296 to 57343 or 2048 chars in all</span>
+    }
+
+    public final static boolean isOneByteUTF8(int b) {
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        return ((b &amp; 0x80) == 0);</span>
+    }
+    public final static boolean isTwoByteUTF8(int b) {
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        return ((b &amp; ~UNICODE_TWO_BYTE_MASK) == UNICODE_TWO_BYTE_HEADER);</span>
+    }
+    public final static boolean isThreeByteUTF8(int b) {
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        return ((b &amp; ~UNICODE_THREE_BYTE_MASK) == UNICODE_THREE_BYTE_HEADER);</span>
+    }
+    public final static boolean isFourByteUTF8(int b) {
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        return ((b &amp; ~UNICODE_FOUR_BYTE_MASK) == UNICODE_FOUR_BYTE_HEADER);</span>
+    }
+    public final static boolean isContinueByteUTF8(int b) {
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        return ((b &amp; ~UNICODE_CONTINUATION_BYTE_MASK) == UNICODE_CONTINUATION_BYTE_HEADER);</span>
+    }
+    public final static boolean isStartByte(int b) {
+<span class="nc bnc" id="L81" title="All 4 branches missed.">        return isOneByteUTF8(b) || !isContinueByteUTF8(b);</span>
+    }
+
+    public final static char twoByteScalar(int b1, int b2) {
+<span class="fc" id="L85">        int c = ((b1 &amp; UNICODE_TWO_BYTE_MASK) &lt;&lt; 6) | (b2 &amp; UNICODE_CONTINUATION_BYTE_MASK);</span>
+<span class="fc" id="L86">        return (char)c;</span>
+    }
+    public final static int threeByteScalar(int b1, int b2, int b3) {
+<span class="fc" id="L89">        int c = ((b1 &amp; UNICODE_THREE_BYTE_MASK) &lt;&lt; 12) | ((b2 &amp; UNICODE_CONTINUATION_BYTE_MASK) &lt;&lt; 6) | (b3 &amp; UNICODE_CONTINUATION_BYTE_MASK);</span>
+<span class="fc" id="L90">        return c;</span>
+    }
+    public final static int fourByteScalar(int b1, int b2, int b3, int b4) {
+<span class="fc" id="L93">        int c = ((b1 &amp; UNICODE_FOUR_BYTE_MASK) &lt;&lt; 18) | ((b2 &amp; UNICODE_CONTINUATION_BYTE_MASK) &lt;&lt; 12) | ((b3 &amp; UNICODE_CONTINUATION_BYTE_MASK) &lt;&lt; 6) | (b4 &amp; UNICODE_CONTINUATION_BYTE_MASK);</span>
+<span class="fc" id="L94">        return c;</span>
+    }
+
+    public final static boolean isOneByteScalar(int unicodeScalar) {
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        return (unicodeScalar &lt;= UNICODE_MAX_ONE_BYTE_SCALAR);</span>
+    }
+    public final static boolean isTwoByteScalar(int unicodeScalar) {
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        return (unicodeScalar &lt;= UNICODE_MAX_TWO_BYTE_SCALAR);</span>
+    }
+    public final static boolean isThreeByteScalar(int unicodeScalar) {
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        return (unicodeScalar &lt;= UNICODE_MAX_THREE_BYTE_SCALAR);</span>
+    }
+    public final static boolean isFourByteScalar(int unicodeScalar) {
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        return (unicodeScalar &lt;= UNICODE_MAX_FOUR_BYTE_SCALAR);</span>
+    }
+    public final static int getUTF8ByteCount(int unicodeScalar) {
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if ((unicodeScalar &amp; UNICODE_THREE_BYTES_OR_FEWER_MASK) != 0) {</span>
+<span class="nc bnc" id="L111" title="All 4 branches missed.">            if (unicodeScalar &gt;= 0 &amp;&amp; unicodeScalar &lt;= UNICODE_MAX_FOUR_BYTE_SCALAR)  return 4;</span>
+<span class="nc" id="L112">            throw new InvalidUnicodeCodePoint();</span>
+        }
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (unicodeScalar &lt;= UNICODE_MAX_ONE_BYTE_SCALAR)   return 1;</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (unicodeScalar &lt;= UNICODE_MAX_TWO_BYTE_SCALAR)   return 2;</span>
+<span class="fc" id="L116">        return 3;</span>
+    }
+    public final static int getUTF8LengthFromFirstByte(int firstByte) {
+<span class="fc" id="L119">        firstByte &amp;= 0xff;</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (isOneByteUTF8(firstByte))   return 1;</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (isTwoByteUTF8(firstByte))   return 2;</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (isThreeByteUTF8(firstByte)) return 3;</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (isFourByteUTF8(firstByte))  return 4;</span>
+<span class="fc" id="L124">        return -1;</span>
+    }
+
+    public final static byte getByte1Of2(int unicodeScalar) {
+<span class="nc" id="L128">        int b1 = (UNICODE_TWO_BYTE_HEADER         | ((unicodeScalar &gt;&gt; 6)  &amp; UNICODE_TWO_BYTE_MASK));</span>
+<span class="nc" id="L129">        return (byte)b1;</span>
+    }
+    public final static byte getByte2Of2(int unicodeScalar) {
+<span class="nc" id="L132">        int b2 = (UNICODE_CONTINUATION_BYTE_HEADER | ( unicodeScalar        &amp; UNICODE_CONTINUATION_BYTE_MASK));</span>
+<span class="nc" id="L133">        return (byte)b2;</span>
+    }
+    public final static byte getByte1Of3(int unicodeScalar) {
+<span class="fc" id="L136">        int b1 = (UNICODE_THREE_BYTE_HEADER        | ((unicodeScalar &gt;&gt; 12) &amp; UNICODE_THREE_BYTE_MASK));</span>
+<span class="fc" id="L137">        return (byte)b1;</span>
+    }
+    public final static byte getByte2Of3(int unicodeScalar) {
+<span class="fc" id="L140">        int b2 = (UNICODE_CONTINUATION_BYTE_HEADER | ((unicodeScalar &gt;&gt; 6)  &amp; UNICODE_CONTINUATION_BYTE_MASK));</span>
+<span class="fc" id="L141">        return (byte)b2;</span>
+    }
+    public final static byte getByte3Of3(int unicodeScalar) {
+<span class="fc" id="L144">        int b3 = (UNICODE_CONTINUATION_BYTE_HEADER | ( unicodeScalar        &amp; UNICODE_CONTINUATION_BYTE_MASK));</span>
+<span class="fc" id="L145">        return (byte)b3;</span>
+    }
+    public final static byte getByte1Of4(int unicodeScalar) {
+<span class="nc" id="L148">        int b1 = (UNICODE_FOUR_BYTE_HEADER         | ((unicodeScalar &gt;&gt; 18) &amp; UNICODE_FOUR_BYTE_MASK));</span>
+<span class="nc" id="L149">        return (byte)b1;</span>
+    }
+    public final static byte getByte2Of4(int unicodeScalar) {
+<span class="nc" id="L152">        int b2 = (UNICODE_CONTINUATION_BYTE_HEADER | ((unicodeScalar &gt;&gt; 12) &amp; UNICODE_CONTINUATION_BYTE_MASK));</span>
+<span class="nc" id="L153">        return (byte)b2;</span>
+    }
+    public final static byte getByte3Of4(int unicodeScalar) {
+<span class="nc" id="L156">        int b3 = (UNICODE_CONTINUATION_BYTE_HEADER | ((unicodeScalar &gt;&gt; 6)  &amp; UNICODE_CONTINUATION_BYTE_MASK));</span>
+<span class="nc" id="L157">        return (byte)b3;</span>
+    }
+    public final static byte getByte4Of4(int unicodeScalar) {
+<span class="nc" id="L160">        int b4 = (UNICODE_CONTINUATION_BYTE_HEADER | ( unicodeScalar        &amp; UNICODE_CONTINUATION_BYTE_MASK));</span>
+<span class="nc" id="L161">        return (byte)b4;</span>
+    }
+    public final static int getAs4BytesReversed(int unicodeScalar) {
+        int four_bytes;
+
+        //loop to write these bytes out:
+        //bytes = getAs4Bytes(us)
+        //do {
+        //    write(bytes &amp; 0xff);
+        //    bytes = (bytes &gt;&gt;&gt; 8);  // don't sign extend
+        //} until (bytes == 0);
+
+<span class="nc bnc" id="L173" title="All 5 branches missed.">        switch (getUTF8ByteCount(unicodeScalar)) {</span>
+        case 1:
+<span class="nc" id="L175">            return unicodeScalar;</span>
+        case 2:
+<span class="nc" id="L177">            four_bytes  = getByte1Of2(unicodeScalar);</span>
+<span class="nc" id="L178">            four_bytes |= getByte2Of2(unicodeScalar) &lt;&lt; 8;</span>
+<span class="nc" id="L179">            return four_bytes;</span>
+        case 3:
+<span class="nc" id="L181">            four_bytes  = getByte1Of3(unicodeScalar);</span>
+<span class="nc" id="L182">            four_bytes |= getByte2Of3(unicodeScalar) &lt;&lt; 8;</span>
+<span class="nc" id="L183">            four_bytes |= getByte3Of3(unicodeScalar) &lt;&lt; 16;</span>
+<span class="nc" id="L184">            return four_bytes;</span>
+        case 4:
+<span class="nc" id="L186">            four_bytes  = getByte1Of4(unicodeScalar);</span>
+<span class="nc" id="L187">            four_bytes |= getByte2Of4(unicodeScalar) &lt;&lt; 8;</span>
+<span class="nc" id="L188">            four_bytes |= getByte3Of4(unicodeScalar) &lt;&lt; 16;</span>
+<span class="nc" id="L189">            four_bytes |= getByte4Of4(unicodeScalar) &lt;&lt; 24;</span>
+<span class="nc" id="L190">            return four_bytes;</span>
+        }
+<span class="nc" id="L192">        throw new InvalidUnicodeCodePoint();</span>
+    }
+    /**
+     * this helper converts the unicodeScalar to a sequence of utf8 bytes
+     * and copies those bytes into the supplied outputBytes array.  If there
+     * is insufficient room in the array to hold the generated bytes it will
+     * throw an ArrayIndexOutOfBoundsException.  It does not check for the
+     * validity of the passed in unicodeScalar thoroughly, however it will
+     * throw an InvalidUnicodeCodePoint if the value is less than negative
+     * or the UTF8 encoding would exceed 4 bytes.
+     * @param unicodeScalar scalar to convert
+     * @param outputBytes user output array to fill with UTF8 bytes
+     * @param offset first array element to fill
+     * @param maxLength maximum number of array elements to fill
+     * @return number of bytes written to the output array
+     */
+    public final static int convertToUTF8Bytes(int unicodeScalar, byte[] outputBytes, int offset, int maxLength)
+    {
+<span class="fc" id="L210">        int dst = offset;</span>
+<span class="fc" id="L211">        int end = offset + maxLength;</span>
+
+<span class="pc bpc" id="L213" title="3 of 5 branches missed.">        switch (getUTF8ByteCount(unicodeScalar)) {</span>
+        case 1:
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            if (dst &gt;= end) throw new ArrayIndexOutOfBoundsException();</span>
+<span class="fc" id="L216">            outputBytes[dst++] = (byte)(unicodeScalar &amp; 0xff);</span>
+<span class="fc" id="L217">            break;</span>
+        case 2:
+<span class="nc bnc" id="L219" title="All 2 branches missed.">            if (dst+1 &gt;= end) throw new ArrayIndexOutOfBoundsException();</span>
+<span class="nc" id="L220">            outputBytes[dst++] = getByte1Of2(unicodeScalar);</span>
+<span class="nc" id="L221">            outputBytes[dst++] = getByte2Of2(unicodeScalar);</span>
+<span class="nc" id="L222">            break;</span>
+        case 3:
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">            if (dst+2 &gt;= end) throw new ArrayIndexOutOfBoundsException();</span>
+<span class="fc" id="L225">            outputBytes[dst++] = getByte1Of3(unicodeScalar);</span>
+<span class="fc" id="L226">            outputBytes[dst++] = getByte2Of3(unicodeScalar);</span>
+<span class="fc" id="L227">            outputBytes[dst++] = getByte3Of3(unicodeScalar);</span>
+<span class="fc" id="L228">            break;</span>
+        case 4:
+<span class="nc bnc" id="L230" title="All 2 branches missed.">            if (dst+3 &gt;= end) throw new ArrayIndexOutOfBoundsException();</span>
+<span class="nc" id="L231">            outputBytes[dst++] = getByte1Of4(unicodeScalar);</span>
+<span class="nc" id="L232">            outputBytes[dst++] = getByte2Of4(unicodeScalar);</span>
+<span class="nc" id="L233">            outputBytes[dst++] = getByte3Of4(unicodeScalar);</span>
+<span class="nc" id="L234">            outputBytes[dst++] = getByte4Of4(unicodeScalar);</span>
+            break;
+        }
+<span class="fc" id="L237">        return dst - offset;</span>
+    }
+    /**
+     * converts a unicode code point to a 0-3 bytes of UTF8
+     * encoded data and a length - note this doesn't pack
+     * a 1 byte character and it returns the start character.
+     * this is the unpacking routine
+     *  while (_utf8_pretch_byte_count &gt; 0 &amp;&amp; offset &lt; limit) {
+     *    _utf8_pretch_byte_count--;
+     *    buffer[offset++] = (byte)((_utf8_pretch_bytes &gt;&gt; (_utf8_pretch_byte_count*8)) &amp; 0xff);
+     *  }
+     */
+    public final static int packBytesAfter1(int unicodeScalar, int utf8Len)
+    {
+        int packed_chars;
+
+<span class="nc bnc" id="L253" title="All 4 branches missed.">        switch (utf8Len) {</span>
+        default:
+<span class="nc" id="L255">            throw new IllegalArgumentException(&quot;pack requires len &gt; 1&quot;);</span>
+        case 2:
+<span class="nc" id="L257">            packed_chars = getByte2Of2(unicodeScalar);</span>
+<span class="nc" id="L258">            break;</span>
+        case 3:
+<span class="nc" id="L260">            packed_chars  = getByte2Of3(unicodeScalar);</span>
+<span class="nc" id="L261">            packed_chars |= getByte3Of3(unicodeScalar) &lt;&lt; 8;</span>
+<span class="nc" id="L262">            break;</span>
+        case 4:
+<span class="nc" id="L264">            packed_chars = getByte2Of4(unicodeScalar);</span>
+<span class="nc" id="L265">            packed_chars |= getByte3Of4(unicodeScalar) &lt;&lt; 8;</span>
+<span class="nc" id="L266">            packed_chars |= getByte4Of4(unicodeScalar) &lt;&lt; 16;</span>
+            break;
+        }
+<span class="nc" id="L269">        return packed_chars;</span>
+
+    }
+
+    public final static int getScalarFrom4BytesReversed(int utf8BytesReversed)
+    {
+        //loop to read these bytes out:
+        // int b4r = read();
+        // switch (getUTF8LengthFromFirstByte(b)) {
+        // case 4: b4r |= (read() &lt;&lt; 24);  // fall through
+        // case 3: b4r |= (read() &lt;&lt; 16);
+        // case 2: b4r |= (read() &lt;&lt;  8);
+        // case 1: // nothing to do
+        // }
+<span class="nc" id="L283">        int c = utf8BytesReversed &amp; 0xff;</span>
+<span class="nc bnc" id="L284" title="All 5 branches missed.">        switch (getUTF8LengthFromFirstByte(c)) {</span>
+        case 1:
+<span class="nc" id="L286">            return c;</span>
+        case 2:
+<span class="nc" id="L288">            c  = ((c &amp; UNICODE_TWO_BYTE_MASK) &lt;&lt; 6);</span>
+<span class="nc" id="L289">            c |= ((utf8BytesReversed &gt;&gt; 8) &amp; UNICODE_CONTINUATION_BYTE_MASK);</span>
+<span class="nc" id="L290">            return c;</span>
+        case 3:
+<span class="nc" id="L292">            c  = ((c &amp; UNICODE_THREE_BYTE_MASK) &lt;&lt; 12);</span>
+<span class="nc" id="L293">            c |= ((utf8BytesReversed &gt;&gt; 2) &amp; (UNICODE_CONTINUATION_BYTE_MASK) &lt;&lt; 6);</span>
+<span class="nc" id="L294">            c |= ((utf8BytesReversed &gt;&gt; 16) &amp; UNICODE_CONTINUATION_BYTE_MASK);</span>
+<span class="nc" id="L295">            return c;</span>
+        case 4:
+<span class="nc" id="L297">            c  = ((c &amp; UNICODE_FOUR_BYTE_MASK) &lt;&lt; 18);</span>
+<span class="nc" id="L298">            c |= (((utf8BytesReversed &lt;&lt; 4) &amp; (UNICODE_CONTINUATION_BYTE_MASK) &lt;&lt; 12));</span>
+<span class="nc" id="L299">            c |= (((utf8BytesReversed &gt;&gt; 2) &amp; (UNICODE_CONTINUATION_BYTE_MASK) &lt;&lt; 6));</span>
+<span class="nc" id="L300">            c |= ((utf8BytesReversed &gt;&gt; 24) &amp; UNICODE_CONTINUATION_BYTE_MASK);</span>
+<span class="nc" id="L301">            return c;</span>
+        }
+<span class="nc" id="L303">        throw new InvalidUnicodeCodePoint();</span>
+    }
+    /**
+     * this helper calculates the number of bytes it will consume from the
+     * supplied byte array (bytes) if getScalarFromBytes is called with
+     * the same parameters.  This is in place of having getScalarFromBytes
+     * return an object with the bytes consumed and the resultant scalar.
+     * This will throw ArrayIndexOutOfBoundsException if there are fewer
+     * bytes remaining (maxLength) than needed for a valid UTF8 sequence
+     * starting at offset.
+     * @param bytes UTF8 bytes in user supplied array
+     * @param offset first array element to read from
+     * @param maxLength maximum number of bytes to read from the array
+     * @return number of bytes needed to decode the next scalar
+     */
+    public final static int getScalarReadLengthFromBytes(byte[] bytes, int offset, int maxLength)
+    {
+<span class="nc" id="L320">        int src = offset;</span>
+<span class="nc" id="L321">        int end = offset + maxLength;</span>
+
+<span class="nc bnc" id="L323" title="All 2 branches missed.">        if (src &gt;= end) throw new ArrayIndexOutOfBoundsException();</span>
+<span class="nc" id="L324">        int c = bytes[src++] &amp; 0xff;</span>
+<span class="nc" id="L325">        int utf8length = getUTF8LengthFromFirstByte(c);</span>
+<span class="nc bnc" id="L326" title="All 2 branches missed.">        if (src + utf8length &gt; end) throw new ArrayIndexOutOfBoundsException();</span>
+
+<span class="nc" id="L328">        return utf8length;</span>
+    }
+    /**
+     * this helper converts the bytes starting at offset from UTF8 to a
+     * Unicode scalar.  This does not check for valid Unicode scalar ranges
+     * but simply handle the UTF8 decoding.  getScalarReadLengthFromBytes
+     * can be used to determine how many bytes would be converted (consumed) in
+     * this process if the same parameters are passed in.  This will throw
+     * ArrayIndexOutOfBoundsException if the array has too few bytes to
+     * fully decode the scalar. It will throw InvalidUnicodeCodePoint if
+     * the first byte isn't a valid UTF8 initial byte with a length of
+     * 4 or less.
+     * @param bytes UTF8 bytes in an array
+     * @param offset initial array element to decode from
+     * @param maxLength maximum number of bytes to consume from the array
+     * @return Unicode scalar
+     */
+    public final static int getScalarFromBytes(byte[] bytes, int offset, int maxLength)
+    {
+<span class="nc" id="L347">        int src = offset;</span>
+<span class="nc" id="L348">        int end = offset + maxLength;</span>
+
+<span class="nc bnc" id="L350" title="All 2 branches missed.">        if (src &gt;= end) throw new ArrayIndexOutOfBoundsException();</span>
+<span class="nc" id="L351">        int c = bytes[src++] &amp; 0xff;</span>
+<span class="nc" id="L352">        int utf8length = getUTF8LengthFromFirstByte(c);</span>
+<span class="nc bnc" id="L353" title="All 2 branches missed.">        if (src + utf8length &gt; end) throw new ArrayIndexOutOfBoundsException();</span>
+
+<span class="nc bnc" id="L355" title="All 5 branches missed.">        switch (utf8length) {</span>
+        case 1:
+<span class="nc" id="L357">            break;</span>
+        case 2:
+<span class="nc" id="L359">            c  = (c &amp; UNICODE_TWO_BYTE_MASK);</span>
+<span class="nc" id="L360">            c |= ((bytes[src++] &amp; 0xff) &amp; UNICODE_CONTINUATION_BYTE_MASK);</span>
+<span class="nc" id="L361">            break;</span>
+        case 3:
+<span class="nc" id="L363">            c  = (c &amp; UNICODE_THREE_BYTE_MASK);</span>
+<span class="nc" id="L364">            c |= ((bytes[src++] &amp; 0xff) &amp; UNICODE_CONTINUATION_BYTE_MASK);</span>
+<span class="nc" id="L365">            c |= ((bytes[src++] &amp; 0xff) &amp; UNICODE_CONTINUATION_BYTE_MASK);</span>
+<span class="nc" id="L366">            break;</span>
+        case 4:
+<span class="nc" id="L368">            c  = (c &amp; UNICODE_FOUR_BYTE_MASK);</span>
+<span class="nc" id="L369">            c |= ((bytes[src++] &amp; 0xff) &amp; UNICODE_CONTINUATION_BYTE_MASK);</span>
+<span class="nc" id="L370">            c |= ((bytes[src++] &amp; 0xff) &amp; UNICODE_CONTINUATION_BYTE_MASK);</span>
+<span class="nc" id="L371">            c |= ((bytes[src++] &amp; 0xff) &amp; UNICODE_CONTINUATION_BYTE_MASK);</span>
+<span class="nc" id="L372">            break;</span>
+        default:
+<span class="nc" id="L374">            throw new InvalidUnicodeCodePoint(&quot;code point is invalid: &quot;+utf8length);</span>
+        }
+<span class="nc" id="L376">        return c;</span>
+    }
+
+    public final static boolean needsSurrogateEncoding(int unicodeScalar) {
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        return (unicodeScalar &gt; MAXIMUM_UTF16_1_CHAR_CODE_POINT);</span>
+    }
+    public final static char highSurrogate(int unicodeScalar) {
+<span class="pc bpc" id="L383" title="2 of 4 branches missed.">        assert(unicodeScalar &gt; MAXIMUM_UTF16_1_CHAR_CODE_POINT);</span>
+<span class="pc bpc" id="L384" title="2 of 4 branches missed.">        assert(unicodeScalar &lt;= Character.MAX_CODE_POINT);</span>
+<span class="fc" id="L385">        int c = ((unicodeScalar - SURROGATE_OFFSET) &gt;&gt; 10);</span>
+<span class="fc" id="L386">        return (char)((c | HIGH_SURROGATE) &amp; 0xffff);</span>
+    }
+    public final static char lowSurrogate(int unicodeScalar) {
+<span class="pc bpc" id="L389" title="2 of 4 branches missed.">        assert(unicodeScalar &gt; MAXIMUM_UTF16_1_CHAR_CODE_POINT);</span>
+<span class="pc bpc" id="L390" title="2 of 4 branches missed.">        assert(unicodeScalar &lt;= Character.MAX_CODE_POINT);</span>
+<span class="fc" id="L391">        int c = ((unicodeScalar - SURROGATE_OFFSET) &amp; 0x3ff);</span>
+<span class="fc" id="L392">        return (char)((c | LOW_SURROGATE) &amp; 0xffff);</span>
+    }
+    public final static int getUnicodeScalarFromSurrogates(int highSurrogate, int lowSurrogate)
+    {
+<span class="nc bnc" id="L396" title="All 4 branches missed.">        assert(IonUTF8.isHighSurrogate(highSurrogate));</span>
+<span class="nc bnc" id="L397" title="All 4 branches missed.">        assert(IonUTF8.isLowSurrogate(lowSurrogate));</span>
+        int scalar;
+<span class="nc" id="L399">        scalar = lowSurrogate &amp; 0x3ff;</span>
+<span class="nc" id="L400">        scalar += (highSurrogate &amp; 0x3ff) &lt;&lt; 10;</span>
+<span class="nc" id="L401">        scalar += SURROGATE_OFFSET;</span>
+<span class="nc" id="L402">        return scalar;</span>
+    }
+
+    public static class InvalidUnicodeCodePoint extends IonException
+    {
+        private static final long serialVersionUID = -3200811216940328945L;
+
+        public InvalidUnicodeCodePoint() {
+<span class="nc" id="L410">            super(&quot;invalid UTF8&quot;);</span>
+<span class="nc" id="L411">        }</span>
+        public InvalidUnicodeCodePoint(String msg) {
+<span class="nc" id="L413">            super(msg);</span>
+<span class="nc" id="L414">        }</span>
+        public InvalidUnicodeCodePoint(Exception e) {
+<span class="nc" id="L416">            super(e);</span>
+<span class="nc" id="L417">        }</span>
+        public InvalidUnicodeCodePoint(String msg, Exception e) {
+<span class="nc" id="L419">            super(msg, e);</span>
+<span class="nc" id="L420">        }</span>
+    }
+
+
+    public static final class UTF8ToChar extends OutputStream implements Closeable
+    {
+        final private Appendable   _char_stream;
+        // the pending bytes are being handled like this
+        // instead of in a byte array as previous timing
+        // of array dereferencing (circa 2009) shows it
+        // to be remarkably slow.
+<span class="nc" id="L431">              private int          _expected_count = 0;</span>
+<span class="nc" id="L432">              private int          _pending_count = 0;</span>
+              private int          _pending_c1;
+              private int          _pending_c2;
+              private int          _pending_c3;
+
+<span class="nc" id="L437">        public UTF8ToChar(Appendable charStream) {</span>
+<span class="nc" id="L438">            _char_stream = charStream;</span>
+<span class="nc" id="L439">        }</span>
+        public final Appendable getAppendable() {
+<span class="nc" id="L441">            return _char_stream;</span>
+        }
+
+        @Override
+        public final void close() throws IOException
+        {
+<span class="nc bnc" id="L447" title="All 2 branches missed.">            if (_pending_count &gt; 0) {</span>
+<span class="nc" id="L448">                throw new IOException(&quot;unfinished utf8 sequence still open&quot;);</span>
+            }
+<span class="nc" id="L450">        }</span>
+
+        @Override
+        public final void write(int b) throws IOException
+        {
+<span class="nc" id="L455">            b = b &amp; 0xff;</span>
+<span class="nc bnc" id="L456" title="All 2 branches missed.">            if (_expected_count &gt; 0) {</span>
+<span class="nc" id="L457">                write_helper_continue(b);</span>
+            }
+<span class="nc bnc" id="L459" title="All 2 branches missed.">            else if (b &gt; 127) {</span>
+<span class="nc bnc" id="L460" title="All 2 branches missed.">                if (!IonUTF8.isStartByte(b)) {</span>
+<span class="nc" id="L461">                    throw new IOException(&quot;invalid UTF8 sequence: byte &gt; 127 is not a UTF8 leading byte&quot;);</span>
+                }
+<span class="nc" id="L463">                write_helper_start_sequence(b);</span>
+            }
+            else {
+<span class="nc" id="L466">                _char_stream.append((char)b);</span>
+            }
+<span class="nc" id="L468">        }</span>
+
+        @Override
+        public final void write(byte[] bytes) throws IOException
+        {
+<span class="nc" id="L473">            write(bytes, 0, bytes.length);</span>
+<span class="nc" id="L474">        }</span>
+
+        @Override
+        public final void write(byte[] bytes, int off, int len) throws IOException
+        {
+<span class="nc bnc" id="L479" title="All 2 branches missed.">            for (int ii=off; ii&lt;off+len; ii++) {</span>
+<span class="nc" id="L480">                int b = bytes[ii] &amp; 0xff;</span>
+<span class="nc bnc" id="L481" title="All 4 branches missed.">                if (_pending_count == 0 &amp;&amp; b &lt; 128) {</span>
+<span class="nc" id="L482">                    _char_stream.append((char)b);</span>
+                }
+                else {
+<span class="nc" id="L485">                    write(b);</span>
+                }
+            }
+<span class="nc" id="L488">        }</span>
+
+        private final void write_helper_start_sequence(int b) throws IOException
+        {
+<span class="nc" id="L492">            _expected_count = IonUTF8.getUTF8LengthFromFirstByte(b);</span>
+<span class="nc" id="L493">            _pending_count = 1;</span>
+<span class="nc" id="L494">            _pending_c1 = b;</span>
+<span class="nc" id="L495">        }</span>
+        private final void write_helper_continue(int b) throws IOException
+        {
+<span class="nc" id="L498">            _pending_count++;</span>
+<span class="nc bnc" id="L499" title="All 2 branches missed.">            if (_expected_count == _pending_count) {</span>
+<span class="nc" id="L500">                write_helper_write_char(b);</span>
+            }
+            else {
+<span class="nc bnc" id="L503" title="All 3 branches missed.">                switch(_pending_count) {</span>
+                case 2:
+<span class="nc" id="L505">                    _pending_c2 = b;</span>
+<span class="nc" id="L506">                    break;</span>
+                case 3:
+<span class="nc" id="L508">                    _pending_c3 = b;</span>
+<span class="nc" id="L509">                    break;</span>
+                default:
+<span class="nc" id="L511">                    throw new IOException(&quot;invalid state for pending vs expected UTF8 bytes&quot;);</span>
+                }
+            }
+<span class="nc" id="L514">        }</span>
+        private final void write_helper_write_char(int b) throws IOException
+        {
+            char c;
+            int  s;
+<span class="nc bnc" id="L519" title="All 4 branches missed.">            switch(_pending_count) {</span>
+            case 2:
+<span class="nc bnc" id="L521" title="All 2 branches missed.">                if (!IonUTF8.isContinueByteUTF8(b)) {</span>
+<span class="nc" id="L522">                    throwBadContinuationByte();</span>
+                }
+<span class="nc" id="L524">                c = IonUTF8.twoByteScalar(_pending_c1, b);</span>
+<span class="nc" id="L525">                _char_stream.append(c);</span>
+<span class="nc" id="L526">                break;</span>
+            case 3:
+<span class="nc bnc" id="L528" title="All 2 branches missed.">                if (!IonUTF8.isContinueByteUTF8(b)) {</span>
+<span class="nc" id="L529">                    throwBadContinuationByte();</span>
+                }
+<span class="nc bnc" id="L531" title="All 2 branches missed.">                if (!IonUTF8.isContinueByteUTF8(_pending_c2)) {</span>
+<span class="nc" id="L532">                    throwBadContinuationByte();</span>
+                }
+<span class="nc" id="L534">                s = IonUTF8.threeByteScalar(_pending_c1, _pending_c2, b);</span>
+<span class="nc bnc" id="L535" title="All 2 branches missed.">                if (IonUTF8.needsSurrogateEncoding(s)) {</span>
+<span class="nc" id="L536">                    _char_stream.append(IonUTF8.lowSurrogate(s));</span>
+<span class="nc" id="L537">                    _char_stream.append(IonUTF8.highSurrogate(s));</span>
+                }
+                else {
+<span class="nc" id="L540">                    _char_stream.append((char)s);</span>
+                }
+<span class="nc" id="L542">                break;</span>
+            case 4:
+<span class="nc bnc" id="L544" title="All 2 branches missed.">                if (!IonUTF8.isContinueByteUTF8(b)) {</span>
+<span class="nc" id="L545">                    throwBadContinuationByte();</span>
+                }
+<span class="nc bnc" id="L547" title="All 2 branches missed.">                if (!IonUTF8.isContinueByteUTF8(_pending_c2)) {</span>
+<span class="nc" id="L548">                    throwBadContinuationByte();</span>
+                }
+<span class="nc bnc" id="L550" title="All 2 branches missed.">                if (!IonUTF8.isContinueByteUTF8(_pending_c3)) {</span>
+<span class="nc" id="L551">                    throwBadContinuationByte();</span>
+                }
+<span class="nc" id="L553">                s = IonUTF8.fourByteScalar(_pending_c1, _pending_c2, _pending_c3, b);</span>
+<span class="nc bnc" id="L554" title="All 2 branches missed.">                if (IonUTF8.needsSurrogateEncoding(s)) {</span>
+<span class="nc" id="L555">                    _char_stream.append(IonUTF8.lowSurrogate(s));</span>
+<span class="nc" id="L556">                    _char_stream.append(IonUTF8.highSurrogate(s));</span>
+                }
+                else {
+<span class="nc" id="L559">                    _char_stream.append((char)s);</span>
+                }
+<span class="nc" id="L561">                break;</span>
+            default:
+<span class="nc" id="L563">                throw new IOException(&quot;invalid state for UTF8 sequence length &quot;+_pending_count);</span>
+            }
+<span class="nc" id="L565">        }</span>
+        private void throwBadContinuationByte() throws IOException
+        {
+<span class="nc" id="L568">            throw new IOException(&quot;continuation byte expected&quot;);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

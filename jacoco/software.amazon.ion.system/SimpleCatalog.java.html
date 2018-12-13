@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SimpleCatalog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">software.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">software.amazon.ion.system</a> &gt; <span class="el_source">SimpleCatalog.java</span></div><h1>SimpleCatalog.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at:
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
+ * language governing permissions and limitations under the License.
+ */
+
+package software.amazon.ion.system;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.TreeMap;
+import software.amazon.ion.IonCatalog;
+import software.amazon.ion.IonMutableCatalog;
+import software.amazon.ion.SymbolTable;
+
+
+/**
+ * A basic implementation of {@link IonCatalog} as a hash table.  There is no
+ * automatic removal of entries.
+ */
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">public class SimpleCatalog</span>
+    implements IonMutableCatalog, Iterable&lt;SymbolTable&gt;
+{
+    /*  CAVEATS AND LIMITATIONS
+     *
+     *  - When getTable can't find an exact match, it does a linear scan of
+     *    all tables with the same name to find the best match.
+     *  - Synchonization could probably be tighter using read/write locks
+     *    instead of simple monitors.
+     */
+<span class="fc" id="L42">    private Map&lt;String,TreeMap&lt;Integer,SymbolTable&gt;&gt; myTablesByName =</span>
+        new HashMap&lt;String,TreeMap&lt;Integer,SymbolTable&gt;&gt;();
+
+
+    public SymbolTable getTable(String name)
+    {
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (name == null)</span>
+        {
+<span class="nc" id="L50">            throw new IllegalArgumentException(&quot;name is null&quot;);</span>
+        }
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (name.length() == 0)</span>
+        {
+<span class="nc" id="L54">            throw new IllegalArgumentException(&quot;name is empty&quot;);</span>
+        }
+
+        TreeMap&lt;Integer,SymbolTable&gt; versions;
+<span class="fc" id="L58">        synchronized (myTablesByName)</span>
+        {
+<span class="fc" id="L60">            versions = myTablesByName.get(name);</span>
+<span class="fc" id="L61">        }</span>
+
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (versions == null) return null;</span>
+
+<span class="fc" id="L65">        synchronized (versions)</span>
+        {
+<span class="fc" id="L67">            Integer highestVersion = versions.lastKey();</span>
+<span class="fc" id="L68">            return versions.get(highestVersion);</span>
+        }
+    }
+
+    public SymbolTable getTable(String name, int version)
+    {
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (name == null)</span>
+        {
+<span class="nc" id="L76">            throw new IllegalArgumentException(&quot;name is null&quot;);</span>
+        }
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (name.length() == 0)</span>
+        {
+<span class="nc" id="L80">            throw new IllegalArgumentException(&quot;name is empty&quot;);</span>
+        }
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (version &lt; 1)</span>
+        {
+<span class="nc" id="L84">            throw new IllegalArgumentException(&quot;version is &lt; 1&quot;);</span>
+        }
+
+        TreeMap&lt;Integer,SymbolTable&gt; versions;
+<span class="fc" id="L88">        synchronized (myTablesByName)</span>
+        {
+<span class="fc" id="L90">            versions = myTablesByName.get(name);</span>
+<span class="fc" id="L91">        }</span>
+
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (versions == null) return null;</span>
+
+<span class="fc" id="L95">        synchronized (versions)</span>
+        {
+<span class="fc" id="L97">            SymbolTable st = versions.get(version);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            if (st == null)</span>
+            {
+                // if we don't have the one you want, we'll give you the
+                // &quot;best&quot; one we have, even if it's newer than what you
+                // asked for (see CAVEAT above)
+<span class="pc bpc" id="L103" title="2 of 4 branches missed.">                assert !versions.isEmpty();</span>
+
+<span class="fc" id="L105">                Integer ibest = bestMatch(version, versions.keySet());</span>
+<span class="pc bpc" id="L106" title="2 of 4 branches missed.">                assert(ibest != null);</span>
+<span class="fc" id="L107">                st = versions.get(ibest);</span>
+<span class="pc bpc" id="L108" title="2 of 4 branches missed.">                assert st != null;</span>
+            }
+
+<span class="fc" id="L111">            return st;</span>
+        }
+    }
+
+    static Integer bestMatch(int requestedVersion,
+                             Iterable&lt;Integer&gt; availableVersions)
+    {
+<span class="fc" id="L118">        int best = requestedVersion;</span>
+<span class="fc" id="L119">        Integer ibest = null;</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        for (Integer available : availableVersions)</span>
+        {
+<span class="pc bpc" id="L122" title="2 of 4 branches missed.">            assert available != requestedVersion;</span>
+
+<span class="fc" id="L124">            int v = available.intValue();</span>
+
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            if (requestedVersion &lt; best) {</span>
+<span class="fc bfc" id="L127" title="All 4 branches covered.">                if (requestedVersion &lt; v &amp;&amp; v &lt; best) {</span>
+<span class="fc" id="L128">                    best = v;</span>
+<span class="fc" id="L129">                    ibest = available;</span>
+                }
+            }
+<span class="fc bfc" id="L132" title="All 2 branches covered.">            else if (best &lt; requestedVersion) {</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">                if (best &lt; v) {</span>
+<span class="fc" id="L134">                    best = v;</span>
+<span class="fc" id="L135">                    ibest = available;</span>
+                }
+            }
+            else {
+<span class="fc" id="L139">                best = v;</span>
+<span class="fc" id="L140">                ibest = available;</span>
+            }
+<span class="fc" id="L142">        }</span>
+<span class="fc" id="L143">        return ibest;</span>
+    }
+
+    public void putTable(SymbolTable table)
+    {
+<span class="pc bpc" id="L148" title="3 of 6 branches missed.">        if (table.isLocalTable() || table.isSystemTable() || table.isSubstitute())</span>
+        {
+<span class="nc" id="L150">            throw new IllegalArgumentException(&quot;table cannot be local or system or substitute table&quot;);</span>
+        }
+
+<span class="fc" id="L153">        String name = table.getName();</span>
+<span class="fc" id="L154">        int version = table.getVersion();</span>
+<span class="pc bpc" id="L155" title="2 of 4 branches missed.">        assert version &gt;= 0;</span>
+
+<span class="fc" id="L157">        synchronized (myTablesByName)</span>
+        {
+<span class="fc" id="L159">            TreeMap&lt;Integer,SymbolTable&gt; versions =</span>
+<span class="fc" id="L160">                myTablesByName.get(name);</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            if (versions == null)</span>
+            {
+<span class="fc" id="L163">                versions = new TreeMap&lt;Integer,SymbolTable&gt;();</span>
+<span class="fc" id="L164">                myTablesByName.put(name, versions);</span>
+            }
+<span class="fc" id="L166">            synchronized (versions)</span>
+            {
+<span class="fc" id="L168">                versions.put(version, table);</span>
+<span class="fc" id="L169">            }</span>
+<span class="fc" id="L170">        }</span>
+<span class="fc" id="L171">    }</span>
+
+
+    /**
+     * Removes a symbol table from this catalog.
+     *
+     * @return the removed table, or &lt;code&gt;null&lt;/code&gt; if this catalog has
+     * no matching table.
+     */
+    public SymbolTable removeTable(String name, int version)
+    {
+<span class="fc" id="L182">        SymbolTable removed = null;</span>
+
+<span class="fc" id="L184">        synchronized (myTablesByName)</span>
+        {
+<span class="fc" id="L186">            TreeMap&lt;Integer,SymbolTable&gt; versions =</span>
+<span class="fc" id="L187">                myTablesByName.get(name);</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">            if (versions != null)</span>
+            {
+<span class="fc" id="L190">                synchronized (versions)</span>
+                {
+<span class="fc" id="L192">                    removed = versions.remove(version);</span>
+
+                    // Remove empty intermediate table
+<span class="fc bfc" id="L195" title="All 2 branches covered.">                    if (versions.isEmpty())</span>
+                    {
+<span class="fc" id="L197">                        myTablesByName.remove(name);</span>
+                    }
+<span class="fc" id="L199">                }</span>
+            }
+<span class="fc" id="L201">        }</span>
+
+<span class="fc" id="L203">        return removed;</span>
+    }
+
+
+    /**
+     * Constructs an iterator that enumerates all of the shared symbol tables
+     * in this catalog, at the time of method invocation. The result represents
+     * a snapshot of the state of this catalog.
+     *
+     * @return a non-null, but potentially empty, iterator.
+     */
+    public Iterator&lt;SymbolTable&gt; iterator()
+    {
+        ArrayList&lt;SymbolTable&gt; tables;
+
+<span class="nc" id="L218">        synchronized (myTablesByName)</span>
+        {
+<span class="nc" id="L220">            tables = new ArrayList&lt;SymbolTable&gt;(myTablesByName.size());</span>
+
+            // I don't think we can shorten the synchronization block
+            // because HashMap.values() result is a live view (not a copy) and
+            // thus needs to be synched too.
+<span class="nc" id="L225">            Collection&lt;TreeMap&lt;Integer, SymbolTable&gt;&gt; symtabNames =</span>
+<span class="nc" id="L226">                myTablesByName.values();</span>
+<span class="nc bnc" id="L227" title="All 2 branches missed.">            for (TreeMap&lt;Integer,SymbolTable&gt; versions : symtabNames)</span>
+            {
+<span class="nc" id="L229">                synchronized (versions)</span>
+                {
+<span class="nc" id="L231">                    tables.addAll(versions.values());</span>
+<span class="nc" id="L232">                }</span>
+<span class="nc" id="L233">            }</span>
+<span class="nc" id="L234">        }</span>
+
+<span class="nc" id="L236">        return tables.iterator();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

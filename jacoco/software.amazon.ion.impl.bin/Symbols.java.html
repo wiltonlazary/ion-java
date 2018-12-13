@@ -1,0 +1,339 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Symbols.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">software.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">software.amazon.ion.impl.bin</a> &gt; <span class="el_source">Symbols.java</span></div><h1>Symbols.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2015-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at:
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
+ * language governing permissions and limitations under the License.
+ */
+
+package software.amazon.ion.impl.bin;
+
+import static java.util.Arrays.asList;
+import static java.util.Collections.unmodifiableList;
+import static java.util.Collections.unmodifiableMap;
+import static software.amazon.ion.SystemSymbols.IMPORTS;
+import static software.amazon.ion.SystemSymbols.IMPORTS_SID;
+import static software.amazon.ion.SystemSymbols.ION;
+import static software.amazon.ion.SystemSymbols.ION_1_0;
+import static software.amazon.ion.SystemSymbols.ION_1_0_MAX_ID;
+import static software.amazon.ion.SystemSymbols.ION_1_0_SID;
+import static software.amazon.ion.SystemSymbols.ION_SHARED_SYMBOL_TABLE;
+import static software.amazon.ion.SystemSymbols.ION_SHARED_SYMBOL_TABLE_SID;
+import static software.amazon.ion.SystemSymbols.ION_SID;
+import static software.amazon.ion.SystemSymbols.ION_SYMBOL_TABLE;
+import static software.amazon.ion.SystemSymbols.ION_SYMBOL_TABLE_SID;
+import static software.amazon.ion.SystemSymbols.MAX_ID;
+import static software.amazon.ion.SystemSymbols.MAX_ID_SID;
+import static software.amazon.ion.SystemSymbols.NAME;
+import static software.amazon.ion.SystemSymbols.NAME_SID;
+import static software.amazon.ion.SystemSymbols.SYMBOLS;
+import static software.amazon.ion.SystemSymbols.SYMBOLS_SID;
+import static software.amazon.ion.SystemSymbols.VERSION;
+import static software.amazon.ion.SystemSymbols.VERSION_SID;
+
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import software.amazon.ion.IonException;
+import software.amazon.ion.SymbolTable;
+import software.amazon.ion.SymbolToken;
+
+/**
+ * Utilities for dealing with {@link SymbolToken} and {@link SymbolTable}.
+ */
+/*package*/ class Symbols
+{
+    private Symbols() {}
+
+    /** Constructs a token with a non-null name and positive value. */
+    public static SymbolToken symbol(final String name, final int val)
+    {
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (name == null) { throw new NullPointerException(); }</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (val &lt;= 0) { throw new IllegalArgumentException(&quot;Symbol value must be positive: &quot; + val); }</span>
+
+<span class="fc" id="L63">        return new SymbolToken()</span>
+<span class="fc" id="L64">        {</span>
+            public String getText()
+            {
+<span class="fc" id="L67">                return name;</span>
+            }
+
+            public String assumeText()
+            {
+<span class="fc" id="L72">                return name;</span>
+            }
+
+            public int getSid()
+            {
+<span class="fc" id="L77">                return val;</span>
+            }
+
+            @Override
+            public String toString()
+            {
+<span class="nc" id="L83">                return &quot;(symbol '&quot; + getText() + &quot;' &quot; + getSid() + &quot;)&quot;;</span>
+            }
+        };
+    }
+
+    /** Lazy iterator over the symbol names of an iterator of symbol tokens. */
+    public static Iterator&lt;String&gt; symbolNameIterator(final Iterator&lt;SymbolToken&gt; tokenIter)
+    {
+<span class="nc" id="L91">        return new Iterator&lt;String&gt;()</span>
+<span class="nc" id="L92">        {</span>
+            public boolean hasNext()
+            {
+<span class="nc" id="L95">                return tokenIter.hasNext();</span>
+            }
+
+            public String next()
+            {
+<span class="nc" id="L100">                return tokenIter.next().getText();</span>
+            }
+
+            public void remove()
+            {
+<span class="nc" id="L105">                throw new UnsupportedOperationException();</span>
+            }
+        };
+    }
+
+<span class="fc" id="L110">    private static final List&lt;SymbolToken&gt; SYSTEM_TOKENS = unmodifiableList(</span>
+<span class="fc" id="L111">        asList(</span>
+<span class="fc" id="L112">            symbol(ION,                      ION_SID)</span>
+<span class="fc" id="L113">          , symbol(ION_1_0,                  ION_1_0_SID)</span>
+<span class="fc" id="L114">          , symbol(ION_SYMBOL_TABLE,         ION_SYMBOL_TABLE_SID)</span>
+<span class="fc" id="L115">          , symbol(NAME,                     NAME_SID)</span>
+<span class="fc" id="L116">          , symbol(VERSION,                  VERSION_SID)</span>
+<span class="fc" id="L117">          , symbol(IMPORTS,                  IMPORTS_SID)</span>
+<span class="fc" id="L118">          , symbol(SYMBOLS,                  SYMBOLS_SID)</span>
+<span class="fc" id="L119">          , symbol(MAX_ID,                   MAX_ID_SID)</span>
+<span class="fc" id="L120">          , symbol(ION_SHARED_SYMBOL_TABLE,  ION_SHARED_SYMBOL_TABLE_SID)</span>
+        )
+    );
+
+    /** Returns a symbol token for a system SID. */
+    public static SymbolToken systemSymbol(final int sid) {
+<span class="pc bpc" id="L126" title="2 of 4 branches missed.">        if (sid &lt; 1 || sid &gt; ION_1_0_MAX_ID)</span>
+        {
+<span class="nc" id="L128">            throw new IllegalArgumentException(&quot;No such system SID: &quot; + sid);</span>
+        }
+<span class="fc" id="L130">        return SYSTEM_TOKENS.get(sid - 1);</span>
+    }
+
+    private static final Map&lt;String, SymbolToken&gt; SYSTEM_TOKEN_MAP;
+    static {
+<span class="fc" id="L135">        final Map&lt;String, SymbolToken&gt; symbols = new HashMap&lt;String, SymbolToken&gt;();</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        for (final SymbolToken token : SYSTEM_TOKENS)</span>
+        {
+<span class="fc" id="L138">            symbols.put(token.getText(), token);</span>
+<span class="fc" id="L139">        }</span>
+<span class="fc" id="L140">        SYSTEM_TOKEN_MAP = unmodifiableMap(symbols);</span>
+    }
+
+<span class="fc" id="L143">    private static SymbolTable SYSTEM_SYMBOL_TABLE = new AbstractSymbolTable(ION, 1)</span>
+<span class="fc" id="L144">    {</span>
+        public SymbolTable[] getImportedTables()
+        {
+<span class="nc" id="L147">            return null;</span>
+        }
+
+        public int getImportedMaxId()
+        {
+<span class="nc" id="L152">            return 0;</span>
+        }
+
+        public boolean isSystemTable()
+        {
+<span class="fc" id="L157">            return true;</span>
+        }
+
+        public boolean isSubstitute()
+        {
+<span class="nc" id="L162">            return false;</span>
+        }
+
+        public boolean isSharedTable()
+        {
+<span class="nc" id="L167">            return true;</span>
+        }
+
+        public boolean isReadOnly()
+        {
+<span class="nc" id="L172">            return true;</span>
+        }
+
+        public boolean isLocalTable()
+        {
+<span class="fc" id="L177">            return false;</span>
+        }
+
+        public SymbolToken intern(final String text)
+        {
+<span class="nc" id="L182">            final SymbolToken token = SYSTEM_TOKEN_MAP.get(text);</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">            if (token == null)</span>
+            {
+<span class="nc" id="L185">                throw new IonException(&quot;Cannot intern new symbol into system symbol table&quot;);</span>
+            }
+<span class="nc" id="L187">            return token;</span>
+        }
+
+        public String findKnownSymbol(int id)
+        {
+<span class="nc bnc" id="L192" title="All 2 branches missed.">            if (id &lt; 1)</span>
+            {
+<span class="nc" id="L194">                throw new IllegalArgumentException(&quot;SID cannot be less than 1: &quot; + id);</span>
+            }
+<span class="nc bnc" id="L196" title="All 2 branches missed.">            if (id &gt; ION_1_0_MAX_ID)</span>
+            {
+<span class="nc" id="L198">                return null;</span>
+            }
+
+<span class="nc" id="L201">            return SYSTEM_TOKENS.get(id - 1).getText();</span>
+        }
+
+        public SymbolToken find(String text)
+        {
+<span class="fc" id="L206">            return SYSTEM_TOKEN_MAP.get(text);</span>
+        }
+
+        public SymbolTable getSystemSymbolTable()
+        {
+<span class="nc" id="L211">            return this;</span>
+        }
+
+        public int getMaxId()
+        {
+<span class="fc" id="L216">            return ION_1_0_MAX_ID;</span>
+        }
+
+        public Iterator&lt;String&gt; iterateDeclaredSymbolNames()
+        {
+<span class="nc" id="L221">            return symbolNameIterator(SYSTEM_TOKENS.iterator());</span>
+        }
+    };
+
+    /** Returns a representation of the system symbol table. */
+    public static SymbolTable systemSymbolTable()
+    {
+<span class="fc" id="L228">        return SYSTEM_SYMBOL_TABLE;</span>
+    }
+
+    /** Returns the system symbols as a collection. */
+    public static Collection&lt;SymbolToken&gt; systemSymbols()
+    {
+<span class="fc" id="L234">        return SYSTEM_TOKENS;</span>
+    }
+
+    /** Returns a substitute shared symbol table where none of the symbols are known. */
+    public static SymbolTable unknownSharedSymbolTable(final String name,
+                                                       final int version,
+                                                       final int maxId)
+    {
+<span class="fc" id="L242">        return new AbstractSymbolTable(name, version)</span>
+<span class="fc" id="L243">        {</span>
+
+            public Iterator&lt;String&gt; iterateDeclaredSymbolNames()
+            {
+<span class="nc" id="L247">                return new Iterator&lt;String&gt;()</span>
+<span class="nc" id="L248">                {</span>
+<span class="nc" id="L249">                    int id = 1;</span>
+
+                    public boolean hasNext()
+                    {
+<span class="nc bnc" id="L253" title="All 2 branches missed.">                        return id &lt;= maxId;</span>
+                    }
+
+                    public String next()
+                    {
+<span class="nc bnc" id="L258" title="All 2 branches missed.">                        if (!hasNext())</span>
+                        {
+<span class="nc" id="L260">                            throw new NoSuchElementException();</span>
+                        }
+                        // all symbols are unknown
+<span class="nc" id="L263">                        id++;</span>
+<span class="nc" id="L264">                        return null;</span>
+                    }
+
+                    public void remove()
+                    {
+<span class="nc" id="L269">                        throw new UnsupportedOperationException();</span>
+                    }
+                };
+            }
+
+            public boolean isSystemTable()
+            {
+<span class="fc" id="L276">                return false;</span>
+            }
+
+            public boolean isSubstitute()
+            {
+<span class="nc" id="L281">                return true;</span>
+            }
+
+            public boolean isSharedTable()
+            {
+<span class="fc" id="L286">                return true;</span>
+            }
+
+            public boolean isReadOnly()
+            {
+<span class="nc" id="L291">                return true;</span>
+            }
+
+            public boolean isLocalTable()
+            {
+<span class="nc" id="L296">                return false;</span>
+            }
+
+            public SymbolToken intern(String text)
+            {
+<span class="nc" id="L301">                throw new UnsupportedOperationException(</span>
+                    &quot;Cannot intern into substitute unknown shared symbol table: &quot;
+                    + name + &quot; version &quot; + version
+                );
+            }
+
+            public SymbolTable getSystemSymbolTable()
+            {
+<span class="nc" id="L309">                return systemSymbolTable();</span>
+            }
+
+            public int getMaxId()
+            {
+<span class="fc" id="L314">                return maxId;</span>
+            }
+
+            public SymbolTable[] getImportedTables()
+            {
+<span class="nc" id="L319">                return null;</span>
+            }
+
+            public int getImportedMaxId()
+            {
+<span class="nc" id="L324">                return 0;</span>
+            }
+
+            public String findKnownSymbol(int id)
+            {
+<span class="nc" id="L329">                return null;</span>
+            }
+
+            public SymbolToken find(String text)
+            {
+<span class="fc" id="L334">                return null;</span>
+            }
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

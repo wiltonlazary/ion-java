@@ -1,0 +1,535 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonWriterSystem.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">software.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">software.amazon.ion.impl</a> &gt; <span class="el_source">IonWriterSystem.java</span></div><h1>IonWriterSystem.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2010-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at:
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
+ * language governing permissions and limitations under the License.
+ */
+
+package software.amazon.ion.impl;
+
+import static software.amazon.ion.SymbolTable.UNKNOWN_SYMBOL_ID;
+import static software.amazon.ion.impl.PrivateUtils.newSymbolToken;
+import static software.amazon.ion.impl.PrivateUtils.newSymbolTokens;
+
+import java.io.IOException;
+import software.amazon.ion.IonType;
+import software.amazon.ion.SymbolTable;
+import software.amazon.ion.SymbolToken;
+import software.amazon.ion.SystemSymbols;
+import software.amazon.ion.UnknownSymbolException;
+import software.amazon.ion.system.IonWriterBuilder.InitialIvmHandling;
+import software.amazon.ion.system.IonWriterBuilder.IvmMinimizing;
+
+
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">abstract class IonWriterSystem</span>
+    extends PrivateIonWriterBase
+{
+    /**
+     * The system symtab used when resetting the stream.
+     * Must not be null.
+     */
+    final SymbolTable _default_system_symbol_table;
+
+    /**
+     * What to do about IVMs at the start of the stream.
+     * Becomes null as soon as we write anything.
+     * After a {@link #finish()} this becomes {@link InitialIVMHandling#ENSURE}
+     * because we must force another IVM to be emitted.
+     */
+    private InitialIvmHandling _initial_ivm_handling;
+
+    /**
+     * What to do about non-initial IVMs.
+     */
+    private final IvmMinimizing _ivm_minimizing;
+
+    /**
+     * Indicates whether the (immediately previous emitted value was an IVM.
+     * This is cleared by {@link #endValue()}.
+     */
+    private boolean _previous_value_was_ivm;
+
+    /**
+     * Indicates whether we've written anything at all.
+     */
+    private boolean _anything_written;
+
+    /**
+     * Must be either local or system table, and never null.
+     * May only be changed between top-level values.
+     */
+    private SymbolTable _symbol_table;
+
+    /** really ion type is only used for int, string or null (unknown) */
+    private IonType     _field_name_type;
+    private String      _field_name;
+<span class="fc" id="L73">    private int         _field_name_sid = UNKNOWN_SYMBOL_ID;</span>
+
+    private static final int DEFAULT_ANNOTATION_COUNT = 4;
+
+    private int         _annotation_count;
+<span class="fc" id="L78">    private SymbolToken[] _annotations =</span>
+        new SymbolToken[DEFAULT_ANNOTATION_COUNT];
+
+
+    //========================================================================
+
+    /**
+     * @param defaultSystemSymbolTable must not be null.
+     */
+    IonWriterSystem(SymbolTable defaultSystemSymbolTable,
+                    InitialIvmHandling initialIvmHandling,
+                    IvmMinimizing ivmMinimizing)
+<span class="fc" id="L90">    {</span>
+<span class="fc" id="L91">        defaultSystemSymbolTable.getClass(); // Efficient null check</span>
+<span class="fc" id="L92">        _default_system_symbol_table = defaultSystemSymbolTable;</span>
+<span class="fc" id="L93">        _symbol_table = defaultSystemSymbolTable;</span>
+<span class="fc" id="L94">        _initial_ivm_handling = initialIvmHandling;</span>
+<span class="fc" id="L95">        _ivm_minimizing = ivmMinimizing;</span>
+<span class="fc" id="L96">    }</span>
+
+
+    //========================================================================
+    // Context management
+
+    final SymbolTable getDefaultSystemSymtab()
+    {
+<span class="fc" id="L104">        return _default_system_symbol_table;</span>
+    }
+
+    public final SymbolTable getSymbolTable()
+    {
+<span class="fc" id="L109">        return _symbol_table;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     * &lt;p&gt;
+     * This implementation simply validates that the argument is not a
+     * shared symbol table, and assigns it to {@link #_symbol_table}.
+     */
+    @Override
+    public final void setSymbolTable(SymbolTable symbols)
+        throws IOException
+    {
+<span class="nc bnc" id="L122" title="All 4 branches missed.">        if (symbols == null || PrivateUtils.symtabIsSharedNotSystem(symbols)) {</span>
+<span class="nc" id="L123">            throw new IllegalArgumentException(&quot;symbol table must be local or system to be set, or reset&quot;);</span>
+        }
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        if (getDepth() &gt; 0) {</span>
+<span class="nc" id="L126">            throw new IllegalStateException(&quot;the symbol table cannot be set, or reset, while a container is open&quot;);</span>
+        }
+<span class="nc" id="L128">        _symbol_table = symbols;</span>
+<span class="nc" id="L129">    }</span>
+
+    boolean shouldWriteIvm()
+    {
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        if (_initial_ivm_handling == InitialIvmHandling.ENSURE)</span>
+        {
+<span class="fc" id="L135">            return true;</span>
+        }
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (_initial_ivm_handling == InitialIvmHandling.SUPPRESS)</span>
+        {
+            // TODO amzn/ion-java#24 Must write IVM if given system != 1.0
+<span class="fc" id="L140">            return false;</span>
+        }
+        // TODO amzn/ion-java#24 Add SUPPRESS_ALL to suppress non 1.0 IVMs
+
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        if (_ivm_minimizing == IvmMinimizing.ADJACENT)</span>
+        {
+            // TODO amzn/ion-java#24 Write IVM if current system version != given system
+            // For now we assume that it's the same since we only support 1.0
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            return ! _previous_value_was_ivm;</span>
+        }
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (_ivm_minimizing == IvmMinimizing.DISTANT)</span>
+        {
+            // TODO amzn/ion-java#24 Write IVM if current system version != given system
+            // For now we assume that it's the same since we only support 1.0
+<span class="fc bfc" id="L154" title="All 2 branches covered.">            return ! _anything_written;</span>
+        }
+
+<span class="fc" id="L157">        return true;</span>
+    }
+
+    /**
+     * Sets {@link #_symbol_table} and clears {@link #_initial_ivm_handling}.
+     * Subclasses should override to generate output.
+     */
+    final void writeIonVersionMarker(SymbolTable systemSymtab)
+        throws IOException
+    {
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (getDepth() != 0)</span>
+        {
+<span class="nc" id="L169">            String message =</span>
+                &quot;Ion Version Markers are only valid at the top level of a &quot; +
+                &quot;data stream&quot;;
+<span class="nc" id="L172">            throw new IllegalStateException(message);</span>
+        }
+<span class="pc bpc" id="L174" title="2 of 4 branches missed.">        assert systemSymtab.isSystemTable();</span>
+
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">        if (! SystemSymbols.ION_1_0.equals(systemSymtab.getIonVersionId()))</span>
+        {
+<span class="nc" id="L178">            String message = &quot;This library only supports Ion 1.0&quot;;</span>
+<span class="nc" id="L179">            throw new UnsupportedOperationException(message);</span>
+        }
+
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        if (shouldWriteIvm())</span>
+        {
+<span class="fc" id="L184">            _initial_ivm_handling = null;</span>
+
+<span class="fc" id="L186">            writeIonVersionMarkerAsIs(systemSymtab);</span>
+
+<span class="fc" id="L188">            _previous_value_was_ivm = true;</span>
+        }
+
+<span class="fc" id="L191">        _symbol_table = systemSymtab;</span>
+<span class="fc" id="L192">    }</span>
+
+    /**
+     * Writes an IVM without checking preconditions or
+     * {@link InitialIVMHandling}.
+     */
+    abstract void writeIonVersionMarkerAsIs(SymbolTable systemSymtab)
+        throws IOException;
+
+
+    @Override
+    public final void writeIonVersionMarker()
+        throws IOException
+    {
+<span class="fc" id="L206">        writeIonVersionMarker(_default_system_symbol_table);</span>
+<span class="fc" id="L207">    }</span>
+
+
+    void writeLocalSymtab(SymbolTable symtab)
+        throws IOException
+    {
+<span class="pc bpc" id="L213" title="2 of 4 branches missed.">        assert symtab.isLocalTable();</span>
+<span class="fc" id="L214">        _symbol_table = symtab;</span>
+<span class="fc" id="L215">    }</span>
+
+
+    /**
+     * Builds a new local symbol table from the current contextual symtab
+     * (a system symtab).
+     * @return not null.
+     */
+    SymbolTable inject_local_symbol_table() throws IOException
+    {
+<span class="nc bnc" id="L225" title="All 4 branches missed.">        assert _symbol_table.isSystemTable();</span>
+        // no catalog since it doesn't matter as this is a
+        // pure local table, with no imports
+<span class="nc" id="L228">        return LocalSymbolTable.DEFAULT_LST_FACTORY.newLocalSymtab(_symbol_table);</span>
+    }
+
+    @Override
+    final String assumeKnownSymbol(int sid)
+    {
+<span class="nc" id="L234">        String text = _symbol_table.findKnownSymbol(sid);</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        if (text == null)</span>
+        {
+<span class="nc" id="L237">            throw new UnknownSymbolException(sid);</span>
+        }
+<span class="nc" id="L239">        return text;</span>
+    }
+
+    final int add_symbol(String name) throws IOException
+    {
+        int sid;
+<span class="nc bnc" id="L245" title="All 2 branches missed.">        if (_symbol_table.isSystemTable()) {</span>
+<span class="nc" id="L246">            sid = _symbol_table.findSymbol(name);</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">            if (sid != UNKNOWN_SYMBOL_ID) {</span>
+<span class="nc" id="L248">                return sid;</span>
+            }
+            // @name is not a system symbol, so we inject a local symtab
+<span class="nc" id="L251">            _symbol_table = inject_local_symbol_table();</span>
+        }
+<span class="nc bnc" id="L253" title="All 4 branches missed.">        assert _symbol_table.isLocalTable();</span>
+<span class="nc" id="L254">        sid = _symbol_table.intern(name).getSid();</span>
+<span class="nc" id="L255">        return sid;</span>
+    }
+
+    void startValue() throws IOException
+    {
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        if (_initial_ivm_handling == InitialIvmHandling.ENSURE)</span>
+        {
+<span class="fc" id="L262">            writeIonVersionMarker(_default_system_symbol_table);</span>
+        }
+<span class="fc" id="L264">    }</span>
+
+    void endValue()
+    {
+<span class="fc" id="L268">        _initial_ivm_handling = null;</span>
+<span class="fc" id="L269">        _previous_value_was_ivm = false;</span>
+<span class="fc" id="L270">        _anything_written = true;</span>
+<span class="fc" id="L271">    }</span>
+
+
+    /** Writes a symbol without checking for system ID. */
+    abstract void writeSymbolAsIs(int symbolId) throws IOException;
+
+    /** Writes a symbol without checking for system ID. */
+    abstract void writeSymbolAsIs(String value) throws IOException;
+
+    @Override
+    final void writeSymbol(int symbolId) throws IOException
+    {
+<span class="fc bfc" id="L283" title="All 2 branches covered.">        if (symbolId &lt; 0) {</span>
+<span class="fc" id="L284">            throw new IllegalArgumentException(&quot;symbol IDs are &gt;= 0.&quot;);</span>
+        }
+
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        if (symbolId == SystemSymbols.ION_1_0_SID</span>
+<span class="pc bpc" id="L288" title="2 of 4 branches missed.">            &amp;&amp; getDepth() == 0</span>
+            &amp;&amp; _annotation_count == 0) {
+            // $ion_1_0 is written as an IVM only if it is not annotated
+            // TODO amzn/ion-java#24 Make sure to get the right symtab, default may differ.
+<span class="fc" id="L292">            writeIonVersionMarker();</span>
+        }
+        else
+        {
+<span class="fc" id="L296">            writeSymbolAsIs(symbolId);</span>
+        }
+<span class="fc" id="L298">    }</span>
+
+    public final void writeSymbol(String value) throws IOException
+    {
+<span class="fc bfc" id="L302" title="All 2 branches covered.">        if (SystemSymbols.ION_1_0.equals(value)</span>
+<span class="fc bfc" id="L303" title="All 4 branches covered.">            &amp;&amp; getDepth() == 0</span>
+            &amp;&amp; _annotation_count == 0) {
+            // $ion_1_0 is written as an IVM only if it is not annotated
+            // TODO amzn/ion-java#24 Make sure to get the right symtab, default may differ.
+<span class="fc" id="L307">            writeIonVersionMarker();</span>
+        }
+        else {
+<span class="fc" id="L310">            writeSymbolAsIs(value);</span>
+        }
+<span class="fc" id="L312">    }</span>
+
+
+    public void finish() throws IOException
+    {
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        if (getDepth() != 0) {</span>
+<span class="fc" id="L318">            throw new IllegalStateException(ERROR_FINISH_NOT_AT_TOP_LEVEL);</span>
+        }
+
+<span class="fc" id="L321">        flush();</span>
+
+<span class="fc" id="L323">        _previous_value_was_ivm = false;</span>
+<span class="fc" id="L324">        _initial_ivm_handling = InitialIvmHandling.ENSURE;</span>
+<span class="fc" id="L325">        _symbol_table = _default_system_symbol_table;</span>
+<span class="fc" id="L326">    }</span>
+
+
+    //========================================================================
+    // Field names
+
+    // This handles converting string to int (or the reverse) using the current
+    // symbol table, if that is needed.  These routines are not generally
+    // overridden except to throw UnsupportedOperationException when they are
+    // not supported.
+
+
+    @Override
+    public final boolean isFieldNameSet()
+    {
+<span class="fc bfc" id="L341" title="All 2 branches covered.">        if (_field_name_type != null) {</span>
+<span class="pc bpc" id="L342" title="2 of 3 branches missed.">            switch (_field_name_type) {</span>
+            case STRING:
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">                return _field_name != null;</span>
+            case INT:
+<span class="nc bnc" id="L346" title="All 2 branches missed.">                return _field_name_sid &gt; 0;</span>
+            default:
+                break;
+            }
+        }
+<span class="fc" id="L351">        return false;</span>
+    }
+
+    final void clearFieldName()
+    {
+<span class="fc" id="L356">        _field_name_type = null;</span>
+<span class="fc" id="L357">        _field_name = null;</span>
+<span class="fc" id="L358">        _field_name_sid = UNKNOWN_SYMBOL_ID;</span>
+<span class="fc" id="L359">    }</span>
+
+
+    public final void setFieldName(String name)
+    {
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">        if (!this.isInStruct()) {</span>
+<span class="nc" id="L365">            throw new IllegalStateException();</span>
+        }
+
+<span class="fc" id="L368">        name.getClass(); // fast null check</span>
+
+<span class="fc" id="L370">        _field_name_type = IonType.STRING;</span>
+<span class="fc" id="L371">        _field_name = name;</span>
+<span class="fc" id="L372">        _field_name_sid = UNKNOWN_SYMBOL_ID;</span>
+<span class="fc" id="L373">    }</span>
+
+    public final void setFieldNameSymbol(SymbolToken name)
+    {
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">        if (!this.isInStruct()) {</span>
+<span class="nc" id="L378">            throw new IllegalStateException();</span>
+        }
+
+<span class="fc" id="L381">        String text = name.getText();</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">        if (text != null)</span>
+        {
+<span class="fc" id="L384">            _field_name_type = IonType.STRING;</span>
+<span class="fc" id="L385">            _field_name = text;</span>
+<span class="fc" id="L386">            _field_name_sid = UNKNOWN_SYMBOL_ID;</span>
+        }
+        else
+        {
+<span class="fc" id="L390">            int sid = name.getSid();</span>
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">            if (sid &lt; 0) {</span>
+<span class="nc" id="L392">                throw new IllegalArgumentException();</span>
+            }
+<span class="fc" id="L394">            validateSymbolId(sid);</span>
+
+<span class="fc" id="L396">            _field_name_type = IonType.INT;</span>
+<span class="fc" id="L397">            _field_name_sid = sid;</span>
+<span class="fc" id="L398">            _field_name = null;</span>
+        }
+<span class="fc" id="L400">    }</span>
+
+    final SymbolToken assumeFieldNameSymbol()
+    {
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        if (_field_name_type == null)  {</span>
+<span class="fc" id="L405">            throw new IllegalStateException(ERROR_MISSING_FIELD_NAME);</span>
+        }
+        // Exactly one of our fields is set.
+<span class="pc bpc" id="L408" title="2 of 8 branches missed.">        assert _field_name != null ^ _field_name_sid &gt;= 0;</span>
+<span class="fc" id="L409">        return new SymbolTokenImpl(_field_name, _field_name_sid);</span>
+    }
+
+    //========================================================================
+    // Annotations
+
+    /**
+     * Ensures that our {@link #_annotations} and {@link #_annotation_sids}
+     * arrays have enough capacity to hold the given number of annotations.
+     * Does not increase {@link #_annotation_count}.
+     */
+    final void ensureAnnotationCapacity(int length) {
+<span class="pc bpc" id="L421" title="1 of 2 branches missed.">        int oldlen = (_annotations == null) ? 0 : _annotations.length;</span>
+<span class="fc bfc" id="L422" title="All 2 branches covered.">        if (length &lt; oldlen) return;</span>
+
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">        int newlen = (_annotations == null) ? 10 : (_annotations.length * 2);</span>
+<span class="fc bfc" id="L425" title="All 2 branches covered.">        if (length &gt; newlen) {</span>
+<span class="fc" id="L426">            newlen = length;</span>
+        }
+
+<span class="fc" id="L429">        SymbolToken[] temp1 = new SymbolToken[newlen];</span>
+
+<span class="pc bpc" id="L431" title="1 of 2 branches missed.">        if (oldlen &gt; 0) {</span>
+<span class="fc" id="L432">            System.arraycopy(_annotations, 0, temp1, 0, oldlen);</span>
+        }
+<span class="fc" id="L434">        _annotations = temp1;</span>
+<span class="fc" id="L435">    }</span>
+
+
+    final boolean hasAnnotations()
+    {
+<span class="fc bfc" id="L440" title="All 2 branches covered.">        return _annotation_count != 0;</span>
+    }
+
+    final void clearAnnotations()
+    {
+<span class="fc" id="L445">        _annotation_count = 0;</span>
+<span class="fc" id="L446">    }</span>
+
+    @Override
+    final int findAnnotation(String name) {
+<span class="fc bfc" id="L450" title="All 2 branches covered.">        if (_annotation_count &gt; 0) {</span>
+<span class="fc bfc" id="L451" title="All 2 branches covered.">            for (int ii=0; ii&lt;_annotation_count; ii++) {</span>
+<span class="fc bfc" id="L452" title="All 2 branches covered.">                if (name.equals(_annotations[ii].getText())) {</span>
+<span class="fc" id="L453">                    return ii;</span>
+                }
+            }
+        }
+<span class="fc" id="L457">        return -1;</span>
+    }
+
+    final SymbolToken[] getTypeAnnotationSymbols()
+    {
+<span class="fc" id="L462">        int count = _annotation_count;</span>
+<span class="pc bpc" id="L463" title="1 of 2 branches missed.">        if (count == 0) return SymbolToken.EMPTY_ARRAY;</span>
+
+<span class="fc" id="L465">        SymbolToken[] syms = new SymbolToken[count];</span>
+<span class="fc" id="L466">        System.arraycopy(_annotations, 0, syms, 0, count);</span>
+<span class="fc" id="L467">        return syms;</span>
+    }
+
+    public final void setTypeAnnotationSymbols(SymbolToken... annotations)
+    {
+<span class="fc bfc" id="L472" title="All 4 branches covered.">        if (annotations == null || annotations.length == 0)</span>
+        {
+<span class="fc" id="L474">            _annotation_count = 0;</span>
+        }
+        else
+        {
+<span class="fc" id="L478">            int count = annotations.length;</span>
+            // TODO the following makes two copy passes
+            // TODO validate the input
+<span class="fc" id="L481">            ensureAnnotationCapacity(count);</span>
+
+<span class="fc" id="L483">            SymbolTable symtab = getSymbolTable();</span>
+<span class="fc bfc" id="L484" title="All 2 branches covered.">            for (int i = 0; i &lt; count; i++)</span>
+            {
+<span class="fc" id="L486">                SymbolToken sym = annotations[i];</span>
+<span class="fc bfc" id="L487" title="All 2 branches covered.">                if (sym.getText() == null) {</span>
+<span class="fc" id="L488">                    validateSymbolId(sym.getSid());</span>
+                }
+<span class="fc" id="L490">                sym = PrivateUtils.localize(symtab, sym);</span>
+<span class="fc" id="L491">                _annotations[i] = sym;</span>
+            }
+<span class="fc" id="L493">            _annotation_count = count;</span>
+        }
+<span class="fc" id="L495">    }</span>
+
+    @Override
+    final String[] getTypeAnnotations()
+    {
+<span class="nc" id="L500">        return PrivateUtils.toStrings(_annotations, _annotation_count);</span>
+    }
+
+    public final void setTypeAnnotations(String... annotations)
+    {
+<span class="fc bfc" id="L505" title="All 4 branches covered.">        if (annotations == null || annotations.length == 0)</span>
+        {
+<span class="fc" id="L507">            _annotation_count = 0;</span>
+        }
+        else
+        {
+<span class="fc" id="L511">            SymbolToken[] syms =</span>
+<span class="fc" id="L512">                newSymbolTokens(getSymbolTable(), annotations);</span>
+<span class="fc" id="L513">            int count = syms.length;</span>
+            // TODO the following makes two copy passes
+<span class="fc" id="L515">            ensureAnnotationCapacity(count);</span>
+<span class="fc" id="L516">            System.arraycopy(syms, 0, _annotations, 0, count);</span>
+<span class="fc" id="L517">            _annotation_count = count;</span>
+        }
+<span class="fc" id="L519">    }</span>
+
+    public final void addTypeAnnotation(String annotation)
+    {
+<span class="fc" id="L523">        SymbolToken is = newSymbolToken(getSymbolTable(), annotation);</span>
+<span class="fc" id="L524">        ensureAnnotationCapacity(_annotation_count + 1);</span>
+<span class="fc" id="L525">        _annotations[_annotation_count++] = is;</span>
+<span class="fc" id="L526">    }</span>
+
+
+    @Override
+    final int[] getTypeAnnotationIds()
+    {
+<span class="nc" id="L532">        return PrivateUtils.toSids(_annotations, _annotation_count);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

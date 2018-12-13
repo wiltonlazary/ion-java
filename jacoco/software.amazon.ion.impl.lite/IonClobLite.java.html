@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonClobLite.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">software.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">software.amazon.ion.impl.lite</a> &gt; <span class="el_source">IonClobLite.java</span></div><h1>IonClobLite.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2010-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at:
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
+ * language governing permissions and limitations under the License.
+ */
+
+package software.amazon.ion.impl.lite;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.Charset;
+import software.amazon.ion.IonClob;
+import software.amazon.ion.IonType;
+import software.amazon.ion.IonWriter;
+import software.amazon.ion.ValueVisitor;
+import software.amazon.ion.impl.PrivateUtils;
+
+final class IonClobLite
+    extends IonLobLite
+    implements IonClob
+{
+<span class="fc" id="L32">    static private final int HASH_SIGNATURE =</span>
+<span class="fc" id="L33">        IonType.CLOB.toString().hashCode();</span>
+
+    /**
+     * Constructs a &lt;code&gt;null.clob&lt;/code&gt; element.
+     */
+    IonClobLite(ContainerlessContext context, boolean isNull)
+    {
+<span class="fc" id="L40">        super(context, isNull);</span>
+<span class="fc" id="L41">    }</span>
+
+    IonClobLite(IonClobLite existing, IonContext context)
+    {
+<span class="fc" id="L45">        super(existing, context);</span>
+<span class="fc" id="L46">    }</span>
+
+    @Override
+    IonClobLite clone(IonContext context)
+    {
+<span class="fc" id="L51">        return new IonClobLite(this, context);</span>
+    }
+
+    @Override
+    public IonClobLite clone()
+    {
+<span class="fc" id="L57">        return clone(ContainerlessContext.wrap(getSystem()));</span>
+    }
+
+    @Override
+    int hashCode(SymbolTableProvider symbolTableProvider) {
+<span class="fc" id="L62">        return lobHashCode(HASH_SIGNATURE, symbolTableProvider);</span>
+    }
+
+    @Override
+    public IonType getType()
+    {
+<span class="fc" id="L68">        return IonType.CLOB;</span>
+    }
+
+
+    public Reader newReader(Charset cs)
+    {
+<span class="fc" id="L74">        InputStream in = newInputStream();</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (in == null) return null;</span>
+
+<span class="fc" id="L77">        return new InputStreamReader(in, cs);</span>
+    }
+
+
+    public String stringValue(Charset cs)
+    {
+        // TODO use Charset directly.
+<span class="fc" id="L84">        byte[] bytes = getBytes();</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (bytes == null) return null;</span>
+
+<span class="fc" id="L87">        return PrivateUtils.decode(bytes, cs);</span>
+    }
+
+    @Override
+    final void writeBodyTo(IonWriter writer, SymbolTableProvider symbolTableProvider)
+        throws IOException
+    {
+<span class="fc" id="L94">        writer.writeClob(getBytesNoCopy());</span>
+<span class="fc" id="L95">    }</span>
+
+    @Override
+    public void accept(ValueVisitor visitor) throws Exception
+    {
+<span class="nc" id="L100">        visitor.visit(this);</span>
+<span class="nc" id="L101">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

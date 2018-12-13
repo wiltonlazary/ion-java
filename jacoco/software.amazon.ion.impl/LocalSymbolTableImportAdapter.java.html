@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LocalSymbolTableImportAdapter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">software.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">software.amazon.ion.impl</a> &gt; <span class="el_source">LocalSymbolTableImportAdapter.java</span></div><h1>LocalSymbolTableImportAdapter.java</h1><pre class="source lang-java linenums">package software.amazon.ion.impl;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import software.amazon.ion.ReadOnlyValueException;
+import software.amazon.ion.SymbolTable;
+import software.amazon.ion.SymbolToken;
+
+/**
+ * Adapter for {@link LocalSymbolTable} to make it importable by ignoring any potentially imported
+ * system table.
+ * &lt;p&gt;
+ * &lt;strong&gt;Important:&lt;/strong&gt; All adapted instances are read only
+ * &lt;/p&gt;
+ */
+final class LocalSymbolTableImportAdapter
+    extends BaseSymbolTableWrapper
+{
+
+    private final int systemSymbolCount;
+
+    static LocalSymbolTableImportAdapter of(final LocalSymbolTable delegate)
+    {
+        /*
+         * There is a hard boundary between the data regions from the imported and derived table. Example:
+         *
+         * LST A that contains symbol A1, LST B is created importing LST A and after B is created symbol A2 is added
+         * to LST A. LST B should have symbol A1, through the import, but it should not have symbol A2 as it was included
+         * after LST B creation
+         *
+         * To maintain this boundary we make a read only copy for mutable LSTs. Copying is not necessary for read only LSTs
+         * as no extra items can be added into them
+         */
+        final LocalSymbolTable readOnlyDelegate;
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        if(delegate.isReadOnly())</span>
+        {
+<span class="nc" id="L40">            readOnlyDelegate = delegate;</span>
+        }
+        else {
+<span class="fc" id="L43">            readOnlyDelegate = delegate.makeCopy();</span>
+<span class="fc" id="L44">            readOnlyDelegate.makeReadOnly();</span>
+        }
+
+<span class="fc" id="L47">        return new LocalSymbolTableImportAdapter(readOnlyDelegate);</span>
+    }
+
+    private LocalSymbolTableImportAdapter(final LocalSymbolTable delegate)
+    {
+<span class="fc" id="L52">        super(delegate);</span>
+
+<span class="fc" id="L54">        systemSymbolCount = countSystemSymbols(getDelegate());</span>
+<span class="fc" id="L55">    }</span>
+
+    @Override
+    public SymbolTable getSystemSymbolTable()
+    {
+<span class="fc" id="L60">        return null;</span>
+    }
+
+    @Override
+    public int getImportedMaxId()
+    {
+<span class="fc" id="L66">        return getDelegate().getImportedMaxId() - systemSymbolCount;</span>
+    }
+
+    @Override
+    public int getMaxId()
+    {
+<span class="fc" id="L72">        return getDelegate().getMaxId() - systemSymbolCount;</span>
+    }
+
+    @Override
+    public SymbolToken find(String text)
+    {
+<span class="fc" id="L78">        SymbolToken symbolToken = getDelegate().find(text);</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if(symbolToken != null)</span>
+        {
+<span class="fc" id="L81">            symbolToken = new SymbolTokenImpl(symbolToken.getText(), symbolToken.getSid() - systemSymbolCount);</span>
+        }
+
+<span class="fc" id="L84">        return symbolToken;</span>
+    }
+
+    @Override
+    public int findSymbol(String name)
+    {
+<span class="fc" id="L90">        int sid = getDelegate().findSymbol(name);</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if(sid != UNKNOWN_SYMBOL_ID){</span>
+<span class="fc" id="L92">            sid = sid - systemSymbolCount;</span>
+        }
+
+<span class="fc" id="L95">        return sid;</span>
+    }
+
+    @Override
+    public String findKnownSymbol(int id)
+    {
+<span class="fc" id="L101">        return getDelegate().findKnownSymbol(id + systemSymbolCount);</span>
+    }
+
+    private int countSystemSymbols(SymbolTable symbolTable)
+    {
+<span class="fc" id="L106">        SymbolTable systemSymbolTable = symbolTable.getSystemSymbolTable();</span>
+
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if(systemSymbolTable != null)</span>
+        {
+<span class="fc" id="L110">            return systemSymbolTable.getMaxId();</span>
+        }
+
+<span class="nc" id="L113">        return 0;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,854 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LocalSymbolTable.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">software.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">software.amazon.ion.impl</a> &gt; <span class="el_source">LocalSymbolTable.java</span></div><h1>LocalSymbolTable.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at:
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
+ * language governing permissions and limitations under the License.
+ */
+
+package software.amazon.ion.impl;
+
+import static software.amazon.ion.SystemSymbols.IMPORTS;
+import static software.amazon.ion.SystemSymbols.IMPORTS_SID;
+import static software.amazon.ion.SystemSymbols.ION;
+import static software.amazon.ion.SystemSymbols.ION_SYMBOL_TABLE;
+import static software.amazon.ion.SystemSymbols.MAX_ID_SID;
+import static software.amazon.ion.SystemSymbols.NAME_SID;
+import static software.amazon.ion.SystemSymbols.SYMBOLS_SID;
+import static software.amazon.ion.SystemSymbols.VERSION_SID;
+import static software.amazon.ion.impl.PrivateUtils.copyOf;
+import static software.amazon.ion.impl.PrivateUtils.getSidForSymbolTableField;
+import static software.amazon.ion.impl.PrivateUtils.safeEquals;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import software.amazon.ion.IonCatalog;
+import software.amazon.ion.IonException;
+import software.amazon.ion.IonReader;
+import software.amazon.ion.IonType;
+import software.amazon.ion.IonWriter;
+import software.amazon.ion.ReadOnlyValueException;
+import software.amazon.ion.SymbolTable;
+import software.amazon.ion.SymbolToken;
+import software.amazon.ion.util.IonTextUtils;
+
+/**
+ * A local symbol table.
+ * &lt;p&gt;
+ * Instances of this class are safe for use by multiple threads.
+ */
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">class LocalSymbolTable</span>
+    implements SymbolTable
+{
+
+    static class Factory implements PrivateLocalSymbolTableFactory
+    {
+
+        private Factory(){} // Should be accessed through the singleton
+
+        @Override
+        public SymbolTable newLocalSymtab(IonCatalog catalog,
+                                          IonReader reader,
+                                          boolean alreadyInStruct)
+        {
+<span class="fc" id="L65">            List&lt;String&gt; symbolsList = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L66">            LocalSymbolTableImports imports = readLocalSymbolTable(reader,</span>
+                                                                   catalog,
+                                                                   alreadyInStruct,
+                                                                   symbolsList);
+<span class="fc" id="L70">            return new LocalSymbolTable(imports, symbolsList);</span>
+        }
+
+        @Override
+        public SymbolTable newLocalSymtab(SymbolTable defaultSystemSymtab,
+                                          SymbolTable... imports)
+        {
+<span class="fc" id="L77">            LocalSymbolTableImports unifiedSymtabImports =</span>
+                new LocalSymbolTableImports(defaultSystemSymtab, imports);
+
+<span class="fc" id="L80">            return new LocalSymbolTable(unifiedSymtabImports,</span>
+                                        null /* local symbols */);
+        }
+
+    }
+
+<span class="fc" id="L86">    static final Factory DEFAULT_LST_FACTORY = new Factory();</span>
+
+
+    /**
+     * The initial length of {@link #mySymbolNames}.
+     */
+    private static final int DEFAULT_CAPACITY = 16;
+
+    /**
+     * The system and shared symtabs imported by this symtab. Never null.
+     * &lt;p&gt;
+     * Note: this member field is immutable and assigned only during
+     * construction, hence no synchronization is needed for its method calls.
+     */
+    private final LocalSymbolTableImports myImportsList;
+
+    /**
+     * Map of symbol names to symbol ids of local symbols that are not in
+     * imports.
+     */
+    private final Map&lt;String, Integer&gt; mySymbolsMap;
+
+    /**
+     * Whether this symbol table is read only, and thus, immutable.
+     */
+    private boolean isReadOnly;
+
+    /**
+     * The local symbol names declared in this symtab; never null.
+     * The sid of the first element is {@link #myFirstLocalSid}.
+     * Only the first {@link #mySymbolsCount} elements are valid.
+     */
+    String[] mySymbolNames;
+
+    /**
+     * This is the number of symbols defined in this symbol table
+     * locally, that is not imported from some other table.
+     */
+    int mySymbolsCount;
+
+    /**
+     * The sid of the first local symbol, which is stored at
+     * {@link #mySymbolNames}[0].
+     */
+    final int myFirstLocalSid;
+
+    //==========================================================================
+    // Private constructor(s) and static factory methods
+    //==========================================================================
+
+    private void buildSymbolsMap()
+    {
+<span class="fc" id="L138">        int sid = myFirstLocalSid;</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        for (int i = 0; i &lt; mySymbolNames.length; i++, sid++)</span>
+        {
+<span class="fc" id="L141">            String symbolText = mySymbolNames[i];</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            if (symbolText != null)</span>
+            {
+<span class="fc" id="L144">                putToMapIfNotThere(mySymbolsMap, symbolText, sid);</span>
+            }
+        }
+<span class="fc" id="L147">    }</span>
+
+
+    /**
+     * @param imports           never null
+     * @param symbolsList       may be null or empty
+     */
+    protected LocalSymbolTable(LocalSymbolTableImports imports, List&lt;String&gt; symbolsList)
+<span class="fc" id="L155">    {</span>
+<span class="fc bfc" id="L156" title="All 4 branches covered.">        if (symbolsList == null || symbolsList.isEmpty())</span>
+        {
+<span class="fc" id="L158">            mySymbolsCount = 0;</span>
+<span class="fc" id="L159">            mySymbolNames  = PrivateUtils.EMPTY_STRING_ARRAY;</span>
+        }
+        else
+        {
+<span class="fc" id="L163">            mySymbolsCount = symbolsList.size();</span>
+<span class="fc" id="L164">            mySymbolNames  = symbolsList.toArray(new String[mySymbolsCount]);</span>
+        }
+
+<span class="fc" id="L167">        myImportsList = imports;</span>
+<span class="fc" id="L168">        myFirstLocalSid = myImportsList.getMaxId() + 1;</span>
+
+        // Copy locally declared symbols to mySymbolsMap
+<span class="fc" id="L171">        mySymbolsMap = new HashMap&lt;String, Integer&gt;();</span>
+<span class="fc" id="L172">        buildSymbolsMap();</span>
+<span class="fc" id="L173">    }</span>
+
+    /**
+     * Copy-constructor, performs defensive copying of member fields where
+     * necessary. The returned instance is mutable.
+     */
+    protected LocalSymbolTable(LocalSymbolTable other, int maxId)
+<span class="fc" id="L180">    {</span>
+<span class="fc" id="L181">        isReadOnly      = false;</span>
+<span class="fc" id="L182">        myFirstLocalSid = other.myFirstLocalSid;</span>
+<span class="fc" id="L183">        myImportsList   = other.myImportsList;</span>
+<span class="fc" id="L184">        mySymbolsCount  = maxId - myImportsList.getMaxId();</span>
+
+<span class="fc" id="L186">        mySymbolNames   = copyOf(other.mySymbolNames, mySymbolsCount);</span>
+
+        // Copy locally declared symbols to mySymbolsMap
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">        if (maxId == other.getMaxId())</span>
+        {
+            // Shallow copy
+<span class="fc" id="L192">            mySymbolsMap = new HashMap&lt;String, Integer&gt;(other.mySymbolsMap);</span>
+        }
+        else
+        {
+<span class="nc" id="L196">            mySymbolsMap = new HashMap&lt;String, Integer&gt;(mySymbolsCount);</span>
+<span class="nc" id="L197">            buildSymbolsMap();</span>
+        }
+<span class="fc" id="L199">    }</span>
+
+    protected static LocalSymbolTableImports readLocalSymbolTable(IonReader reader,
+                                                                  IonCatalog catalog,
+                                                                  boolean isOnStruct,
+                                                                  List&lt;String&gt; symbolsListOut)
+    {
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        if (! isOnStruct)</span>
+        {
+<span class="fc" id="L208">            reader.next();</span>
+        }
+
+<span class="pc bpc" id="L211" title="2 of 4 branches missed.">        assert reader.getType() == IonType.STRUCT</span>
+            : &quot;invalid symbol table image passed in reader &quot; +
+<span class="nc" id="L213">              reader.getType() + &quot; encountered when a struct was expected&quot;;</span>
+
+<span class="pc bpc" id="L215" title="2 of 4 branches missed.">        assert ION_SYMBOL_TABLE.equals(reader.getTypeAnnotations()[0])</span>
+            : &quot;local symbol tables must be annotated by &quot; + ION_SYMBOL_TABLE;
+
+<span class="fc" id="L218">        reader.stepIn();</span>
+
+<span class="fc" id="L220">        List&lt;SymbolTable&gt; importsList = new ArrayList&lt;SymbolTable&gt;();</span>
+<span class="fc" id="L221">        importsList.add(reader.getSymbolTable().getSystemSymbolTable());</span>
+
+        IonType fieldType;
+<span class="fc" id="L224">        boolean foundImportList = false;</span>
+<span class="fc" id="L225">        boolean foundLocalSymbolList = false;</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        while ((fieldType = reader.next()) != null)</span>
+        {
+<span class="fc bfc" id="L228" title="All 2 branches covered.">            if (reader.isNullValue()) continue;</span>
+
+<span class="fc" id="L230">            SymbolToken symTok = reader.getFieldNameSymbol();</span>
+<span class="fc" id="L231">            int sid = symTok.getSid();</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">            if (sid == SymbolTable.UNKNOWN_SYMBOL_ID)</span>
+            {
+                // This is a user-defined IonReader or a pure DOM, fall
+                // back to text
+<span class="fc" id="L236">                final String fieldName = reader.getFieldName();</span>
+<span class="fc" id="L237">                sid = getSidForSymbolTableField(fieldName);</span>
+            }
+
+            // TODO amzn/ion-java#36 Switching over SIDs doesn't cover the case
+            //      where the relevant field names are defined by a prev LST;
+            //      the prev LST could have 'symbols' defined locally with a
+            //      different SID!
+<span class="fc bfc" id="L244" title="All 3 branches covered.">            switch (sid)</span>
+            {
+                case SYMBOLS_SID:
+                {
+                    // As per the Spec, other field types are treated as
+                    // empty lists
+<span class="fc bfc" id="L250" title="All 2 branches covered.">                    if(foundLocalSymbolList){</span>
+<span class="fc" id="L251">                        throw new IonException(&quot;Multiple symbol fields found within a single local symbol table.&quot;);</span>
+                    }
+<span class="fc" id="L253">                    foundLocalSymbolList = true;</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">                    if (fieldType == IonType.LIST)</span>
+                    {
+<span class="fc" id="L256">                        reader.stepIn();</span>
+                        IonType type;
+<span class="fc bfc" id="L258" title="All 2 branches covered.">                        while ((type = reader.next()) != null)</span>
+                        {
+                            final String text;
+<span class="fc bfc" id="L261" title="All 2 branches covered.">                            if (type == IonType.STRING)</span>
+                            {
+<span class="fc" id="L263">                                text = reader.stringValue();</span>
+                            }
+                            else
+                            {
+<span class="fc" id="L267">                                text = null;</span>
+                            }
+
+<span class="fc" id="L270">                            symbolsListOut.add(text);</span>
+<span class="fc" id="L271">                        }</span>
+<span class="fc" id="L272">                        reader.stepOut();</span>
+<span class="fc" id="L273">                    }</span>
+                    break;
+                }
+                case IMPORTS_SID:
+                {
+<span class="fc bfc" id="L278" title="All 2 branches covered.">                    if(foundImportList){</span>
+<span class="fc" id="L279">                        throw new IonException(&quot;Multiple imports fields found within a single local symbol table.&quot;);</span>
+                    }
+<span class="fc" id="L281">                    foundImportList = true;</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">                    if (fieldType == IonType.LIST)</span>
+                    {
+<span class="fc" id="L284">                        prepImportsList(importsList, reader, catalog);</span>
+                    }
+<span class="fc bfc" id="L286" title="All 2 branches covered.">                    else if (fieldType == IonType.SYMBOL)</span>
+                    {
+                        // trying to import the current table
+<span class="pc bpc" id="L289" title="1 of 4 branches missed.">                        if(reader.getSymbolTable().isLocalTable() &amp;&amp; ION_SYMBOL_TABLE.equals(reader.stringValue()))</span>
+                        {
+<span class="fc" id="L291">                            importsList.add(reader.getSymbolTable());</span>
+                        }
+                    }
+                    break;
+                }
+                default:
+                {
+                    // As per the Spec, any other field is ignored
+                    break;
+                }
+            }
+<span class="fc" id="L302">        }</span>
+
+<span class="fc" id="L304">        reader.stepOut();</span>
+
+<span class="fc" id="L306">        return new LocalSymbolTableImports(importsList);</span>
+    }
+
+    synchronized LocalSymbolTable makeCopy()
+    {
+<span class="fc" id="L311">        return new LocalSymbolTable(this, getMaxId());</span>
+    }
+
+    synchronized LocalSymbolTable makeCopy(int maxId)
+    {
+<span class="nc" id="L316">        return new LocalSymbolTable(this, maxId);</span>
+    }
+
+    public boolean isLocalTable()
+    {
+<span class="fc" id="L321">        return true;</span>
+    }
+
+    public boolean isSharedTable()
+    {
+<span class="fc" id="L326">        return false;</span>
+    }
+
+    public boolean isSystemTable()
+    {
+<span class="fc" id="L331">        return false;</span>
+    }
+
+    public boolean isSubstitute()
+    {
+<span class="fc" id="L336">        return false;</span>
+    }
+
+    public synchronized boolean isReadOnly()
+    {
+<span class="fc" id="L341">        return isReadOnly;</span>
+    }
+
+    public synchronized void makeReadOnly()
+    {
+<span class="fc" id="L346">        isReadOnly = true;</span>
+<span class="fc" id="L347">    }</span>
+
+    public int getImportedMaxId()
+    {
+<span class="fc" id="L351">        return myImportsList.getMaxId();</span>
+    }
+
+    public synchronized int getMaxId()
+    {
+<span class="fc" id="L356">        int maxid = mySymbolsCount + myImportsList.getMaxId();</span>
+<span class="fc" id="L357">        return maxid;</span>
+    }
+
+    public int getVersion()
+    {
+<span class="fc" id="L362">        return 0;</span>
+    }
+
+    public String getName()
+    {
+<span class="fc" id="L367">        return null;</span>
+    }
+
+    public String getIonVersionId()
+    {
+<span class="fc" id="L372">        SymbolTable system_table = myImportsList.getSystemSymbolTable();</span>
+<span class="fc" id="L373">        return system_table.getIonVersionId();</span>
+    }
+
+    public synchronized Iterator&lt;String&gt; iterateDeclaredSymbolNames()
+    {
+<span class="fc" id="L378">        return new SymbolIterator(mySymbolNames, mySymbolsCount);</span>
+    }
+
+    public String findKnownSymbol(int id)
+    {
+<span class="fc" id="L383">        String name = null;</span>
+
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">        if (id &lt; 0)</span>
+        {
+<span class="nc" id="L387">            String message = &quot;symbol IDs must be &gt;= 0&quot;;</span>
+<span class="nc" id="L388">            throw new IllegalArgumentException(message);</span>
+        }
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        else if (id &lt; myFirstLocalSid)</span>
+        {
+<span class="fc" id="L392">            name = myImportsList.findKnownSymbol(id);</span>
+        }
+        else
+        {
+<span class="fc" id="L396">            int offset = id - myFirstLocalSid;</span>
+
+            String[] names;
+<span class="fc" id="L399">            synchronized (this)</span>
+            {
+<span class="fc" id="L401">                names = mySymbolNames;</span>
+<span class="fc" id="L402">            }</span>
+
+<span class="fc bfc" id="L404" title="All 2 branches covered.">            if (offset &lt; names.length)</span>
+            {
+<span class="fc" id="L406">                name = names[offset];</span>
+            }
+        }
+
+<span class="fc" id="L410">        return name;</span>
+    }
+
+    public int findSymbol(String name)
+    {
+        // Look in system then imports
+<span class="fc" id="L416">        int sid = myImportsList.findSymbol(name);</span>
+
+        // Look in local symbols
+<span class="fc bfc" id="L419" title="All 2 branches covered.">        if (sid == UNKNOWN_SYMBOL_ID)</span>
+        {
+<span class="fc" id="L421">            sid = findLocalSymbol(name);</span>
+        }
+
+<span class="fc" id="L424">        return sid;</span>
+    }
+
+    private int findLocalSymbol(String name)
+    {
+        Integer isid;
+<span class="fc" id="L430">        synchronized (this)</span>
+        {
+<span class="fc" id="L432">            isid = mySymbolsMap.get(name);</span>
+<span class="fc" id="L433">        }</span>
+
+<span class="fc bfc" id="L435" title="All 2 branches covered.">        if (isid != null)</span>
+        {
+<span class="pc bpc" id="L437" title="2 of 4 branches missed.">            assert isid != UNKNOWN_SYMBOL_ID;</span>
+<span class="fc" id="L438">            return isid;</span>
+        }
+<span class="fc" id="L440">        return UNKNOWN_SYMBOL_ID;</span>
+    }
+
+
+    public synchronized SymbolToken intern(String text)
+    {
+<span class="fc" id="L446">        SymbolToken is = find(text);</span>
+<span class="fc bfc" id="L447" title="All 2 branches covered.">        if (is == null)</span>
+        {
+<span class="fc" id="L449">            validateSymbol(text);</span>
+<span class="fc" id="L450">            int sid = putSymbol(text);</span>
+<span class="fc" id="L451">            is = new SymbolTokenImpl(text, sid);</span>
+        }
+<span class="fc" id="L453">        return is;</span>
+    }
+
+    public SymbolToken find(String text)
+    {
+<span class="fc" id="L458">        text.getClass(); // fast null check</span>
+
+        // Look in system then imports
+<span class="fc" id="L461">        SymbolToken symTok = myImportsList.find(text);</span>
+
+        // Look in local symbols
+<span class="fc bfc" id="L464" title="All 2 branches covered.">        if (symTok == null)</span>
+        {
+            Integer  sid;
+            String[] names;
+<span class="fc" id="L468">            synchronized (this)</span>
+            {
+<span class="fc" id="L470">                sid = mySymbolsMap.get(text);</span>
+<span class="fc" id="L471">                names = mySymbolNames;</span>
+<span class="fc" id="L472">            }</span>
+
+<span class="fc bfc" id="L474" title="All 2 branches covered.">            if (sid != null)</span>
+            {
+<span class="fc" id="L476">                int offset = sid - myFirstLocalSid;</span>
+<span class="fc" id="L477">                String internedText = names[offset];</span>
+<span class="pc bpc" id="L478" title="2 of 4 branches missed.">                assert internedText != null;</span>
+<span class="fc" id="L479">                symTok = new SymbolTokenImpl(internedText, sid);</span>
+            }
+        }
+
+<span class="fc" id="L483">        return symTok;</span>
+    }
+
+    private static final void validateSymbol(String name)
+    {
+<span class="pc bpc" id="L488" title="1 of 2 branches missed.">        if (name == null)</span>
+        {
+<span class="nc" id="L490">            throw new IllegalArgumentException(&quot;symbols must not be null&quot;);</span>
+        }
+<span class="fc bfc" id="L492" title="All 2 branches covered.">        for (int i = 0; i &lt; name.length(); ++i)</span>
+        {
+<span class="fc" id="L494">            int c = name.charAt(i);</span>
+<span class="fc bfc" id="L495" title="All 4 branches covered.">            if (c &gt;= 0xD800 &amp;&amp; c &lt;= 0xDFFF)</span>
+            {
+<span class="pc bpc" id="L497" title="1 of 2 branches missed.">                if (c &gt;= 0xDC00)</span>
+                {
+<span class="nc" id="L499">                    String message = &quot;unpaired trailing surrogate in symbol &quot; +</span>
+                            &quot;name at position &quot; + i;
+<span class="nc" id="L501">                    throw new IllegalArgumentException(message);</span>
+                }
+<span class="fc" id="L503">                ++i;</span>
+<span class="pc bpc" id="L504" title="1 of 2 branches missed.">                if (i == name.length())</span>
+                {
+<span class="nc" id="L506">                    String message = &quot;unmatched leading surrogate in symbol &quot; +</span>
+                            &quot;name at position &quot; + i;
+<span class="nc" id="L508">                    throw new IllegalArgumentException(message);</span>
+                }
+<span class="fc" id="L510">                c = name.charAt(i);</span>
+<span class="pc bpc" id="L511" title="2 of 4 branches missed.">                if (c &lt; 0xDC00 || c &gt; 0xDFFF)</span>
+                {
+<span class="nc" id="L513">                    String message = &quot;unmatched leading surrogate in symbol &quot; +</span>
+                            &quot;name at position &quot; + i;
+<span class="nc" id="L515">                    throw new IllegalArgumentException(message);</span>
+                }
+            }
+        }
+<span class="fc" id="L519">    }</span>
+
+    /**
+     * NOT SYNCHRONIZED! Call within constructor or from synch'd method.
+     */
+    int putSymbol(String symbolName)
+    {
+<span class="fc bfc" id="L526" title="All 2 branches covered.">        if (isReadOnly)</span>
+        {
+<span class="fc" id="L528">            throw new ReadOnlyValueException(SymbolTable.class);</span>
+        }
+
+<span class="fc bfc" id="L531" title="All 2 branches covered.">        if (mySymbolsCount == mySymbolNames.length)</span>
+        {
+<span class="fc" id="L533">            int newlen = mySymbolsCount * 2;</span>
+<span class="fc bfc" id="L534" title="All 2 branches covered.">            if (newlen &lt; DEFAULT_CAPACITY)</span>
+            {
+<span class="fc" id="L536">                newlen = DEFAULT_CAPACITY;</span>
+            }
+<span class="fc" id="L538">            String[] temp = new String[newlen];</span>
+<span class="fc" id="L539">            System.arraycopy(mySymbolNames, 0, temp, 0, mySymbolsCount);</span>
+<span class="fc" id="L540">            mySymbolNames = temp;</span>
+        }
+
+<span class="fc" id="L543">        int sid = -1;</span>
+<span class="fc bfc" id="L544" title="All 2 branches covered.">        if (symbolName != null)</span>
+        {
+<span class="fc" id="L546">            sid = mySymbolsCount + myFirstLocalSid;</span>
+<span class="pc bpc" id="L547" title="2 of 4 branches missed.">            assert sid == getMaxId() + 1;</span>
+
+<span class="fc" id="L549">            putToMapIfNotThere(mySymbolsMap, symbolName, sid);</span>
+        }
+<span class="fc" id="L551">        mySymbolNames[mySymbolsCount] = symbolName;</span>
+<span class="fc" id="L552">        mySymbolsCount++;</span>
+
+<span class="fc" id="L554">        return sid;</span>
+    }
+
+    private static void putToMapIfNotThere(Map&lt;String, Integer&gt; symbolsMap,
+                                           String text,
+                                           int sid)
+    {
+        // When there's a duplicate name, don't replace the lower sid.
+        // This pattern avoids double-lookup in the normal happy case
+        // and only requires a second lookup when there's a duplicate.
+<span class="fc" id="L564">        Integer extantSid = symbolsMap.put(text, sid);</span>
+<span class="pc bpc" id="L565" title="1 of 2 branches missed.">        if (extantSid != null)</span>
+        {
+            // We always insert symbols with increasing sids
+<span class="nc bnc" id="L568" title="All 4 branches missed.">            assert extantSid &lt; sid;</span>
+<span class="nc" id="L569">            symbolsMap.put(text, extantSid);</span>
+        }
+<span class="fc" id="L571">    }</span>
+
+    public SymbolTable getSystemSymbolTable()
+    {
+<span class="fc" id="L575">        return myImportsList.getSystemSymbolTable();</span>
+    }
+
+    public SymbolTable[] getImportedTables()
+    {
+<span class="fc" id="L580">        return myImportsList.getImportedTables();</span>
+    }
+
+    /**
+     * Returns the imported symbol tables without making a copy.
+     * &lt;p&gt;
+     * &lt;b&gt;Note:&lt;/b&gt; Callers must not modify the resulting SymbolTable array!
+     * This will violate the immutability property of this class.
+     *
+     * @return
+     *          the imported symtabs, as-is; the first element is a system
+     *          symtab, the rest are non-system shared symtabs
+     *
+     * @see #getImportedTables()
+     */
+    SymbolTable[] getImportedTablesNoCopy()
+    {
+<span class="fc" id="L597">        return myImportsList.getImportedTablesNoCopy();</span>
+    }
+
+    public void writeTo(IonWriter writer) throws IOException
+    {
+<span class="fc" id="L602">        IonReader reader = new SymbolTableReader(this);</span>
+<span class="fc" id="L603">        writer.writeValues(reader);</span>
+<span class="fc" id="L604">    }</span>
+
+    /**
+     * Collects the necessary imports from the reader and catalog, and load
+     * them into the passed-in {@code importsList}.
+     */
+    private static void prepImportsList(List&lt;SymbolTable&gt; importsList,
+                                        IonReader reader,
+                                        IonCatalog catalog)
+    {
+<span class="pc bpc" id="L614" title="2 of 4 branches missed.">        assert IMPORTS.equals(reader.getFieldName());</span>
+
+<span class="fc" id="L616">        reader.stepIn();</span>
+        IonType t;
+<span class="fc bfc" id="L618" title="All 2 branches covered.">        while ((t = reader.next()) != null)</span>
+        {
+<span class="fc bfc" id="L620" title="All 4 branches covered.">            if (!reader.isNullValue() &amp;&amp; t == IonType.STRUCT)</span>
+            {
+<span class="fc" id="L622">                SymbolTable importedTable = readOneImport(reader, catalog);</span>
+
+<span class="fc bfc" id="L624" title="All 2 branches covered.">                if (importedTable != null)</span>
+                {
+<span class="fc" id="L626">                    importsList.add(importedTable);</span>
+                }
+<span class="fc" id="L628">            }</span>
+        }
+<span class="fc" id="L630">        reader.stepOut();</span>
+<span class="fc" id="L631">    }</span>
+
+    /**
+     * Returns a {@link SymbolTable} representation of a single import
+     * declaration from the passed-in reader and catalog.
+     *
+     * @return
+     *          symbol table representation of the import; null if the import
+     *          declaration is malformed
+     */
+    private static SymbolTable readOneImport(IonReader ionRep,
+                                             IonCatalog catalog)
+    {
+<span class="pc bpc" id="L644" title="2 of 4 branches missed.">        assert (ionRep.getType() == IonType.STRUCT);</span>
+
+<span class="fc" id="L646">        String name = null;</span>
+<span class="fc" id="L647">        int    version = -1;</span>
+<span class="fc" id="L648">        int    maxid = -1;</span>
+
+<span class="fc" id="L650">        ionRep.stepIn();</span>
+        IonType t;
+<span class="fc bfc" id="L652" title="All 2 branches covered.">        while ((t = ionRep.next()) != null)</span>
+        {
+<span class="fc bfc" id="L654" title="All 2 branches covered.">            if (ionRep.isNullValue()) continue;</span>
+
+<span class="fc" id="L656">            SymbolToken symTok = ionRep.getFieldNameSymbol();</span>
+<span class="fc" id="L657">            int field_id = symTok.getSid();</span>
+<span class="pc bpc" id="L658" title="1 of 2 branches missed.">            if (field_id == UNKNOWN_SYMBOL_ID)</span>
+            {
+                // this is a user defined reader or a pure DOM
+                // we fall back to text here
+<span class="nc" id="L662">                final String fieldName = ionRep.getFieldName();</span>
+<span class="nc" id="L663">                field_id = getSidForSymbolTableField(fieldName);</span>
+            }
+<span class="pc bpc" id="L665" title="1 of 4 branches missed.">            switch(field_id)</span>
+            {
+                case NAME_SID:
+<span class="fc bfc" id="L668" title="All 2 branches covered.">                    if (t == IonType.STRING)</span>
+                    {
+<span class="fc" id="L670">                        name = ionRep.stringValue();</span>
+                    }
+                    break;
+                case VERSION_SID:
+<span class="pc bpc" id="L674" title="1 of 2 branches missed.">                    if (t == IonType.INT)</span>
+                    {
+<span class="fc" id="L676">                        version = ionRep.intValue();</span>
+                    }
+                    break;
+                case MAX_ID_SID:
+<span class="fc bfc" id="L680" title="All 2 branches covered.">                    if (t == IonType.INT)</span>
+                    {
+<span class="fc" id="L682">                        maxid = ionRep.intValue();</span>
+                    }
+                    break;
+                default:
+                    // we just ignore anything else as &quot;open content&quot;
+                    break;
+            }
+<span class="fc" id="L689">        }</span>
+<span class="fc" id="L690">        ionRep.stepOut();</span>
+
+        // Ignore import clauses with malformed name field.
+<span class="fc bfc" id="L693" title="All 6 branches covered.">        if (name == null || name.length() == 0 || name.equals(ION))</span>
+        {
+<span class="fc" id="L695">            return null;</span>
+        }
+
+<span class="pc bpc" id="L698" title="1 of 2 branches missed.">        if (version &lt; 1)</span>
+        {
+<span class="nc" id="L700">            version = 1;</span>
+        }
+
+<span class="fc" id="L703">        SymbolTable itab = null;</span>
+<span class="pc bpc" id="L704" title="1 of 2 branches missed.">        if (catalog != null)</span>
+        {
+<span class="fc" id="L706">            itab = catalog.getTable(name, version);</span>
+        }
+<span class="fc bfc" id="L708" title="All 2 branches covered.">        if (maxid &lt; 0)</span>
+        {
+<span class="pc bpc" id="L710" title="1 of 4 branches missed.">            if (itab == null || version != itab.getVersion())</span>
+            {
+<span class="fc" id="L712">                String message =</span>
+                    &quot;Import of shared table &quot;
+<span class="fc" id="L714">                        + IonTextUtils.printString(name)</span>
+                        + &quot; lacks a valid max_id field, but an exact match was not&quot;
+                        + &quot; found in the catalog&quot;;
+<span class="pc bpc" id="L717" title="1 of 2 branches missed.">                if (itab != null)</span>
+                {
+<span class="nc" id="L719">                    message += &quot; (found version &quot; + itab.getVersion() + &quot;)&quot;;</span>
+                }
+                // TODO custom exception
+<span class="fc" id="L722">                throw new IonException(message);</span>
+            }
+
+            // Exact match is found, but max_id is undefined in import
+            // declaration, set max_id to largest sid of shared symtab
+<span class="fc" id="L727">            maxid = itab.getMaxId();</span>
+        }
+
+<span class="fc bfc" id="L730" title="All 2 branches covered.">        if (itab == null)</span>
+        {
+<span class="pc bpc" id="L732" title="2 of 4 branches missed.">            assert maxid &gt;= 0;</span>
+
+            // Construct substitute table with max_id undefined symbols
+<span class="fc" id="L735">            itab = new SubstituteSymbolTable(name, version, maxid);</span>
+        }
+<span class="fc bfc" id="L737" title="All 4 branches covered.">        else if (itab.getVersion() != version || itab.getMaxId() != maxid)</span>
+        {
+            // A match was found BUT specs are not an exact match
+            // Construct a substitute with correct specs, containing the
+            // original import table that was found
+<span class="fc" id="L742">            itab = new SubstituteSymbolTable(itab, version, maxid);</span>
+        }
+
+<span class="fc" id="L745">        return itab;</span>
+    }
+
+    /**
+     * Generate the string representation of a symbol with an unknown id.
+     * @param id must be a value greater than zero.
+     * @return the symbol name, of the form &lt;code&gt;$NNN&lt;/code&gt; where NNN is the
+     * integer rendering of &lt;code&gt;id&lt;/code&gt;
+     */
+    public static String unknownSymbolName(int id)
+    {
+<span class="nc bnc" id="L756" title="All 4 branches missed.">        assert id &gt; 0;</span>
+<span class="nc" id="L757">        return &quot;$&quot; + id;</span>
+    }
+
+    @Override
+    public String toString()
+    {
+<span class="nc" id="L763">        return &quot;(LocalSymbolTable max_id:&quot; + getMaxId() + ')';</span>
+    }
+
+    private static final class SymbolIterator
+        implements Iterator&lt;String&gt;
+    {
+        private final String[] mySymbolNames;
+        private final int      mySymbolsCount;
+<span class="fc" id="L771">        private int            _idx = 0;</span>
+
+        SymbolIterator(String[] symbolNames, int count)
+<span class="fc" id="L774">        {</span>
+<span class="fc" id="L775">            mySymbolNames = symbolNames;</span>
+<span class="fc" id="L776">            mySymbolsCount = count;</span>
+<span class="fc" id="L777">        }</span>
+
+        public boolean hasNext()
+        {
+<span class="fc bfc" id="L781" title="All 2 branches covered.">            if (_idx &lt; mySymbolsCount)</span>
+            {
+<span class="fc" id="L783">                return true;</span>
+            }
+<span class="fc" id="L785">            return false;</span>
+        }
+
+        public String next()
+        {
+<span class="pc bpc" id="L790" title="1 of 2 branches missed.">            if (_idx &lt; mySymbolsCount)</span>
+            {
+<span class="fc" id="L792">                return mySymbolNames[_idx++];</span>
+            }
+<span class="nc" id="L794">            throw new NoSuchElementException();</span>
+        }
+
+        public void remove()
+        {
+<span class="nc" id="L799">            throw new UnsupportedOperationException();</span>
+        }
+    }
+
+    /**
+     * This method, and the context from which it is called, assumes that the
+     * symtabs are not being mutated by another thread.
+     * Therefore it doesn't use synchronization.
+     */
+    boolean symtabExtends(SymbolTable other)
+    {
+        // Throws ClassCastException if other isn't a local symtab
+<span class="fc" id="L811">        LocalSymbolTable subset = (LocalSymbolTable) other;</span>
+
+        // Gather snapshots of each LST's data, so we don't
+
+        // Superset must have same/more known symbols than subset.
+<span class="pc bpc" id="L816" title="1 of 2 branches missed.">        if (getMaxId() &lt; subset.getMaxId()) return false;</span>
+
+        // TODO amzn/ion-java#18 Currently, we check imports by their refs. which
+        //      might be overly strict; imports which are not the same ref.
+        //      but have the same semantic states fails the extension check.
+<span class="pc bpc" id="L821" title="1 of 2 branches missed.">        if (! myImportsList.equalImports(subset.myImportsList))</span>
+<span class="nc" id="L822">            return false;</span>
+
+<span class="fc" id="L824">        int subLocalSymbolCount = subset.mySymbolsCount;</span>
+
+        // Superset extends subset if subset doesn't have any declared symbols.
+<span class="pc bpc" id="L827" title="1 of 2 branches missed.">        if (subLocalSymbolCount == 0) return true;</span>
+
+        // Superset must have same/more declared (local) symbols than subset.
+<span class="pc bpc" id="L830" title="1 of 2 branches missed.">        if (mySymbolsCount &lt; subLocalSymbolCount) return false;</span>
+
+<span class="fc" id="L832">        String[] subsetSymbols = subset.mySymbolNames;</span>
+
+        // Before we go through the expensive iteration from the front,
+        // check the last (largest) declared symbol in subset beforehand
+<span class="pc bpc" id="L836" title="1 of 2 branches missed.">        if (! safeEquals(mySymbolNames[subLocalSymbolCount- 1],</span>
+                                  subsetSymbols[subLocalSymbolCount- 1]))
+        {
+<span class="nc" id="L839">            return false;</span>
+        }
+
+        // Now, we iterate from the first declared symbol, note that the
+        // iteration below is O(n)!
+<span class="fc bfc" id="L844" title="All 2 branches covered.">        for (int i = 0; i &lt; subLocalSymbolCount - 1; i++)</span>
+        {
+<span class="pc bpc" id="L846" title="1 of 2 branches missed.">            if (! safeEquals(mySymbolNames[i], subsetSymbols[i]))</span>
+<span class="nc" id="L847">                return false;</span>
+        }
+
+<span class="fc" id="L850">        return true;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

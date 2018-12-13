@@ -1,0 +1,581 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Base64Encoder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">software.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">software.amazon.ion.impl</a> &gt; <span class="el_source">Base64Encoder.java</span></div><h1>Base64Encoder.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at:
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
+ * language governing permissions and limitations under the License.
+ */
+
+package software.amazon.ion.impl;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.Reader;
+import software.amazon.ion.IonException;
+import software.amazon.ion.util.IonTextUtils;
+
+/**
+ * This is a class that supports encoding and decoding binary
+ * data in base 64 encodings.
+ * &lt;p&gt;
+ * The default encoding is the URL Safe encoding variant specified
+ * in http://tools.ietf.org/html/rfc4648
+ * &lt;p&gt;
+ * It's character translation table is:
+ * &lt;pre&gt;
+ *    Table 2: The &quot;URL and Filename safe&quot; Base 64 Alphabet
+ *
+ * NO LONGER URL/FILENAME SAFE, BACK TO THE ORIGINAL URL CHARACTERS
+ *
+ *   Value Encoding  Value Encoding  Value Encoding  Value Encoding
+ *        0 A            17 R            34 i            51 z
+ *        1 B            18 S            35 j            52 0
+ *        2 C            19 T            36 k            53 1
+ *        3 D            20 U            37 l            54 2
+ *        4 E            21 V            38 m            55 3
+ *        5 F            22 W            39 n            56 4
+ *        6 G            23 X            40 o            57 5
+ *        7 H            24 Y            41 p            58 6
+ *        8 I            25 Z            42 q            59 7
+ *        9 J            26 a            43 r            60 8
+ *       10 K            27 b            44 s            61 9
+ *       11 L            28 c            45 t            62 +
+ *       12 M            29 d            46 u            63 /
+ *       13 N            30 e            47 v
+ *       14 O            31 f            48 w
+ *       15 P            32 g            49 x
+ *       16 Q            33 h            50 y            (pad) =
+ * &lt;/pre&gt;
+ */
+final class Base64Encoder
+{
+    static class EL {  // EncoderLetter
+        public int  value;
+        public char letter;
+<span class="fc" id="L61">        public EL(int v, char l) {</span>
+<span class="fc" id="L62">            value = v;</span>
+<span class="fc" id="L63">            letter = l;</span>
+<span class="fc" id="L64">        }</span>
+    }
+<span class="fc" id="L66">    private final static EL[] Base64Alphabet =  {</span>
+         new EL((-1), ('='))  // pad
+        ,new EL( 0, 'A') ,new EL(17, 'R') ,new EL(34, 'i') ,new EL(51, 'z')
+        ,new EL( 1, 'B') ,new EL(18, 'S') ,new EL(35, 'j') ,new EL(52, '0')
+        ,new EL( 2, 'C') ,new EL(19, 'T') ,new EL(36, 'k') ,new EL(53, '1')
+        ,new EL( 3, 'D') ,new EL(20, 'U') ,new EL(37, 'l') ,new EL(54, '2')
+        ,new EL( 4, 'E') ,new EL(21, 'V') ,new EL(38, 'm') ,new EL(55, '3')
+        ,new EL( 5, 'F') ,new EL(22, 'W') ,new EL(39, 'n') ,new EL(56, '4')
+        ,new EL( 6, 'G') ,new EL(23, 'X') ,new EL(40, 'o') ,new EL(57, '5')
+        ,new EL( 7, 'H') ,new EL(24, 'Y') ,new EL(41, 'p') ,new EL(58, '6')
+        ,new EL( 8, 'I') ,new EL(25, 'Z') ,new EL(42, 'q') ,new EL(59, '7')
+        ,new EL( 9, 'J') ,new EL(26, 'a') ,new EL(43, 'r') ,new EL(60, '8')
+        ,new EL(10, 'K') ,new EL(27, 'b') ,new EL(44, 's') ,new EL(61, '9')
+        ,new EL(11, 'L') ,new EL(28, 'c') ,new EL(45, 't') ,new EL(62, '+')
+        ,new EL(12, 'M') ,new EL(29, 'd') ,new EL(46, 'u') ,new EL(63, '/')
+        ,new EL(13, 'N') ,new EL(30, 'e') ,new EL(47, 'v')
+        ,new EL(14, 'O') ,new EL(31, 'f') ,new EL(48, 'w')
+        ,new EL(15, 'P') ,new EL(32, 'g') ,new EL(49, 'x')
+        ,new EL(16, 'Q') ,new EL(33, 'h') ,new EL(50, 'y'),
+    };
+
+<span class="fc" id="L87">    final static char  URLSafe64IntToCharTerminator = init64IntToCharTerminator(Base64Alphabet);</span>
+<span class="fc" id="L88">    final static int[] URLSafe64IntToChar = init64IntToChar(Base64Alphabet);</span>
+<span class="fc" id="L89">    final static int[] URLSafe64CharToInt = init64CharToInt(Base64Alphabet);</span>
+
+<span class="fc" id="L91">    final static int[] Base64EncodingIntToChar = init64IntToChar(Base64Alphabet);</span>
+<span class="fc" id="L92">    final static int[] Base64EncodingCharToInt = init64CharToInt(Base64Alphabet);</span>
+<span class="fc" id="L93">    final static char  Base64EncodingTerminator = init64IntToCharTerminator(Base64Alphabet);</span>
+
+    static private char init64IntToCharTerminator(EL[] els)
+    {
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        for (EL letter : els) {</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">            if (letter.value == -1) {</span>
+<span class="fc" id="L99">                return letter.letter;</span>
+            }
+        }
+<span class="nc" id="L102">        throw new RuntimeException(new IonException(&quot;fatal: invalid char map definition - missing terminator&quot;));</span>
+    }
+    static private int[] init64IntToChar(EL[] els)
+    {
+<span class="fc" id="L106">        int[] output = new int[64];</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (EL letter : els) {</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            if (letter.value != -1) {</span>
+<span class="fc" id="L109">                output[letter.value] = letter.letter;</span>
+            }
+        }
+<span class="fc" id="L112">        return output;</span>
+    }
+    static private int[] init64CharToInt(EL[] els)
+    {
+<span class="fc" id="L116">        int[] output = new int[256];</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        for (int ii=0; ii&lt;256; ii++) {</span>
+<span class="fc" id="L118">            output[ii] = -1; // mark everything as invalid to start with</span>
+        }
+        // mark the valid entries with a non -1 value is they're useful
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        for (EL letter : els) {</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">            if (letter.letter &gt; 255) {</span>
+<span class="nc" id="L123">                throw new RuntimeException(&quot;fatal base 64 encoding static initializer: letter out of bounds&quot;);</span>
+            }
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            else if (letter.value &gt;= 0) {</span>
+<span class="fc" id="L126">                output[letter.letter] = letter.value;</span>
+            }
+        }
+<span class="fc" id="L129">        return output;</span>
+    }
+
+    final static boolean isBase64Character(int c) {
+<span class="nc bnc" id="L133" title="All 4 branches missed.">        if (c &lt; 32 || c &gt; 255) return false;</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        return (URLSafe64CharToInt[c] &gt;= 0);</span>
+    }
+
+    private Base64Encoder() {}
+
+    /*********************************************************************
+     *
+     * BinaryStream, reads a text input and decodes the printable characters
+     *               into a binary output stream
+     *
+     *               reads 1024 characters at a time from the input stream
+     *               as there is a 3:4 output to input character ratio
+     */
+    final static int BUFSIZE = 1024;
+
+    static final class BinaryStream
+        extends Reader
+    {
+        boolean  _ready;
+        Reader   _source;
+        int[]    _chartobin;
+        int      _terminator;
+        int      _otherTerminator;
+        int      _terminatingChar;
+        int      _state;      // 0=started, 1=eof
+        char[]   _buffer;
+        int      _bufEnd;
+        int      _bufPos;
+
+        BinaryStream(Reader input, int[] chartobin, char terminator, char otherTerminator)
+<span class="nc" id="L164">        {</span>
+<span class="nc" id="L165">            _source = input;</span>
+<span class="nc" id="L166">            _chartobin = chartobin;</span>
+<span class="nc" id="L167">            _terminator = terminator;</span>
+<span class="nc" id="L168">            _otherTerminator = otherTerminator;</span>
+<span class="nc" id="L169">            _terminatingChar = -1;</span>
+<span class="nc" id="L170">            _buffer = new char[4+1];</span>
+<span class="nc" id="L171">            _ready = true;</span>
+<span class="nc" id="L172">        }</span>
+
+        BinaryStream(Reader input, char altterminator)
+        {
+<span class="nc" id="L176">            this(input, URLSafe64CharToInt, URLSafe64IntToCharTerminator, altterminator);</span>
+<span class="nc" id="L177">        }</span>
+
+        int terminatingChar()
+        {
+<span class="nc" id="L181">            return this._terminatingChar;</span>
+        }
+
+        private int characterToBinary(final int c) throws IOException {
+<span class="nc" id="L185">            int result = -1;</span>
+<span class="nc bnc" id="L186" title="All 4 branches missed.">            if (c &gt;= 0 &amp;&amp; c &lt; _chartobin.length) {</span>
+<span class="nc" id="L187">                result = _chartobin[c];</span>
+            }
+<span class="nc bnc" id="L189" title="All 2 branches missed.">            if (result &lt; 0) {</span>
+<span class="nc" id="L190">                throw new IonException(&quot;invalid base64 character (&quot; + c + &quot;)&quot;);</span>
+            }
+<span class="nc" id="L192">            return result;</span>
+        }
+
+        // Read a buffer from the input stream and prep the output stream
+        private void loadNextBuffer() throws IOException
+        {
+
+<span class="nc" id="L199">            int inlen = 0;</span>
+<span class="nc" id="L200">            int convert, c = -1, cbin;</span>
+
+<span class="nc" id="L202">            this._bufEnd = 0;</span>
+<span class="nc" id="L203">            this._bufPos = 0;</span>
+
+<span class="nc bnc" id="L205" title="All 2 branches missed.">            if (this._state == 1) {</span>
+<span class="nc" id="L206">                return;</span>
+            }
+
+            // try to read in 4 convertable text characters from the source stream
+<span class="nc bnc" id="L210" title="All 2 branches missed.">            while (inlen &lt; 4) {</span>
+<span class="nc" id="L211">                c = this._source.read();</span>
+<span class="nc bnc" id="L212" title="All 8 branches missed.">                if (c == -1 || c == 65535 || c == this._terminator || c == this._otherTerminator) {</span>
+<span class="nc" id="L213">                    _terminatingChar = c;</span>
+<span class="nc" id="L214">                    break;</span>
+                }
+<span class="nc bnc" id="L216" title="All 2 branches missed.">                if (IonTextUtils.isWhitespace(c)) continue;</span>
+<span class="nc" id="L217">                cbin = characterToBinary(c);</span>
+
+<span class="nc" id="L219">                this._buffer[inlen++] = (char)cbin;</span>
+            }
+<span class="nc bnc" id="L221" title="All 2 branches missed.">            if (inlen != 4) {</span>
+<span class="nc bnc" id="L222" title="All 4 branches missed.">                if (inlen == 0 &amp;&amp; c != this._terminator) {</span>
+<span class="nc" id="L223">                    this._state = 1;</span>
+<span class="nc" id="L224">                    return;</span>
+                }
+                // read through the trailing '='s
+<span class="nc" id="L227">                int templen = inlen;</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">                while (c == this._terminator) {</span>
+<span class="nc" id="L229">                    templen++;</span>
+<span class="nc" id="L230">                    c = this._source.read();</span>
+                }
+<span class="nc bnc" id="L232" title="All 2 branches missed.">                if (templen != 4) {</span>
+<span class="nc" id="L233">                    throw new IonException(&quot;base64 character count must be divisible by 4, using '=' for padding&quot;);</span>
+                }
+<span class="nc bnc" id="L235" title="All 2 branches missed.">                else if (inlen &lt; 1) {</span>
+<span class="nc" id="L236">                    throw new IonException(&quot;base64 character count must be divisible by 4, but using no more than 3 '=' chars for padding&quot;);</span>
+                }
+
+<span class="nc" id="L239">                this._terminatingChar = c;</span>
+            }
+
+            // now convert those characters
+<span class="nc" id="L243">            int ii = 0;</span>
+            for (;;) {
+
+                // next usable char:
+<span class="nc" id="L247">                c = this._buffer[ii++];</span>
+<span class="nc" id="L248">                convert =  c &lt;&lt; 18;</span>
+
+                // next usable char:
+<span class="nc" id="L251">                c = this._buffer[ii++];</span>
+<span class="nc" id="L252">                convert |= (c &lt;&lt; 12);</span>
+<span class="nc bnc" id="L253" title="All 2 branches missed.">                if (inlen &lt; 3) {</span>
+                    // with 2 input chars (6*2 = 12 bits) we get only 1 output byte (8 bits)
+<span class="nc" id="L255">                    this._buffer[this._bufEnd++] = (char)((convert &amp; 0x00FF0000) &gt;&gt; 16);</span>
+<span class="nc" id="L256">                    this._state = 1; // if we ran out, then we're done</span>
+<span class="nc" id="L257">                    break;</span>
+                }
+
+                // next usable char:
+<span class="nc" id="L261">                c = this._buffer[ii++];</span>
+<span class="nc" id="L262">                convert |= (c &lt;&lt; 6);</span>
+<span class="nc bnc" id="L263" title="All 2 branches missed.">                if (inlen &lt; 4) {</span>
+                    // with 3 input chars (6*3 = 18 bits) we get 2 output bytes (8*2 = 16 bits)
+<span class="nc" id="L265">                    this._buffer[this._bufEnd++] = (char)((convert &amp; 0x00FF0000) &gt;&gt; 16);</span>
+<span class="nc" id="L266">                    this._buffer[this._bufEnd++] = (char)((convert &amp; 0x0000FF00) &gt;&gt; 8);</span>
+<span class="nc" id="L267">                    this._state = 1; // if we ran out, then we're done</span>
+<span class="nc" id="L268">                    break;</span>
+                }
+
+                //    next (and final possible out of 4) usable char:
+<span class="nc" id="L272">                c = this._buffer[ii++];</span>
+<span class="nc" id="L273">                convert |= (c &lt;&lt; 0);</span>
+                // and with 4 input chars (6*4 = 24 bits) we get the full 3 output byte2 (8*3 = 24 bits)
+<span class="nc" id="L275">                this._buffer[this._bufEnd++] = (char)((convert &amp; 0x00FF0000) &gt;&gt; 16);</span>
+<span class="nc" id="L276">                this._buffer[this._bufEnd++] = (char)((convert &amp; 0x0000FF00) &gt;&gt; 8);</span>
+<span class="nc" id="L277">                this._buffer[this._bufEnd++] = (char)((convert &amp; 0x000000FF) &gt;&gt; 0);</span>
+                break;
+            }
+<span class="nc" id="L280">            return;</span>
+        }
+
+        @Override
+        public boolean markSupported()
+        {
+<span class="nc" id="L286">            return false;</span>
+        }
+
+        @Override
+        public void close() throws IOException
+        {
+<span class="nc" id="L292">            this._source.close();</span>
+<span class="nc" id="L293">        }</span>
+
+        //Read a single character.
+        @Override
+        public int read() throws IOException
+        {
+<span class="nc" id="L299">            int outchar = -1;</span>
+<span class="nc bnc" id="L300" title="All 2 branches missed.">            if (!_ready) {</span>
+<span class="nc" id="L301">                throw new IOException(this.getClass().getName()+ &quot; is not ready&quot;);</span>
+            }
+
+            // read input until we get a translatable character
+<span class="nc bnc" id="L305" title="All 2 branches missed.">            if (this._bufPos &gt;= this._bufEnd) {</span>
+<span class="nc" id="L306">                this.loadNextBuffer();</span>
+            }
+<span class="nc bnc" id="L308" title="All 2 branches missed.">            if (this._bufPos &lt; this._bufEnd) {</span>
+<span class="nc" id="L309">                outchar = this._buffer[this._bufPos++];</span>
+            }
+<span class="nc" id="L311">            return outchar;</span>
+        }
+
+        // Read characters into an array.
+        @Override
+        public int read(char[] cbuf) throws IOException
+        {
+<span class="nc" id="L318">            int ii = 0;</span>
+<span class="nc bnc" id="L319" title="All 2 branches missed.">            for (ii=0; ii&lt;cbuf.length; ii++) {</span>
+<span class="nc" id="L320">                int c = read();</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">                if (c == -1) break;</span>
+<span class="nc" id="L322">                cbuf[ii] = (char)c;</span>
+            }
+<span class="nc" id="L324">            return ii;</span>
+        }
+
+        // Read characters into a portion of an array.
+        @Override
+        public int read(char[] cbuf, int off, int rlen) throws IOException
+        {
+<span class="nc" id="L331">            int ii = 0;</span>
+<span class="nc bnc" id="L332" title="All 2 branches missed.">            for (ii=0; ii&lt;rlen; ii++) {</span>
+<span class="nc" id="L333">                int c = read();</span>
+<span class="nc bnc" id="L334" title="All 2 branches missed.">                if (c == -1) break;</span>
+<span class="nc" id="L335">                cbuf[off + ii] = (char)c;</span>
+            }
+<span class="nc" id="L337">            return ii;</span>
+        }
+
+    }
+
+    final static int BUFSIZE_BIN = 3*BUFSIZE/8; // 1024 -&gt; 384
+    final static int BUFSIZE_TEXT = (BUFSIZE/2);  // 1024/2 -&gt; 512 .. (384/3)*4 = 512
+
+    /**
+     * The TextStream takes a reader over binary data and returns
+     * a text reader.  This reads binary bytes and produces base64
+     * encoded printable characters
+     */
+    static final class TextStream
+        extends Reader
+    {
+        final InputStream _source;
+        final int[]    _bintochar;
+        final char     _padding;
+        boolean  _ready;
+        int      _state;      // 0=started, 1=eof
+<span class="fc" id="L358">        byte[]   _inbuf  = new byte[BUFSIZE_BIN+1];  // +1 for terminator</span>
+<span class="fc" id="L359">        char[]   _outbuf = new char[BUFSIZE_TEXT];</span>
+        int      _outBufEnd;
+        int      _outBufPos;
+
+        TextStream(InputStream input, int[] bintochar, char terminator)
+<span class="fc" id="L364">        {</span>
+<span class="fc" id="L365">            _source = input;</span>
+<span class="fc" id="L366">            _bintochar = bintochar;</span>
+<span class="fc" id="L367">            _padding = terminator;</span>
+<span class="fc" id="L368">            _ready = true;</span>
+<span class="fc" id="L369">        }</span>
+
+        public TextStream(InputStream input)
+        {
+<span class="fc" id="L373">            this(input, URLSafe64IntToChar, URLSafe64IntToCharTerminator);</span>
+<span class="fc" id="L374">        }</span>
+
+        //Close the stream.
+        @Override
+        public void close() throws IOException
+        {
+<span class="nc bnc" id="L380" title="All 2 branches missed.">            if (_ready) {</span>
+<span class="nc" id="L381">                _ready = false;</span>
+<span class="nc" id="L382">                _source.close();</span>
+            }
+<span class="nc" id="L384">            this._inbuf = null;</span>
+<span class="nc" id="L385">            this._outbuf = null;</span>
+<span class="nc" id="L386">        }</span>
+
+        // Mark the present position in the stream.
+        @Override
+        public void mark(int readAheadLimit) throws IOException {
+<span class="nc" id="L391">            throw new UnsupportedOperationException();</span>
+        }
+
+        @Override
+        public boolean markSupported() {
+<span class="nc" id="L396">            return false;</span>
+        }
+
+        // Read a buffer from the binary input stream and prep the output stream
+        //
+        // note that the output is longer than the input as 3 binary
+        // bytes produce 4 ascii characters
+        //
+        @SuppressWarnings(&quot;cast&quot;)
+        private void loadNextBuffer() throws IOException
+        {
+<span class="fc" id="L407">            this._outBufEnd = 0;</span>
+<span class="fc" id="L408">            this._outBufPos = 0;</span>
+<span class="fc" id="L409">            int inlen = this._source.read(this._inbuf, 0, BUFSIZE_BIN);</span>
+<span class="fc bfc" id="L410" title="All 2 branches covered.">            if (inlen &lt; 0) {</span>
+<span class="fc" id="L411">                this._state = 1;</span>
+<span class="fc" id="L412">                return;</span>
+            }
+
+<span class="fc" id="L415">            int ii = 0;</span>
+            for (;;) {
+                // next usable char:
+<span class="fc bfc" id="L418" title="All 2 branches covered.">                if (ii &gt;= inlen) {</span>
+<span class="fc" id="L419">                    break;</span>
+                }
+<span class="fc" id="L421">                int c = (((int)this._inbuf[ii++]) &amp; 0xFF);</span>
+<span class="fc" id="L422">                int convert =  c &lt;&lt; 16;</span>
+
+                // next usable char
+<span class="fc bfc" id="L425" title="All 2 branches covered.">                if (ii &gt;= inlen) {</span>
+<span class="fc" id="L426">                    this._outbuf[this._outBufEnd++] = (char)this._bintochar[((convert &amp; 0xFC0000) &gt;&gt; 18)];</span>
+<span class="fc" id="L427">                    this._outbuf[this._outBufEnd++] = (char)this._bintochar[((convert &amp; 0x03F000) &gt;&gt; 12)];</span>
+<span class="fc" id="L428">                    this._outbuf[this._outBufEnd++] = (char)this._padding;</span>
+<span class="fc" id="L429">                    this._outbuf[this._outBufEnd++] = (char)this._padding;</span>
+<span class="fc" id="L430">                    break;</span>
+                }
+<span class="fc" id="L432">                c = (((int)this._inbuf[ii++]) &amp; 0xFF);</span>
+<span class="fc" id="L433">                convert |=  c &lt;&lt; 8;</span>
+
+                // next usable char
+<span class="fc bfc" id="L436" title="All 2 branches covered.">                if (ii &gt;= inlen) {</span>
+<span class="fc" id="L437">                    this._outbuf[this._outBufEnd++] = (char)this._bintochar[((convert &amp; 0xFC0000) &gt;&gt; 18)];</span>
+<span class="fc" id="L438">                    this._outbuf[this._outBufEnd++] = (char)this._bintochar[((convert &amp; 0x03F000) &gt;&gt; 12)];</span>
+<span class="fc" id="L439">                    this._outbuf[this._outBufEnd++] = (char)this._bintochar[((convert &amp; 0x000FC0) &gt;&gt;  6)];</span>
+<span class="fc" id="L440">                    this._outbuf[this._outBufEnd++] = (char)this._padding;</span>
+<span class="fc" id="L441">                    break;</span>
+                }
+<span class="fc" id="L443">                c = (((int)this._inbuf[ii++]) &amp; 0xFF);</span>
+<span class="fc" id="L444">                convert |=  c &lt;&lt; 0;</span>
+
+<span class="fc" id="L446">                this._outbuf[this._outBufEnd++] = (char)this._bintochar[((convert &amp; 0xFC0000) &gt;&gt; 18)];</span>
+<span class="fc" id="L447">                this._outbuf[this._outBufEnd++] = (char)this._bintochar[((convert &amp; 0x03F000) &gt;&gt; 12)];</span>
+<span class="fc" id="L448">                this._outbuf[this._outBufEnd++] = (char)this._bintochar[((convert &amp; 0x000FC0) &gt;&gt;  6)];</span>
+<span class="fc" id="L449">                this._outbuf[this._outBufEnd++] = (char)this._bintochar[((convert &amp; 0x00003F) &gt;&gt;  0)];</span>
+<span class="fc" id="L450">            }</span>
+<span class="fc" id="L451">            return;</span>
+        }
+        //Read a single character.
+        @Override
+        public int read() throws IOException
+        {
+<span class="fc" id="L457">            int outchar = -1;</span>
+<span class="pc bpc" id="L458" title="1 of 2 branches missed.">            if (!_ready) {</span>
+<span class="nc" id="L459">                throw new IOException(this.getClass().getName()+ &quot; is closed&quot;);</span>
+            }
+<span class="pc bpc" id="L461" title="1 of 2 branches missed.">            if (_state != 0) return  -1;</span>
+
+            // read input until we get a translatable character
+<span class="fc bfc" id="L464" title="All 2 branches covered.">            if (this._outBufPos &gt;= this._outBufEnd) {</span>
+<span class="fc" id="L465">                this.loadNextBuffer();</span>
+            }
+<span class="fc bfc" id="L467" title="All 2 branches covered.">            if (this._outBufPos &lt; this._outBufEnd) {</span>
+<span class="fc" id="L468">                outchar = this._outbuf[this._outBufPos++];</span>
+            }
+<span class="fc" id="L470">            return outchar;</span>
+        }
+
+        // Read characters into an array.
+        @Override
+        public int read(char[] cbuf) throws IOException
+        {
+<span class="nc bnc" id="L477" title="All 2 branches missed.">            if (!_ready) {</span>
+<span class="nc" id="L478">                throw new IOException(this.getClass().getName()+ &quot; is closed&quot;);</span>
+            }
+<span class="nc bnc" id="L480" title="All 2 branches missed.">            if (_state != 0) return -1;</span>
+
+<span class="nc" id="L482">            int dstPos = 0;</span>
+<span class="nc" id="L483">            int needed = cbuf.length;</span>
+
+<span class="nc bnc" id="L485" title="All 2 branches missed.">            while (needed &gt; 0) {</span>
+                // read input until we get a translatable character
+<span class="nc bnc" id="L487" title="All 2 branches missed.">                if (this._outBufPos &gt;= this._outBufEnd) {</span>
+<span class="nc" id="L488">                    this.loadNextBuffer();</span>
+                }
+<span class="nc bnc" id="L490" title="All 2 branches missed.">                if (this._outBufPos &gt;= this._outBufEnd) {</span>
+<span class="nc" id="L491">                    break;</span>
+                }
+<span class="nc" id="L493">                int xfer = this._outBufEnd - this._outBufPos;</span>
+<span class="nc bnc" id="L494" title="All 2 branches missed.">                if (xfer &gt; needed) xfer = needed;</span>
+<span class="nc" id="L495">                System.arraycopy(this._outbuf, this._outBufPos, cbuf, dstPos, xfer);</span>
+<span class="nc" id="L496">                this._outBufPos += xfer;</span>
+<span class="nc" id="L497">                needed -= xfer;</span>
+<span class="nc" id="L498">            }</span>
+<span class="nc" id="L499">            return dstPos;</span>
+        }
+
+        // Read characters into a portion of an array.
+        @Override
+        public int read(char[] cbuf, int off, int rlen) throws IOException
+        {
+<span class="pc bpc" id="L506" title="1 of 2 branches missed.">            if (!_ready) {</span>
+<span class="nc" id="L507">                throw new IOException(this.getClass().getName()+ &quot; is closed&quot;);</span>
+            }
+<span class="fc bfc" id="L509" title="All 2 branches covered.">            if (_state != 0) return -1;</span>
+
+<span class="fc" id="L511">            int dstPos = off;</span>
+<span class="fc" id="L512">            int needed = rlen;</span>
+<span class="fc bfc" id="L513" title="All 2 branches covered.">            while (needed &gt; 0) {</span>
+                // read input until we get a translatable character
+<span class="fc bfc" id="L515" title="All 2 branches covered.">                if (this._outBufPos &gt;= this._outBufEnd) {</span>
+<span class="fc" id="L516">                    this.loadNextBuffer();</span>
+                }
+<span class="fc bfc" id="L518" title="All 2 branches covered.">                if (this._outBufPos &gt;= this._outBufEnd) {</span>
+<span class="fc" id="L519">                    break;</span>
+                }
+<span class="fc" id="L521">                int xfer = this._outBufEnd - this._outBufPos;</span>
+<span class="fc bfc" id="L522" title="All 2 branches covered.">                if (xfer &gt; needed) xfer = needed;</span>
+<span class="fc" id="L523">                System.arraycopy(this._outbuf, this._outBufPos, cbuf, dstPos, xfer);</span>
+<span class="fc" id="L524">                this._outBufPos += xfer;</span>
+<span class="fc" id="L525">                dstPos += xfer;</span>
+<span class="fc" id="L526">                needed -= xfer;</span>
+<span class="fc" id="L527">            }</span>
+<span class="fc" id="L528">            return dstPos;</span>
+        }
+
+        // Tell whether this stream is ready to be read.
+        @Override
+        public boolean ready() throws IOException
+        {
+            // TODO I don't think this is strictly correct.
+<span class="nc bnc" id="L536" title="All 4 branches missed.">            return this._ready &amp;&amp; (_source.available() &gt; 0);</span>
+        }
+
+        // Reset the stream.
+        @Override
+        public void reset() throws IOException
+        {
+<span class="nc" id="L543">            throw new IOException(&quot;reset not supported&quot;);</span>
+        }
+
+        //Skip characters.
+        @Override
+        public long skip(long n) throws IOException
+        {
+<span class="nc bnc" id="L550" title="All 2 branches missed.">            if (!_ready) {</span>
+<span class="nc" id="L551">                throw new IOException(this.getClass().getName()+ &quot; is closed&quot;);</span>
+            }
+<span class="nc bnc" id="L553" title="All 2 branches missed.">            if (n &lt; 0) {</span>
+<span class="nc" id="L554">                throw new IllegalArgumentException(&quot;error skip only support non-negative a values for n&quot;);</span>
+            }
+<span class="nc" id="L556">            long needed = n;</span>
+            int  available;
+
+<span class="nc bnc" id="L559" title="All 2 branches missed.">            while (needed &gt; 0) {</span>
+<span class="nc" id="L560">                available = this._outBufEnd - this._outBufPos;</span>
+<span class="nc bnc" id="L561" title="All 2 branches missed.">                if (available &lt; 1) {</span>
+<span class="nc" id="L562">                    this.loadNextBuffer();</span>
+<span class="nc" id="L563">                    available = this._outBufEnd - this._outBufPos;</span>
+<span class="nc bnc" id="L564" title="All 2 branches missed.">                    if (available &lt; 1) break;</span>
+                }
+<span class="nc bnc" id="L566" title="All 2 branches missed.">                if (available &gt; needed) {</span>
+<span class="nc" id="L567">                    this._outBufPos += (int)needed;</span>
+<span class="nc" id="L568">                    needed = 0;</span>
+<span class="nc" id="L569">                    break;</span>
+                }
+<span class="nc" id="L571">                needed -= available;</span>
+<span class="nc" id="L572">                this._outBufPos += available;</span>
+            }
+<span class="nc" id="L574">            return n - needed;</span>
+        }
+    }
+
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

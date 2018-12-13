@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Spans.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">software.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">software.amazon.ion.util</a> &gt; <span class="el_source">Spans.java</span></div><h1>Spans.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2011-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at:
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
+ * language governing permissions and limitations under the License.
+ */
+
+package software.amazon.ion.util;
+
+import static software.amazon.ion.facet.Facets.asFacet;
+
+import software.amazon.ion.Span;
+import software.amazon.ion.SpanProvider;
+
+/**
+ * Utility methods for working with {@link Span}s.
+ *
+ */
+<span class="nc" id="L26">public final class Spans</span>
+{
+    /**
+     * Attempts to get a {@link Span} from the given object, if it
+     * supports {@link SpanProvider#currentSpan()}.
+     *
+     * @param spanProvider may be null.
+     * @return null if there's not a current span.
+     */
+    public static Span currentSpan(Object spanProvider)
+    {
+<span class="fc" id="L37">        SpanProvider sp = asFacet(SpanProvider.class, spanProvider);</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        Span span = (sp == null ? null : sp.currentSpan());</span>
+<span class="fc" id="L39">        return span;</span>
+    }
+
+
+    /**
+     * Attempts to get a {@link Span} facet from the given object, if it
+     * supports {@link SpanProvider#currentSpan()}.
+     *
+     * @param spanProvider may be null.
+     * @return null if there's not a current span supporting
+     *  {@code spanFacetType}.
+     */
+    public static &lt;T&gt; T currentSpan(Class&lt;T&gt; spanFacetType,
+                                    Object spanProvider)
+    {
+<span class="fc" id="L54">        Span span = currentSpan(spanProvider);</span>
+<span class="fc" id="L55">        T spanFacet = asFacet(spanFacetType, span);</span>
+<span class="fc" id="L56">        return spanFacet;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

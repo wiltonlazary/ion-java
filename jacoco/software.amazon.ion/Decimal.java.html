@@ -68,29 +68,27 @@ public class Decimal
         public float floatValue()
         {
 <span class="fc" id="L70">            float v = super.floatValue();</span>
-<span class="pc bpc" id="L71" title="1 of 2 branches missed.">            if (Float.compare(0f, v) &lt;= 0) v = -1 * v;</span>
-<span class="fc" id="L72">            return v;</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">            return Float.compare(0f, v) &lt;= 0 ? -1 * v : v;</span>
         }
 
         @Override
         public double doubleValue()
         {
-<span class="fc" id="L78">            double v = super.doubleValue();</span>
-<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            if (Double.compare(0d, v) &lt;= 0) v = -1 * v;</span>
-<span class="fc" id="L80">            return v;</span>
+<span class="fc" id="L77">            double v = super.doubleValue();</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">            return Double.compare(0d, v) &lt;= 0 ? -1 * v : v;</span>
         }
 
 
         @Override
         public BigDecimal abs()
         {
-<span class="fc" id="L87">            return new BigDecimal(unscaledValue(), scale());</span>
+<span class="fc" id="L85">            return new BigDecimal(unscaledValue(), scale());</span>
         }
 
         @Override
         public BigDecimal abs(MathContext mc)
         {
-<span class="fc" id="L93">            return new BigDecimal(unscaledValue(), scale(), mc);</span>
+<span class="fc" id="L91">            return new BigDecimal(unscaledValue(), scale(), mc);</span>
         }
 
         // TODO signum might break clients if -0 returns &lt;0 instead of 0
@@ -109,31 +107,31 @@ public class Decimal
         @Override
         public String toString()
         {
-<span class="fc" id="L112">            return '-' + super.toString();</span>
+<span class="fc" id="L110">            return '-' + super.toString();</span>
         }
 
         @Override
         public String toEngineeringString()
         {
-<span class="fc" id="L118">            return '-' + super.toEngineeringString();</span>
+<span class="fc" id="L116">            return '-' + super.toEngineeringString();</span>
         }
 
         @Override
         public String toPlainString()
         {
-<span class="fc" id="L124">            return '-' + super.toPlainString();</span>
+<span class="fc" id="L122">            return '-' + super.toPlainString();</span>
         }
     }
 
     /**
      * The value 0, with a scale of 0.
      */
-<span class="fc" id="L131">    public static final Decimal ZERO = new Decimal(0);</span>
+<span class="fc" id="L129">    public static final Decimal ZERO = new Decimal(0);</span>
 
     /**
      * The value -0, with a scale of 0.
      */
-<span class="fc" id="L136">    public static final Decimal NEGATIVE_ZERO = new NegativeZero(0);</span>
+<span class="fc" id="L134">    public static final Decimal NEGATIVE_ZERO = new NegativeZero(0);</span>
 
 
     /**
@@ -147,7 +145,7 @@ public class Decimal
      */
     public static boolean isNegativeZero(BigDecimal val)
     {
-<span class="fc bfc" id="L150" title="All 2 branches covered.">        return (val.getClass() == NegativeZero.class);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        return (val.getClass() == NegativeZero.class);</span>
     }
 
     /**
@@ -159,12 +157,8 @@ public class Decimal
      */
     public static BigDecimal bigDecimalValue(BigDecimal val)
     {
-<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (val == null</span>
-<span class="fc bfc" id="L163" title="All 2 branches covered.">            || val.getClass() == BigDecimal.class)</span>
-        {
-<span class="fc" id="L165">            return val;</span>
-        }
-<span class="fc" id="L167">        return new BigDecimal(val.unscaledValue(), val.scale());</span>
+<span class="fc bfc" id="L160" title="All 4 branches covered.">        return val == null || val.getClass() == BigDecimal.class ?</span>
+<span class="fc" id="L161">            val : new BigDecimal(val.unscaledValue(), val.scale());</span>
     }
 
     /**
@@ -181,8 +175,8 @@ public class Decimal
      */
     public static boolean equals(BigDecimal v1, BigDecimal v2)
     {
-<span class="fc bfc" id="L184" title="All 2 branches covered.">        return (isNegativeZero(v1) == isNegativeZero(v2)</span>
-<span class="fc bfc" id="L185" title="All 2 branches covered.">                &amp;&amp; v1.equals(v2));</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        return (isNegativeZero(v1) == isNegativeZero(v2)</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">                &amp;&amp; v1.equals(v2));</span>
     }
 
 
@@ -197,7 +191,7 @@ public class Decimal
      */
     public static Decimal negativeZero(int scale)
     {
-<span class="fc" id="L200">        return new NegativeZero(scale);</span>
+<span class="fc" id="L194">        return new NegativeZero(scale);</span>
     }
 
     /**
@@ -209,104 +203,99 @@ public class Decimal
      */
     public static Decimal negativeZero(int scale, MathContext mc)
     {
-<span class="fc" id="L212">        return new NegativeZero(scale, mc);</span>
+<span class="fc" id="L206">        return new NegativeZero(scale, mc);</span>
     }
 
 
     public static Decimal valueOf(BigInteger unscaledVal, int scale)
     {
-<span class="nc" id="L218">        return new Decimal(unscaledVal, scale);</span>
+<span class="nc" id="L212">        return new Decimal(unscaledVal, scale);</span>
     }
 
     public static Decimal valueOf(BigInteger unscaledVal, int scale,
                                   MathContext mc)
     {
-<span class="fc" id="L224">        return new Decimal(unscaledVal, scale, mc);</span>
+<span class="fc" id="L218">        return new Decimal(unscaledVal, scale, mc);</span>
     }
 
 
     public static Decimal valueOf(BigInteger val)
     {
-<span class="nc" id="L230">        return new Decimal(val);</span>
+<span class="nc" id="L224">        return new Decimal(val);</span>
     }
 
     public static Decimal valueOf(BigInteger val, MathContext mc)
     {
-<span class="nc" id="L235">        return new Decimal(val, mc);</span>
+<span class="nc" id="L229">        return new Decimal(val, mc);</span>
     }
 
 
     public static Decimal valueOf(int val)
     {
-<span class="fc" id="L241">        return new Decimal(val);</span>
+<span class="fc" id="L235">        return new Decimal(val);</span>
     }
 
     public static Decimal valueOf(int val, MathContext mc)
     {
-<span class="fc" id="L246">        return new Decimal(val, mc);</span>
+<span class="fc" id="L240">        return new Decimal(val, mc);</span>
     }
 
 
     public static Decimal valueOf(long val)
     {
-<span class="fc" id="L252">        return new Decimal(val);</span>
+<span class="fc" id="L246">        return new Decimal(val);</span>
     }
 
     public static Decimal valueOf(long val, MathContext mc)
     {
-<span class="nc" id="L257">        return new Decimal(val, mc);</span>
+<span class="nc" id="L251">        return new Decimal(val, mc);</span>
     }
 
     public static Decimal valueOf(double val)
     {
-<span class="fc bfc" id="L262" title="All 2 branches covered.">        if (Double.compare(val, -0d) == 0)</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        if (Double.compare(val, -0d) == 0)</span>
         {
             // Simulate BigDecimal.valueOf(0d) which has scale of 1
-<span class="fc" id="L265">            return new NegativeZero(1);</span>
+<span class="fc" id="L259">            return new NegativeZero(1);</span>
         }
-<span class="fc" id="L267">        return new Decimal(Double.toString(val));</span>
+<span class="fc" id="L261">        return new Decimal(Double.toString(val));</span>
     }
 
     public static Decimal valueOf(double val, MathContext mc)
     {
-<span class="fc bfc" id="L272" title="All 2 branches covered.">        if (Double.compare(val, -0d) == 0)</span>
-        {
-<span class="fc" id="L274">            return new NegativeZero(1, mc);</span>
-        }
-<span class="fc" id="L276">        return new Decimal(Double.toString(val), mc);</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">        return Double.compare(val, -0d) == 0 ? new NegativeZero(1, mc) : new Decimal(Double.toString(val), mc);</span>
     }
 
     public static Decimal valueOf(BigDecimal val)
     {
-<span class="fc bfc" id="L281" title="All 4 branches covered.">        if (val == null || val instanceof Decimal) return (Decimal) val;</span>
-<span class="fc" id="L282">        return new Decimal(val.unscaledValue(), val.scale());</span>
+<span class="fc bfc" id="L271" title="All 4 branches covered.">        return val == null || val instanceof Decimal ? (Decimal) val : new Decimal(val.unscaledValue(), val.scale());</span>
     }
 
     public static Decimal valueOf(BigDecimal val, MathContext mc)
     {
-<span class="nc" id="L287">        return new Decimal(val.unscaledValue(), val.scale(), mc);</span>
+<span class="nc" id="L276">        return new Decimal(val.unscaledValue(), val.scale(), mc);</span>
     }
 
     public static Decimal valueOf(String val)
     {
-<span class="fc" id="L292">        boolean negative = val.startsWith(&quot;-&quot;);</span>
-<span class="fc" id="L293">        Decimal ibd = new Decimal(val);</span>
-<span class="fc bfc" id="L294" title="All 4 branches covered.">        if (negative &amp;&amp; ibd.signum() == 0)</span>
+<span class="fc" id="L281">        boolean negative = val.startsWith(&quot;-&quot;);</span>
+<span class="fc" id="L282">        Decimal ibd = new Decimal(val);</span>
+<span class="fc bfc" id="L283" title="All 4 branches covered.">        if (negative &amp;&amp; ibd.signum() == 0)</span>
         {
-<span class="fc" id="L296">            ibd = new NegativeZero(ibd.scale());</span>
+<span class="fc" id="L285">            ibd = new NegativeZero(ibd.scale());</span>
         }
-<span class="fc" id="L298">        return ibd;</span>
+<span class="fc" id="L287">        return ibd;</span>
     }
 
     public static Decimal valueOf(String val, MathContext mc)
     {
-<span class="fc" id="L303">        boolean negative = val.startsWith(&quot;-&quot;);</span>
-<span class="fc" id="L304">        Decimal ibd = new Decimal(val, mc);</span>
-<span class="fc bfc" id="L305" title="All 4 branches covered.">        if (negative &amp;&amp; ibd.signum() == 0)</span>
+<span class="fc" id="L292">        boolean negative = val.startsWith(&quot;-&quot;);</span>
+<span class="fc" id="L293">        Decimal ibd = new Decimal(val, mc);</span>
+<span class="fc bfc" id="L294" title="All 4 branches covered.">        if (negative &amp;&amp; ibd.signum() == 0)</span>
         {
-<span class="fc" id="L307">            ibd = new NegativeZero(ibd.scale(), mc);</span>
+<span class="fc" id="L296">            ibd = new NegativeZero(ibd.scale(), mc);</span>
         }
-<span class="fc" id="L309">        return ibd;</span>
+<span class="fc" id="L298">        return ibd;</span>
     }
 
 
@@ -317,100 +306,100 @@ public class Decimal
 
     private Decimal(BigInteger unscaledVal, int scale)
     {
-<span class="fc" id="L320">        super(unscaledVal, scale);</span>
-<span class="fc" id="L321">    }</span>
+<span class="fc" id="L309">        super(unscaledVal, scale);</span>
+<span class="fc" id="L310">    }</span>
 
     private Decimal(BigInteger unscaledVal, int scale, MathContext mc)
     {
-<span class="fc" id="L325">        super(unscaledVal, scale, mc);</span>
-<span class="fc" id="L326">    }</span>
+<span class="fc" id="L314">        super(unscaledVal, scale, mc);</span>
+<span class="fc" id="L315">    }</span>
 
 
     private Decimal(BigInteger val)
     {
-<span class="nc" id="L331">        super(val);</span>
-<span class="nc" id="L332">    }</span>
+<span class="nc" id="L320">        super(val);</span>
+<span class="nc" id="L321">    }</span>
 
     private Decimal(BigInteger val, MathContext mc)
     {
-<span class="nc" id="L336">        super(val, mc);</span>
-<span class="nc" id="L337">    }</span>
+<span class="nc" id="L325">        super(val, mc);</span>
+<span class="nc" id="L326">    }</span>
 
 
     private Decimal(int val)
     {
-<span class="fc" id="L342">        super(val);</span>
-<span class="fc" id="L343">    }</span>
+<span class="fc" id="L331">        super(val);</span>
+<span class="fc" id="L332">    }</span>
 
     private Decimal(int val, MathContext mc)
     {
-<span class="fc" id="L347">        super(val, mc);</span>
-<span class="fc" id="L348">    }</span>
+<span class="fc" id="L336">        super(val, mc);</span>
+<span class="fc" id="L337">    }</span>
 
     private Decimal(long val)
     {
-<span class="fc" id="L352">        super(val);</span>
-<span class="fc" id="L353">    }</span>
+<span class="fc" id="L341">        super(val);</span>
+<span class="fc" id="L342">    }</span>
 
     private Decimal(long val, MathContext mc)
+    {
+<span class="nc" id="L346">        super(val, mc);</span>
+<span class="nc" id="L347">    }</span>
+
+
+    private Decimal(double val)
+    {
+<span class="nc" id="L352">        super(val);</span>
+<span class="nc" id="L353">    }</span>
+
+    private Decimal(double val, MathContext mc)
     {
 <span class="nc" id="L357">        super(val, mc);</span>
 <span class="nc" id="L358">    }</span>
 
 
-    private Decimal(double val)
-    {
-<span class="nc" id="L363">        super(val);</span>
-<span class="nc" id="L364">    }</span>
-
-    private Decimal(double val, MathContext mc)
-    {
-<span class="nc" id="L368">        super(val, mc);</span>
-<span class="nc" id="L369">    }</span>
-
-
     // TODO create static valueOf to check for -0
     private Decimal(char[] in, int offset, int len)
     {
-<span class="nc" id="L375">        super(in, offset, len);</span>
-<span class="nc" id="L376">    }</span>
+<span class="nc" id="L364">        super(in, offset, len);</span>
+<span class="nc" id="L365">    }</span>
 
     // TODO create static valueOf to check for -0
     private Decimal(char[] in, int offset, int len, MathContext mc)
     {
-<span class="nc" id="L381">       super(in, offset, len, mc);</span>
-<span class="nc" id="L382">    }</span>
+<span class="nc" id="L370">       super(in, offset, len, mc);</span>
+<span class="nc" id="L371">    }</span>
 
 
     // TODO create static valueOf to check for -0
     private Decimal(char[] in)
     {
-<span class="nc" id="L388">        super(in);</span>
-<span class="nc" id="L389">    }</span>
+<span class="nc" id="L377">        super(in);</span>
+<span class="nc" id="L378">    }</span>
 
     // TODO create static valueOf to check for -0
     private Decimal(char[] in, MathContext mc)
     {
-<span class="nc" id="L394">        super(in, mc);</span>
-<span class="nc" id="L395">    }</span>
+<span class="nc" id="L383">        super(in, mc);</span>
+<span class="nc" id="L384">    }</span>
 
 
     private Decimal(String val)
     {
-<span class="fc" id="L400">        super(val);</span>
-<span class="fc" id="L401">    }</span>
+<span class="fc" id="L389">        super(val);</span>
+<span class="fc" id="L390">    }</span>
 
     private Decimal(String val, MathContext mc)
     {
-<span class="fc" id="L405">        super(val, mc);</span>
-<span class="fc" id="L406">    }</span>
+<span class="fc" id="L394">        super(val, mc);</span>
+<span class="fc" id="L395">    }</span>
 
 
     //========================================================================
 
     public final boolean isNegativeZero()
     {
-<span class="fc bfc" id="L413" title="All 2 branches covered.">        return (getClass() == NegativeZero.class);</span>
+<span class="fc bfc" id="L402" title="All 2 branches covered.">        return (getClass() == NegativeZero.class);</span>
     }
 
     /**
@@ -421,8 +410,7 @@ public class Decimal
      */
     public final BigDecimal bigDecimalValue()
     {
-
-<span class="nc" id="L425">        return new BigDecimal(unscaledValue(), scale());</span>
+<span class="nc" id="L413">        return new BigDecimal(unscaledValue(), scale());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

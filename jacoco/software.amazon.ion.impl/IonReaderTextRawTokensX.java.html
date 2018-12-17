@@ -2049,25 +2049,28 @@ import software.amazon.ion.util.IonTextUtils;
     protected int read_double_quoted_char(boolean is_clob) throws IOException
     {
 <span class="fc" id="L2051">        int c = read_char();</span>
+<span class="pc bpc" id="L2052" title="1 of 4 branches missed.">        if(is_clob &amp;&amp; c &gt; 127) {</span>
+<span class="fc" id="L2053">            throw new IonReaderTextTokenException(&quot;non ASCII character in clob: &quot; + c);</span>
+        }
 
-<span class="pc bpc" id="L2053" title="1 of 4 branches missed.">        switch (c) {</span>
+<span class="pc bpc" id="L2056" title="1 of 4 branches missed.">        switch (c) {</span>
         case '&quot;':
-<span class="nc" id="L2055">            unread_char(c);</span>
-<span class="nc" id="L2056">            c = CharacterSequence.CHAR_SEQ_STRING_TERMINATOR;</span>
-<span class="nc" id="L2057">            break;</span>
+<span class="nc" id="L2058">            unread_char(c);</span>
+<span class="nc" id="L2059">            c = CharacterSequence.CHAR_SEQ_STRING_TERMINATOR;</span>
+<span class="nc" id="L2060">            break;</span>
         case -1:
-<span class="fc" id="L2059">            break;</span>
-        case '\\':
-<span class="fc" id="L2061">            c = read_char_escaped(c, is_clob);</span>
 <span class="fc" id="L2062">            break;</span>
+        case '\\':
+<span class="fc" id="L2064">            c = read_char_escaped(c, is_clob);</span>
+<span class="fc" id="L2065">            break;</span>
         default:
-<span class="pc bpc" id="L2064" title="3 of 4 branches missed.">            if (!is_clob &amp;&amp; !IonTokenConstsX.is7bitValue(c)) {</span>
-<span class="nc" id="L2065">                c = read_large_char_sequence(c);</span>
+<span class="pc bpc" id="L2067" title="3 of 4 branches missed.">            if (!is_clob &amp;&amp; !IonTokenConstsX.is7bitValue(c)) {</span>
+<span class="nc" id="L2068">                c = read_large_char_sequence(c);</span>
             }
             break;
         }
 
-<span class="fc" id="L2070">        return c;</span>
+<span class="fc" id="L2073">        return c;</span>
     }
 
     /**
@@ -2078,8 +2081,8 @@ import software.amazon.ion.util.IonTextUtils;
      */
     private void skip_triple_quoted_string(SavePoint sp) throws IOException
     {
-<span class="fc" id="L2081">        skip_triple_quoted_string(sp, CommentStrategy.IGNORE);</span>
-<span class="fc" id="L2082">    }</span>
+<span class="fc" id="L2084">        skip_triple_quoted_string(sp, CommentStrategy.IGNORE);</span>
+<span class="fc" id="L2085">    }</span>
 
     /**
      * Skip to the end of a triple quoted string sequence within a clob,
@@ -2090,40 +2093,40 @@ import software.amazon.ion.util.IonTextUtils;
      */
     private void skip_triple_quoted_clob_string(SavePoint sp) throws IOException
     {
-<span class="fc" id="L2093">        skip_triple_quoted_string(sp, CommentStrategy.ERROR);</span>
-<span class="fc" id="L2094">    }</span>
+<span class="fc" id="L2096">        skip_triple_quoted_string(sp, CommentStrategy.ERROR);</span>
+<span class="fc" id="L2097">    }</span>
 
     private void skip_triple_quoted_string(SavePoint sp, CommentStrategy commentStrategy) throws IOException
     {
         // starts AFTER the 3 quotes have been consumed
         int c;
         for (;;) {
-<span class="fc" id="L2101">            c = read_char();</span>
-<span class="pc bpc" id="L2102" title="1 of 4 branches missed.">            switch (c) {</span>
+<span class="fc" id="L2104">            c = read_char();</span>
+<span class="pc bpc" id="L2105" title="1 of 4 branches missed.">            switch (c) {</span>
             case -1:
-<span class="nc" id="L2104">                unexpected_eof();</span>
+<span class="nc" id="L2107">                unexpected_eof();</span>
             case '\'':
-<span class="fc" id="L2106">                c = read_char();</span>
-<span class="fc bfc" id="L2107" title="All 2 branches covered.">                if (c == '\'') { // 2nd quote</span>
-<span class="fc" id="L2108">                    c = read_char(); // possibly the 3rd</span>
-<span class="fc bfc" id="L2109" title="All 2 branches covered.">                    if (sp != null) {</span>
-<span class="fc" id="L2110">                        sp.markEnd(-3);</span>
+<span class="fc" id="L2109">                c = read_char();</span>
+<span class="fc bfc" id="L2110" title="All 2 branches covered.">                if (c == '\'') { // 2nd quote</span>
+<span class="fc" id="L2111">                    c = read_char(); // possibly the 3rd</span>
+<span class="fc bfc" id="L2112" title="All 2 branches covered.">                    if (sp != null) {</span>
+<span class="fc" id="L2113">                        sp.markEnd(-3);</span>
                     }
-<span class="fc bfc" id="L2112" title="All 2 branches covered.">                    if (c == '\'') { // it is the 3rd quote - end of this segment</span>
-<span class="fc" id="L2113">                        c = skip_over_whitespace(commentStrategy);</span>
-<span class="pc bpc" id="L2114" title="1 of 4 branches missed.">                        if (c == '\'' &amp;&amp; is_2_single_quotes_helper()) {</span>
+<span class="fc bfc" id="L2115" title="All 2 branches covered.">                    if (c == '\'') { // it is the 3rd quote - end of this segment</span>
+<span class="fc" id="L2116">                        c = skip_over_whitespace(commentStrategy);</span>
+<span class="pc bpc" id="L2117" title="1 of 4 branches missed.">                        if (c == '\'' &amp;&amp; is_2_single_quotes_helper()) {</span>
                             // there's another segment so read the next segment as well
-<span class="fc" id="L2116">                            break;</span>
+<span class="fc" id="L2119">                            break;</span>
                         }
                         // end of last segment
-<span class="fc" id="L2119">                        unread_char(c);</span>
-<span class="fc" id="L2120">                        return;</span>
+<span class="fc" id="L2122">                        unread_char(c);</span>
+<span class="fc" id="L2123">                        return;</span>
                     }
                 }
                 break;
             case '\\':
-<span class="fc" id="L2125">                c = read_char();</span>
-<span class="fc" id="L2126">               break;</span>
+<span class="fc" id="L2128">                c = read_char();</span>
+<span class="fc" id="L2129">               break;</span>
             }
         }
     }
@@ -2134,350 +2137,354 @@ import software.amazon.ion.util.IonTextUtils;
         int c;
 
         for (;;) {
-<span class="fc" id="L2137">            c = read_triple_quoted_char(is_clob);</span>
-<span class="fc bfc" id="L2138" title="All 6 branches covered.">            switch(c) {</span>
+<span class="fc" id="L2140">            c = read_triple_quoted_char(is_clob);</span>
+<span class="fc bfc" id="L2141" title="All 6 branches covered.">            switch(c) {</span>
             case CharacterSequence.CHAR_SEQ_STRING_TERMINATOR:
             case CharacterSequence.CHAR_SEQ_EOF: // was EOF
-<span class="fc" id="L2141">                return c;</span>
+<span class="fc" id="L2144">                return c;</span>
             // new line normalization and counting is handled in read_char
             case CharacterSequence.CHAR_SEQ_NEWLINE_SEQUENCE_1:
-<span class="fc" id="L2144">                c = '\n';</span>
-<span class="fc" id="L2145">                break;</span>
+<span class="fc" id="L2147">                c = '\n';</span>
+<span class="fc" id="L2148">                break;</span>
             case CharacterSequence.CHAR_SEQ_NEWLINE_SEQUENCE_2:
                 // TODO: uncomment if we don't want to normalize end of line: c = '\r';
-<span class="fc" id="L2148">                c = '\n';</span>
-<span class="fc" id="L2149">                break;</span>
+<span class="fc" id="L2151">                c = '\n';</span>
+<span class="fc" id="L2152">                break;</span>
             case CharacterSequence.CHAR_SEQ_NEWLINE_SEQUENCE_3:
                 // TODO: uncomment if we don't want to normalize end of line: sb.append('\r');
-<span class="fc" id="L2152">                c = '\n';</span>
-<span class="fc" id="L2153">                break;</span>
+<span class="fc" id="L2155">                c = '\n';</span>
+<span class="fc" id="L2156">                break;</span>
             case CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_1:
             case CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_2:
             case CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_3:
             case CharacterSequence.CHAR_SEQ_STRING_NON_TERMINATOR:
-<span class="fc" id="L2158">                continue;</span>
+<span class="fc" id="L2161">                continue;</span>
             default:
                 break;
             }
             // if this isn't a clob we need to decode UTF8 and
             // handle surrogate encoding (otherwise we don't care)
-<span class="pc bpc" id="L2164" title="1 of 2 branches missed.">            if (!is_clob) {</span>
-<span class="fc bfc" id="L2165" title="All 2 branches covered.">                if (IonUTF8.needsSurrogateEncoding(c)) {</span>
-<span class="fc" id="L2166">                    sb.append(IonUTF8.highSurrogate(c));</span>
-<span class="fc" id="L2167">                    c = IonUTF8.lowSurrogate(c);</span>
+<span class="pc bpc" id="L2167" title="1 of 2 branches missed.">            if (!is_clob) {</span>
+<span class="fc bfc" id="L2168" title="All 2 branches covered.">                if (IonUTF8.needsSurrogateEncoding(c)) {</span>
+<span class="fc" id="L2169">                    sb.append(IonUTF8.highSurrogate(c));</span>
+<span class="fc" id="L2170">                    c = IonUTF8.lowSurrogate(c);</span>
                 }
             }
-<span class="fc" id="L2170">            sb.append((char)c);</span>
+<span class="fc" id="L2173">            sb.append((char)c);</span>
         }
     }
 
     protected int read_triple_quoted_char(boolean is_clob) throws IOException
     {
-<span class="fc" id="L2176">        int c = read_string_char(ProhibitedCharacters.LONG_CHAR);</span>
-<span class="fc bfc" id="L2177" title="All 5 branches covered.">        switch (c) {</span>
+<span class="fc" id="L2179">        int c = read_string_char(ProhibitedCharacters.LONG_CHAR);</span>
+<span class="fc bfc" id="L2180" title="All 4 branches covered.">        if(is_clob &amp;&amp; c &gt; 127) {</span>
+<span class="fc" id="L2181">            throw new IonReaderTextTokenException(&quot;non ASCII character in clob: &quot; + c);</span>
+        }
+
+<span class="fc bfc" id="L2184" title="All 5 branches covered.">        switch (c) {</span>
         case '\'':
-<span class="fc bfc" id="L2179" title="All 2 branches covered.">            if (is_2_single_quotes_helper()) {</span>
+<span class="fc bfc" id="L2186" title="All 2 branches covered.">            if (is_2_single_quotes_helper()) {</span>
                 // so at this point we are at the end of the closing
                 // triple quote - so we need to look ahead to see if
                 // there's just whitespace and a new opening triple quote
-<span class="fc" id="L2183">                c = skip_over_whitespace();</span>
-<span class="pc bpc" id="L2184" title="1 of 4 branches missed.">                if (c == '\'' &amp;&amp; is_2_single_quotes_helper()) {</span>
+<span class="fc" id="L2190">                c = skip_over_whitespace();</span>
+<span class="pc bpc" id="L2191" title="1 of 4 branches missed.">                if (c == '\'' &amp;&amp; is_2_single_quotes_helper()) {</span>
                     // there's another segment so read the next segment as well
                     // since we're now just before char 1 of the next segment
                     // loop again, but don't append this char
-<span class="fc" id="L2188">                    return CharacterSequence.CHAR_SEQ_STRING_NON_TERMINATOR;</span>
+<span class="fc" id="L2195">                    return CharacterSequence.CHAR_SEQ_STRING_NON_TERMINATOR;</span>
                 }
                 // end of last segment - we're done (although we read a bit too far)
-<span class="fc" id="L2191">                unread_char(c);</span>
-<span class="fc" id="L2192">                c = CharacterSequence.CHAR_SEQ_STRING_TERMINATOR;</span>
+<span class="fc" id="L2198">                unread_char(c);</span>
+<span class="fc" id="L2199">                c = CharacterSequence.CHAR_SEQ_STRING_TERMINATOR;</span>
             }
             break;
         case '\\':
-<span class="fc" id="L2196">            c = read_char_escaped(c, is_clob);</span>
-<span class="fc" id="L2197">            break;</span>
+<span class="fc" id="L2203">            c = read_char_escaped(c, is_clob);</span>
+<span class="fc" id="L2204">            break;</span>
         case CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_1:
         case CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_2:
         case CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_3:
         case CharacterSequence.CHAR_SEQ_NEWLINE_SEQUENCE_1:
         case CharacterSequence.CHAR_SEQ_NEWLINE_SEQUENCE_2:
         case CharacterSequence.CHAR_SEQ_NEWLINE_SEQUENCE_3:
-<span class="fc" id="L2204">            break;</span>
+<span class="fc" id="L2211">            break;</span>
         case -1:
-<span class="fc" id="L2206">            break;</span>
+<span class="fc" id="L2213">            break;</span>
         default:
-<span class="fc bfc" id="L2208" title="All 4 branches covered.">            if (!is_clob &amp;&amp; !IonTokenConstsX.is7bitValue(c)) {</span>
-<span class="fc" id="L2209">                c = read_large_char_sequence(c);</span>
+<span class="fc bfc" id="L2215" title="All 4 branches covered.">            if (!is_clob &amp;&amp; !IonTokenConstsX.is7bitValue(c)) {</span>
+<span class="fc" id="L2216">                c = read_large_char_sequence(c);</span>
             }
             break;
         }
 
-<span class="fc" id="L2214">        return c;</span>
+<span class="fc" id="L2221">        return c;</span>
     }
 
     /** Skips over the closing }} too. */
     protected void skip_over_lob(int lobToken, SavePoint sp) throws IOException {
-<span class="pc bpc" id="L2219" title="1 of 4 branches missed.">        switch(lobToken) {</span>
+<span class="pc bpc" id="L2226" title="1 of 4 branches missed.">        switch(lobToken) {</span>
         case IonTokenConstsX.TOKEN_STRING_DOUBLE_QUOTE:
-<span class="fc" id="L2221">            skip_double_quoted_string(sp);</span>
-<span class="fc" id="L2222">            skip_clob_close_punctuation();</span>
-<span class="fc" id="L2223">            break;</span>
-        case IonTokenConstsX.TOKEN_STRING_TRIPLE_QUOTE:
-<span class="fc" id="L2225">            skip_triple_quoted_clob_string(sp);</span>
-<span class="fc" id="L2226">            skip_clob_close_punctuation();</span>
-<span class="fc" id="L2227">            break;</span>
-        case IonTokenConstsX.TOKEN_OPEN_DOUBLE_BRACE:
-<span class="fc" id="L2229">            skip_over_blob(sp);</span>
+<span class="fc" id="L2228">            skip_double_quoted_string(sp);</span>
+<span class="fc" id="L2229">            skip_clob_close_punctuation();</span>
 <span class="fc" id="L2230">            break;</span>
+        case IonTokenConstsX.TOKEN_STRING_TRIPLE_QUOTE:
+<span class="fc" id="L2232">            skip_triple_quoted_clob_string(sp);</span>
+<span class="fc" id="L2233">            skip_clob_close_punctuation();</span>
+<span class="fc" id="L2234">            break;</span>
+        case IonTokenConstsX.TOKEN_OPEN_DOUBLE_BRACE:
+<span class="fc" id="L2236">            skip_over_blob(sp);</span>
+<span class="fc" id="L2237">            break;</span>
         default:
-<span class="nc" id="L2232">            error(&quot;unexpected token &quot;+IonTokenConstsX.getTokenName(lobToken)+</span>
+<span class="nc" id="L2239">            error(&quot;unexpected token &quot;+IonTokenConstsX.getTokenName(lobToken)+</span>
                   &quot; encountered for lob content&quot;);
         }
-<span class="fc" id="L2235">    }</span>
+<span class="fc" id="L2242">    }</span>
 
     protected void load_clob(int lobToken, StringBuilder sb) throws IOException
     {
-<span class="nc bnc" id="L2239" title="All 4 branches missed.">        switch(lobToken) {</span>
+<span class="nc bnc" id="L2246" title="All 4 branches missed.">        switch(lobToken) {</span>
         case IonTokenConstsX.TOKEN_STRING_DOUBLE_QUOTE:
-<span class="nc" id="L2241">            load_double_quoted_string(sb, true);</span>
-<span class="nc" id="L2242">            break;</span>
+<span class="nc" id="L2248">            load_double_quoted_string(sb, true);</span>
+<span class="nc" id="L2249">            break;</span>
         case IonTokenConstsX.TOKEN_STRING_TRIPLE_QUOTE:
-<span class="nc" id="L2244">            load_triple_quoted_string(sb, true);</span>
-<span class="nc" id="L2245">            break;</span>
+<span class="nc" id="L2251">            load_triple_quoted_string(sb, true);</span>
+<span class="nc" id="L2252">            break;</span>
         case IonTokenConstsX.TOKEN_OPEN_DOUBLE_BRACE:
-<span class="nc" id="L2247">            load_blob(sb);</span>
-<span class="nc" id="L2248">            break;</span>
+<span class="nc" id="L2254">            load_blob(sb);</span>
+<span class="nc" id="L2255">            break;</span>
         default:
-<span class="nc" id="L2250">            error(&quot;unexpected token &quot;+IonTokenConstsX.getTokenName(lobToken)+</span>
+<span class="nc" id="L2257">            error(&quot;unexpected token &quot;+IonTokenConstsX.getTokenName(lobToken)+</span>
                   &quot; encountered for lob content&quot;);
         }
-<span class="nc" id="L2253">    }</span>
+<span class="nc" id="L2260">    }</span>
 
     private final int read_char_escaped(int c, boolean is_clob)
         throws IOException
     {
         for (;;) {
-<span class="pc bpc" id="L2259" title="2 of 3 branches missed.">            switch (c) {</span>
+<span class="pc bpc" id="L2266" title="2 of 3 branches missed.">            switch (c) {</span>
             case CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_1:
             case CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_2:
             case CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_3:
                 // loop again, we don't want empty escape chars
-<span class="nc" id="L2264">                c = read_string_char(ProhibitedCharacters.NONE);</span>
-<span class="nc" id="L2265">                continue;</span>
+<span class="nc" id="L2271">                c = read_string_char(ProhibitedCharacters.NONE);</span>
+<span class="nc" id="L2272">                continue;</span>
             case '\\':
-<span class="fc" id="L2267">                c = read_char();</span>
-<span class="fc bfc" id="L2268" title="All 2 branches covered.">                if (c &lt; 0) {</span>
-<span class="nc" id="L2269">                    unexpected_eof();</span>
+<span class="fc" id="L2274">                c = read_char();</span>
+<span class="fc bfc" id="L2275" title="All 2 branches covered.">                if (c &lt; 0) {</span>
+<span class="nc" id="L2276">                    unexpected_eof();</span>
                 }
-<span class="fc" id="L2271">                c = read_escaped_char_content_helper(c, is_clob);</span>
-<span class="pc bpc" id="L2272" title="3 of 6 branches missed.">                if (c == CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_1</span>
+<span class="fc" id="L2278">                c = read_escaped_char_content_helper(c, is_clob);</span>
+<span class="pc bpc" id="L2279" title="3 of 6 branches missed.">                if (c == CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_1</span>
                  || c == CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_2
                  || c == CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_3
                 ) {
                     // loop again, we don't want empty escape chars
-<span class="nc" id="L2277">                    c = read_string_char(ProhibitedCharacters.NONE);</span>
-<span class="nc" id="L2278">                    continue;</span>
+<span class="nc" id="L2284">                    c = read_string_char(ProhibitedCharacters.NONE);</span>
+<span class="nc" id="L2285">                    continue;</span>
                 }
-<span class="pc bpc" id="L2280" title="1 of 2 branches missed.">                if (c == IonTokenConstsX.ESCAPE_NOT_DEFINED) bad_escape_sequence();</span>
+<span class="pc bpc" id="L2287" title="1 of 2 branches missed.">                if (c == IonTokenConstsX.ESCAPE_NOT_DEFINED) bad_escape_sequence();</span>
                 break;
             default:
-<span class="nc bnc" id="L2283" title="All 4 branches missed.">                if (!is_clob &amp;&amp; !IonTokenConstsX.is7bitValue(c)) {</span>
-<span class="nc" id="L2284">                    c = read_large_char_sequence(c);</span>
+<span class="nc bnc" id="L2290" title="All 4 branches missed.">                if (!is_clob &amp;&amp; !IonTokenConstsX.is7bitValue(c)) {</span>
+<span class="nc" id="L2291">                    c = read_large_char_sequence(c);</span>
                 }
                 break;
             }
             break; // at this point we have a post-escaped character to return to the caller
         }
 
-<span class="pc bpc" id="L2291" title="1 of 2 branches missed.">        if (c == CharacterSequence.CHAR_SEQ_EOF) return c;</span>
-<span class="pc bpc" id="L2292" title="1 of 4 branches missed.">        if (is_clob &amp;&amp; !IonTokenConstsX.is8bitValue(c)) {</span>
-<span class="nc" id="L2293">            error(&quot;invalid character [&quot;+ printCodePointAsString(c)+&quot;] in CLOB&quot;);</span>
+<span class="pc bpc" id="L2298" title="1 of 2 branches missed.">        if (c == CharacterSequence.CHAR_SEQ_EOF) return c;</span>
+<span class="pc bpc" id="L2299" title="1 of 4 branches missed.">        if (is_clob &amp;&amp; !IonTokenConstsX.is8bitValue(c)) {</span>
+<span class="nc" id="L2300">            error(&quot;invalid character [&quot;+ printCodePointAsString(c)+&quot;] in CLOB&quot;);</span>
         }
-<span class="fc" id="L2295">        return c;</span>
+<span class="fc" id="L2302">        return c;</span>
     }
 
     private final int read_large_char_sequence(int c) throws IOException
     {
-<span class="fc bfc" id="L2300" title="All 2 branches covered.">        if (_stream._is_byte_data) {</span>
-<span class="fc" id="L2301">            return read_ut8_sequence(c);</span>
+<span class="fc bfc" id="L2307" title="All 2 branches covered.">        if (_stream._is_byte_data) {</span>
+<span class="fc" id="L2308">            return read_ut8_sequence(c);</span>
         }
-<span class="fc bfc" id="L2303" title="All 2 branches covered.">        if (PrivateIonConstants.isHighSurrogate(c)) {</span>
-<span class="fc" id="L2304">            int c2 = read_char();</span>
-<span class="fc bfc" id="L2305" title="All 2 branches covered.">            if (PrivateIonConstants.isLowSurrogate(c2)) {</span>
-<span class="fc" id="L2306">                c = PrivateIonConstants.makeUnicodeScalar(c, c2);</span>
+<span class="fc bfc" id="L2310" title="All 2 branches covered.">        if (PrivateIonConstants.isHighSurrogate(c)) {</span>
+<span class="fc" id="L2311">            int c2 = read_char();</span>
+<span class="fc bfc" id="L2312" title="All 2 branches covered.">            if (PrivateIonConstants.isLowSurrogate(c2)) {</span>
+<span class="fc" id="L2313">                c = PrivateIonConstants.makeUnicodeScalar(c, c2);</span>
             }
             else {
                 // we don't always pair up surrogates here
                 // our caller does that
-<span class="fc" id="L2311">                unread_char(c2);</span>
+<span class="fc" id="L2318">                unread_char(c2);</span>
             }
         }
-<span class="fc" id="L2314">        return c;</span>
+<span class="fc" id="L2321">        return c;</span>
     }
     private final int read_ut8_sequence(int c) throws IOException
     {
         // this should have the high order bit set
-<span class="pc bpc" id="L2319" title="2 of 4 branches missed.">        assert(!IonTokenConstsX.is7bitValue(c));</span>
-<span class="fc" id="L2320">        int len = IonUTF8.getUTF8LengthFromFirstByte(c);</span>
+<span class="pc bpc" id="L2326" title="2 of 4 branches missed.">        assert(!IonTokenConstsX.is7bitValue(c));</span>
+<span class="fc" id="L2327">        int len = IonUTF8.getUTF8LengthFromFirstByte(c);</span>
         int b2, b3, b4;
-<span class="pc bpc" id="L2322" title="2 of 5 branches missed.">        switch (len) {</span>
+<span class="pc bpc" id="L2329" title="2 of 5 branches missed.">        switch (len) {</span>
         case 1:
-<span class="nc" id="L2324">            break;</span>
+<span class="nc" id="L2331">            break;</span>
         case 2:
-<span class="fc" id="L2326">            b2 = read_char();</span>
-<span class="fc" id="L2327">            c = IonUTF8.twoByteScalar(c, b2);</span>
-<span class="fc" id="L2328">            break;</span>
+<span class="fc" id="L2333">            b2 = read_char();</span>
+<span class="fc" id="L2334">            c = IonUTF8.twoByteScalar(c, b2);</span>
+<span class="fc" id="L2335">            break;</span>
         case 3:
-<span class="fc" id="L2330">            b2 = read_char();</span>
-<span class="fc" id="L2331">            b3 = read_char();</span>
-<span class="fc" id="L2332">            c = IonUTF8.threeByteScalar(c, b2, b3);</span>
-<span class="fc" id="L2333">            break;</span>
+<span class="fc" id="L2337">            b2 = read_char();</span>
+<span class="fc" id="L2338">            b3 = read_char();</span>
+<span class="fc" id="L2339">            c = IonUTF8.threeByteScalar(c, b2, b3);</span>
+<span class="fc" id="L2340">            break;</span>
         case 4:
-<span class="fc" id="L2335">            b2 = read_char();</span>
-<span class="fc" id="L2336">            b3 = read_char();</span>
-<span class="fc" id="L2337">            b4 = read_char();</span>
-<span class="fc" id="L2338">            c = IonUTF8.fourByteScalar(c, b2, b3, b4);</span>
-<span class="fc" id="L2339">            break;</span>
+<span class="fc" id="L2342">            b2 = read_char();</span>
+<span class="fc" id="L2343">            b3 = read_char();</span>
+<span class="fc" id="L2344">            b4 = read_char();</span>
+<span class="fc" id="L2345">            c = IonUTF8.fourByteScalar(c, b2, b3, b4);</span>
+<span class="fc" id="L2346">            break;</span>
         default:
-<span class="nc" id="L2341">            error(&quot;invalid UTF8 starting byte&quot;);</span>
+<span class="nc" id="L2348">            error(&quot;invalid UTF8 starting byte&quot;);</span>
         }
-<span class="fc" id="L2343">        return c;</span>
+<span class="fc" id="L2350">        return c;</span>
     }
 
     private void skip_over_blob(SavePoint sp) throws IOException
     {
-<span class="fc" id="L2348">        int c = skip_over_blob_whitespace();</span>
+<span class="fc" id="L2355">        int c = skip_over_blob_whitespace();</span>
         for (;;) {
-<span class="fc bfc" id="L2350" title="All 2 branches covered.">            if (c == UnifiedInputStreamX.EOF) break;</span>
-<span class="fc bfc" id="L2351" title="All 2 branches covered.">            if (c == '}') break;</span>
-<span class="fc" id="L2352">            c = skip_over_blob_whitespace();</span>
+<span class="fc bfc" id="L2357" title="All 2 branches covered.">            if (c == UnifiedInputStreamX.EOF) break;</span>
+<span class="fc bfc" id="L2358" title="All 2 branches covered.">            if (c == '}') break;</span>
+<span class="fc" id="L2359">            c = skip_over_blob_whitespace();</span>
         }
-<span class="fc bfc" id="L2354" title="All 2 branches covered.">        if (sp != null) {</span>
+<span class="fc bfc" id="L2361" title="All 2 branches covered.">        if (sp != null) {</span>
             // we don't care about these last 2 closing curly braces
             // but we may have seen one of them already
-<span class="fc bfc" id="L2357" title="All 2 branches covered.">            int offset = (c == '}') ? -1 : 0;</span>
-<span class="fc" id="L2358">            sp.markEnd(offset);</span>
+<span class="fc bfc" id="L2364" title="All 2 branches covered.">            int offset = (c == '}') ? -1 : 0;</span>
+<span class="fc" id="L2365">            sp.markEnd(offset);</span>
         }
         // did we hit EOF or the first '}' ?
-<span class="pc bpc" id="L2361" title="1 of 2 branches missed.">        if (c != '}') unexpected_eof();</span>
-<span class="fc" id="L2362">        c = read_char();</span>
-<span class="fc bfc" id="L2363" title="All 2 branches covered.">        if (c &lt; 0) {</span>
-<span class="nc" id="L2364">            unexpected_eof();</span>
+<span class="pc bpc" id="L2368" title="1 of 2 branches missed.">        if (c != '}') unexpected_eof();</span>
+<span class="fc" id="L2369">        c = read_char();</span>
+<span class="fc bfc" id="L2370" title="All 2 branches covered.">        if (c &lt; 0) {</span>
+<span class="nc" id="L2371">            unexpected_eof();</span>
         }
-<span class="fc bfc" id="L2366" title="All 2 branches covered.">        if (c != '}') {</span>
-<span class="fc" id="L2367">            String message = &quot;improperly closed BLOB, &quot;</span>
-<span class="fc" id="L2368">                           + IonTextUtils.printCodePointAsString(c)</span>
+<span class="fc bfc" id="L2373" title="All 2 branches covered.">        if (c != '}') {</span>
+<span class="fc" id="L2374">            String message = &quot;improperly closed BLOB, &quot;</span>
+<span class="fc" id="L2375">                           + IonTextUtils.printCodePointAsString(c)</span>
                            + &quot; encountered when '}' was expected&quot;;
-<span class="nc" id="L2370">            error(message);</span>
+<span class="nc" id="L2377">            error(message);</span>
         }
-<span class="fc bfc" id="L2372" title="All 2 branches covered.">        if (sp != null) {</span>
-<span class="fc" id="L2373">            sp.markEnd();</span>
+<span class="fc bfc" id="L2379" title="All 2 branches covered.">        if (sp != null) {</span>
+<span class="fc" id="L2380">            sp.markEnd();</span>
         }
-<span class="fc" id="L2375">        return;</span>
+<span class="fc" id="L2382">        return;</span>
     }
     protected void load_blob(StringBuilder sb) throws IOException {
         int c;
 
         for (;;) {
-<span class="nc" id="L2381">            c = read_base64_byte();</span>
-<span class="nc bnc" id="L2382" title="All 2 branches missed.">            if (c == UnifiedInputStreamX.EOF) {</span>
-<span class="nc" id="L2383">                break;</span>
+<span class="nc" id="L2388">            c = read_base64_byte();</span>
+<span class="nc bnc" id="L2389" title="All 2 branches missed.">            if (c == UnifiedInputStreamX.EOF) {</span>
+<span class="nc" id="L2390">                break;</span>
             }
-<span class="nc" id="L2385">            sb.append(c);</span>
+<span class="nc" id="L2392">            sb.append(c);</span>
         }
         // did we hit EOF or the first '}' ?
-<span class="nc bnc" id="L2388" title="All 2 branches missed.">        if (_stream.isEOF()) unexpected_eof();</span>
+<span class="nc bnc" id="L2395" title="All 2 branches missed.">        if (_stream.isEOF()) unexpected_eof();</span>
 
-<span class="nc" id="L2390">        c = read_char();</span>
-<span class="nc bnc" id="L2391" title="All 2 branches missed.">        if (c &lt; 0) {</span>
-<span class="nc" id="L2392">            unexpected_eof();</span>
+<span class="nc" id="L2397">        c = read_char();</span>
+<span class="nc bnc" id="L2398" title="All 2 branches missed.">        if (c &lt; 0) {</span>
+<span class="nc" id="L2399">            unexpected_eof();</span>
         }
-<span class="nc bnc" id="L2394" title="All 2 branches missed.">        if (c != '}') {</span>
-<span class="nc" id="L2395">            String message = &quot;improperly closed BLOB, &quot;</span>
-<span class="nc" id="L2396">                           + IonTextUtils.printCodePointAsString(c)</span>
+<span class="nc bnc" id="L2401" title="All 2 branches missed.">        if (c != '}') {</span>
+<span class="nc" id="L2402">            String message = &quot;improperly closed BLOB, &quot;</span>
+<span class="nc" id="L2403">                           + IonTextUtils.printCodePointAsString(c)</span>
                            + &quot; encountered when '}' was expected&quot;;
-<span class="nc" id="L2398">            error(message);</span>
+<span class="nc" id="L2405">            error(message);</span>
         }
-<span class="nc" id="L2400">        return;</span>
+<span class="nc" id="L2407">        return;</span>
     }
 
     private final int read_escaped_char_content_helper(int c1, boolean is_clob)
         throws IOException
     {
-<span class="pc bpc" id="L2406" title="1 of 2 branches missed.">        if (c1 &lt; 0) {</span>
-<span class="nc bnc" id="L2407" title="All 4 branches missed.">            switch (c1) {</span>
+<span class="pc bpc" id="L2413" title="1 of 2 branches missed.">        if (c1 &lt; 0) {</span>
+<span class="nc bnc" id="L2414" title="All 4 branches missed.">            switch (c1) {</span>
             // new line normalization and counting is handled in read_char
             case CharacterSequence.CHAR_SEQ_NEWLINE_SEQUENCE_1:
-<span class="nc" id="L2410">                return CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_1;</span>
+<span class="nc" id="L2417">                return CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_1;</span>
             case CharacterSequence.CHAR_SEQ_NEWLINE_SEQUENCE_2:
-<span class="nc" id="L2412">                return CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_2;</span>
+<span class="nc" id="L2419">                return CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_2;</span>
             case CharacterSequence.CHAR_SEQ_NEWLINE_SEQUENCE_3:
-<span class="nc" id="L2414">                return CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_3;</span>
+<span class="nc" id="L2421">                return CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_3;</span>
             default:
-<span class="nc" id="L2416">                bad_escape_sequence(c1);</span>
+<span class="nc" id="L2423">                bad_escape_sequence(c1);</span>
             }
         }
-<span class="fc bfc" id="L2419" title="All 2 branches covered.">        if (!IonTokenConstsX.isValidEscapeStart(c1)) {</span>
-<span class="nc" id="L2420">            bad_escape_sequence(c1);</span>
+<span class="fc bfc" id="L2426" title="All 2 branches covered.">        if (!IonTokenConstsX.isValidEscapeStart(c1)) {</span>
+<span class="nc" id="L2427">            bad_escape_sequence(c1);</span>
         }
-<span class="fc" id="L2422">        int c2 = IonTokenConstsX.escapeReplacementCharacter(c1);</span>
-<span class="pc bpc" id="L2423" title="1 of 5 branches missed.">        switch (c2) {</span>
+<span class="fc" id="L2429">        int c2 = IonTokenConstsX.escapeReplacementCharacter(c1);</span>
+<span class="pc bpc" id="L2430" title="1 of 5 branches missed.">        switch (c2) {</span>
         case IonTokenConstsX.ESCAPE_NOT_DEFINED:
-<span class="nc bnc" id="L2425" title="All 2 branches missed.">            assert false</span>
+<span class="nc bnc" id="L2432" title="All 2 branches missed.">            assert false</span>
                 : &quot;invalid escape start characters (line &quot; + ((char)c1)
                 + &quot; should have been removed by isValid&quot;;
             break;
         case IonTokenConstsX.ESCAPE_LITTLE_U:
-<span class="fc bfc" id="L2430" title="All 2 branches covered.">            if (is_clob) {</span>
-<span class="nc" id="L2431">                bad_escape_sequence(c2);</span>
+<span class="fc bfc" id="L2437" title="All 2 branches covered.">            if (is_clob) {</span>
+<span class="nc" id="L2438">                bad_escape_sequence(c2);</span>
             }
-<span class="fc" id="L2433">            c2 = read_hex_escape_sequence_value(4);</span>
-<span class="fc" id="L2434">            break;</span>
+<span class="fc" id="L2440">            c2 = read_hex_escape_sequence_value(4);</span>
+<span class="fc" id="L2441">            break;</span>
         case IonTokenConstsX.ESCAPE_BIG_U:
-<span class="fc bfc" id="L2436" title="All 2 branches covered.">            if (is_clob) {</span>
-<span class="nc" id="L2437">                bad_escape_sequence(c2);</span>
+<span class="fc bfc" id="L2443" title="All 2 branches covered.">            if (is_clob) {</span>
+<span class="nc" id="L2444">                bad_escape_sequence(c2);</span>
             }
-<span class="fc" id="L2439">            c2 = read_hex_escape_sequence_value(8);</span>
-<span class="fc" id="L2440">            break;</span>
+<span class="fc" id="L2446">            c2 = read_hex_escape_sequence_value(8);</span>
+<span class="fc" id="L2447">            break;</span>
         case IonTokenConstsX.ESCAPE_HEX:
-<span class="fc" id="L2442">            c2 = read_hex_escape_sequence_value(2);</span>
+<span class="fc" id="L2449">            c2 = read_hex_escape_sequence_value(2);</span>
             break;
         }
-<span class="fc" id="L2445">        return c2;</span>
+<span class="fc" id="L2452">        return c2;</span>
     }
     private final int read_hex_escape_sequence_value(int len) throws IOException
     {
-<span class="fc" id="L2449">        int hexchar = 0;</span>
-<span class="fc bfc" id="L2450" title="All 2 branches covered.">        while (len &gt; 0) {</span>
-<span class="fc" id="L2451">            len--;</span>
-<span class="fc" id="L2452">            int c = read_char();</span>
-<span class="pc bpc" id="L2453" title="1 of 2 branches missed.">            if (c &lt; 0) {</span>
-<span class="nc" id="L2454">                unexpected_eof();</span>
+<span class="fc" id="L2456">        int hexchar = 0;</span>
+<span class="fc bfc" id="L2457" title="All 2 branches covered.">        while (len &gt; 0) {</span>
+<span class="fc" id="L2458">            len--;</span>
+<span class="fc" id="L2459">            int c = read_char();</span>
+<span class="pc bpc" id="L2460" title="1 of 2 branches missed.">            if (c &lt; 0) {</span>
+<span class="nc" id="L2461">                unexpected_eof();</span>
             }
-<span class="fc" id="L2456">            int d = IonTokenConstsX.hexDigitValue(c);</span>
-<span class="pc bpc" id="L2457" title="1 of 2 branches missed.">            if (d &lt; 0) return -1;</span>
-<span class="fc" id="L2458">            hexchar = (hexchar &lt;&lt; 4) + d;</span>
-<span class="fc" id="L2459">        }</span>
-<span class="pc bpc" id="L2460" title="1 of 2 branches missed.">        if (len &gt; 0) {</span>
-<span class="nc" id="L2461">            String message = &quot;invalid hex digit [&quot;</span>
-<span class="nc" id="L2462">                + IonTextUtils.printCodePointAsString(hexchar)</span>
+<span class="fc" id="L2463">            int d = IonTokenConstsX.hexDigitValue(c);</span>
+<span class="pc bpc" id="L2464" title="1 of 2 branches missed.">            if (d &lt; 0) return -1;</span>
+<span class="fc" id="L2465">            hexchar = (hexchar &lt;&lt; 4) + d;</span>
+<span class="fc" id="L2466">        }</span>
+<span class="pc bpc" id="L2467" title="1 of 2 branches missed.">        if (len &gt; 0) {</span>
+<span class="nc" id="L2468">            String message = &quot;invalid hex digit [&quot;</span>
+<span class="nc" id="L2469">                + IonTextUtils.printCodePointAsString(hexchar)</span>
                 + &quot;] in escape sequence&quot;;
-<span class="nc" id="L2464">            error(message);</span>
+<span class="nc" id="L2471">            error(message);</span>
         }
-<span class="fc" id="L2466">        return hexchar;</span>
+<span class="fc" id="L2473">        return hexchar;</span>
     }
 
     public final int read_base64_byte() throws IOException
     {
         int b;
-<span class="fc bfc" id="L2472" title="All 2 branches covered.">        if (_base64_prefetch_count &lt; 1) {</span>
-<span class="fc" id="L2473">            b = read_base64_byte_helper();</span>
+<span class="fc bfc" id="L2479" title="All 2 branches covered.">        if (_base64_prefetch_count &lt; 1) {</span>
+<span class="fc" id="L2480">            b = read_base64_byte_helper();</span>
         }
         else {
-<span class="fc" id="L2476">            b = (_base64_prefetch_stack &amp; 0xff);</span>
-<span class="fc" id="L2477">            _base64_prefetch_stack &gt;&gt;= 8;</span>
-<span class="fc" id="L2478">            _base64_prefetch_count--;</span>
+<span class="fc" id="L2483">            b = (_base64_prefetch_stack &amp; 0xff);</span>
+<span class="fc" id="L2484">            _base64_prefetch_stack &gt;&gt;= 8;</span>
+<span class="fc" id="L2485">            _base64_prefetch_count--;</span>
         }
-<span class="fc" id="L2480">        return b;</span>
+<span class="fc" id="L2487">        return b;</span>
     }
     private final int read_base64_byte_helper() throws IOException
     {
@@ -2487,83 +2494,83 @@ import software.amazon.ion.util.IonTextUtils;
         // will be 1 byte returned immediately and 0-2 bytes
         // put on the _binhex_stack to return later
 
-<span class="fc" id="L2490">        int c = skip_over_blob_whitespace();</span>
-<span class="pc bpc" id="L2491" title="1 of 4 branches missed.">        if (c == UnifiedInputStreamX.EOF || c == '}') {</span>
+<span class="fc" id="L2497">        int c = skip_over_blob_whitespace();</span>
+<span class="pc bpc" id="L2498" title="1 of 4 branches missed.">        if (c == UnifiedInputStreamX.EOF || c == '}') {</span>
             // we'll figure how which is which by check the stream for eof
-<span class="fc" id="L2493">            return UnifiedInputStreamX.EOF;</span>
+<span class="fc" id="L2500">            return UnifiedInputStreamX.EOF;</span>
         }
 
-<span class="fc" id="L2496">        int c1 = read_base64_getchar_helper(c);</span>
-<span class="fc" id="L2497">        int c2 = read_base64_getchar_helper();</span>
-<span class="fc" id="L2498">        int c3 = read_base64_getchar_helper();</span>
-<span class="fc" id="L2499">        int c4 = read_base64_getchar_helper();</span>
+<span class="fc" id="L2503">        int c1 = read_base64_getchar_helper(c);</span>
+<span class="fc" id="L2504">        int c2 = read_base64_getchar_helper();</span>
+<span class="fc" id="L2505">        int c3 = read_base64_getchar_helper();</span>
+<span class="fc" id="L2506">        int c4 = read_base64_getchar_helper();</span>
 
-<span class="fc" id="L2501">        int b1, len = decode_base64_length(c1, c2, c3, c4);</span>
+<span class="fc" id="L2508">        int b1, len = decode_base64_length(c1, c2, c3, c4);</span>
 
-<span class="fc" id="L2503">        _base64_prefetch_stack = 0;</span>
-<span class="fc" id="L2504">        _base64_prefetch_count = len - 1;</span>
-<span class="pc bpc" id="L2505" title="1 of 4 branches missed.">        switch (len) {</span>
+<span class="fc" id="L2510">        _base64_prefetch_stack = 0;</span>
+<span class="fc" id="L2511">        _base64_prefetch_count = len - 1;</span>
+<span class="pc bpc" id="L2512" title="1 of 4 branches missed.">        switch (len) {</span>
         default:
-<span class="nc" id="L2507">            String message =</span>
-<span class="nc" id="L2508">                &quot;invalid binhex sequence encountered at offset&quot;+input_position();</span>
-<span class="nc" id="L2509">            throw new IonReaderTextTokenException(message);</span>
+<span class="nc" id="L2514">            String message =</span>
+<span class="nc" id="L2515">                &quot;invalid binhex sequence encountered at offset&quot;+input_position();</span>
+<span class="nc" id="L2516">            throw new IonReaderTextTokenException(message);</span>
         case 3:
-<span class="fc" id="L2511">            int b3  = decode_base64_byte3(c1, c2, c3, c4);</span>
-<span class="fc" id="L2512">            _base64_prefetch_stack = (b3 &lt;&lt; 8) &amp; 0xff00;</span>
+<span class="fc" id="L2518">            int b3  = decode_base64_byte3(c1, c2, c3, c4);</span>
+<span class="fc" id="L2519">            _base64_prefetch_stack = (b3 &lt;&lt; 8) &amp; 0xff00;</span>
             // fall through
         case 2:
-<span class="fc" id="L2515">            int b2  = decode_base64_byte2(c1, c2, c3, c4);</span>
-<span class="fc" id="L2516">            _base64_prefetch_stack |= (b2 &amp; 0xff);</span>
+<span class="fc" id="L2522">            int b2  = decode_base64_byte2(c1, c2, c3, c4);</span>
+<span class="fc" id="L2523">            _base64_prefetch_stack |= (b2 &amp; 0xff);</span>
             // fall through
         case 1:
-<span class="fc" id="L2519">            b1 = decode_base64_byte1(c1, c2, c3, c4);</span>
+<span class="fc" id="L2526">            b1 = decode_base64_byte1(c1, c2, c3, c4);</span>
             // fall through
         }
-<span class="fc" id="L2522">        return b1;</span>
+<span class="fc" id="L2529">        return b1;</span>
     }
     private final int read_base64_getchar_helper(int c) throws IOException {
-<span class="pc bpc" id="L2525" title="3 of 6 branches missed.">        assert( ! (c == UnifiedInputStreamX.EOF || c == '}') );</span>
+<span class="pc bpc" id="L2532" title="3 of 6 branches missed.">        assert( ! (c == UnifiedInputStreamX.EOF || c == '}') );</span>
 
-<span class="pc bpc" id="L2527" title="2 of 4 branches missed.">        if (c == UnifiedInputStreamX.EOF || c == '}') {</span>
-<span class="nc" id="L2528">            return UnifiedInputStreamX.EOF;</span>
+<span class="pc bpc" id="L2534" title="2 of 4 branches missed.">        if (c == UnifiedInputStreamX.EOF || c == '}') {</span>
+<span class="nc" id="L2535">            return UnifiedInputStreamX.EOF;</span>
         }
-<span class="fc bfc" id="L2530" title="All 2 branches covered.">        if (c == BASE64_TERMINATOR_CHAR) {</span>
-<span class="nc" id="L2531">            error(&quot;invalid base64 image - excess terminator characters ['=']&quot;);</span>
-        }
-<span class="fc" id="L2533">        return read_base64_getchar_helper2(c);</span>
-    }
-    private final int read_base64_getchar_helper() throws IOException {
-<span class="fc" id="L2536">        int c = skip_over_blob_whitespace();</span>
-<span class="pc bpc" id="L2537" title="1 of 4 branches missed.">        if (c == UnifiedInputStreamX.EOF || c == '}') {</span>
-<span class="nc" id="L2538">            error(&quot;invalid base64 image - too short&quot;);</span>
+<span class="fc bfc" id="L2537" title="All 2 branches covered.">        if (c == BASE64_TERMINATOR_CHAR) {</span>
+<span class="nc" id="L2538">            error(&quot;invalid base64 image - excess terminator characters ['=']&quot;);</span>
         }
 <span class="fc" id="L2540">        return read_base64_getchar_helper2(c);</span>
     }
+    private final int read_base64_getchar_helper() throws IOException {
+<span class="fc" id="L2543">        int c = skip_over_blob_whitespace();</span>
+<span class="pc bpc" id="L2544" title="1 of 4 branches missed.">        if (c == UnifiedInputStreamX.EOF || c == '}') {</span>
+<span class="nc" id="L2545">            error(&quot;invalid base64 image - too short&quot;);</span>
+        }
+<span class="fc" id="L2547">        return read_base64_getchar_helper2(c);</span>
+    }
     private final int read_base64_getchar_helper2(int c) throws IOException {
-<span class="pc bpc" id="L2543" title="3 of 6 branches missed.">        assert( ! (c == UnifiedInputStreamX.EOF || c == '}') );</span>
+<span class="pc bpc" id="L2550" title="3 of 6 branches missed.">        assert( ! (c == UnifiedInputStreamX.EOF || c == '}') );</span>
 
-<span class="fc bfc" id="L2545" title="All 2 branches covered.">        if (c == BASE64_TERMINATOR_CHAR) {</span>
+<span class="fc bfc" id="L2552" title="All 2 branches covered.">        if (c == BASE64_TERMINATOR_CHAR) {</span>
             // we're using a new EOF here since the '=' is in range
             // of 0-63 (6 bits) and we don't want to confuse it with
             // the normal EOF
-<span class="fc" id="L2549">            return BASE64_EOF;</span>
+<span class="fc" id="L2556">            return BASE64_EOF;</span>
         }
-<span class="fc" id="L2551">        int b = BASE64_CHAR_TO_BIN[c &amp; 0xff];</span>
-<span class="pc bpc" id="L2552" title="1 of 4 branches missed.">        if (b == UnifiedInputStreamX.EOF || !IonTokenConstsX.is8bitValue(c)) {</span>
-<span class="fc" id="L2553">            String message = &quot;invalid character &quot;</span>
-<span class="fc" id="L2554">                           + Character.toString((char)c)</span>
+<span class="fc" id="L2558">        int b = BASE64_CHAR_TO_BIN[c &amp; 0xff];</span>
+<span class="pc bpc" id="L2559" title="1 of 4 branches missed.">        if (b == UnifiedInputStreamX.EOF || !IonTokenConstsX.is8bitValue(c)) {</span>
+<span class="fc" id="L2560">            String message = &quot;invalid character &quot;</span>
+<span class="fc" id="L2561">                           + Character.toString((char)c)</span>
                            + &quot; encountered in base64 value at &quot;
-<span class="fc" id="L2556">                           + input_position();</span>
-<span class="fc" id="L2557">            throw new IonReaderTextTokenException(message);</span>
+<span class="fc" id="L2563">                           + input_position();</span>
+<span class="fc" id="L2564">            throw new IonReaderTextTokenException(message);</span>
         }
-<span class="fc" id="L2559">        return b;</span>
+<span class="fc" id="L2566">        return b;</span>
     }
     private final static int decode_base64_length(int c1, int c2, int c3, int c4) {
-<span class="fc" id="L2562">        int len = 3;</span>
-<span class="fc bfc" id="L2563" title="All 2 branches covered.">        if (c4 != BASE64_EOF)      len = 3;</span>
-<span class="fc bfc" id="L2564" title="All 2 branches covered.">        else if (c3 != BASE64_EOF) len = 2;</span>
-<span class="fc" id="L2565">        else                       len = 1;</span>
-<span class="fc" id="L2566">        return len;</span>
+<span class="fc" id="L2569">        int len = 3;</span>
+<span class="fc bfc" id="L2570" title="All 2 branches covered.">        if (c4 != BASE64_EOF)      len = 3;</span>
+<span class="fc bfc" id="L2571" title="All 2 branches covered.">        else if (c3 != BASE64_EOF) len = 2;</span>
+<span class="fc" id="L2572">        else                       len = 1;</span>
+<span class="fc" id="L2573">        return len;</span>
     }
     private final static int decode_base64_byte1(int c1, int c2, int c3, int c4) {
         //extracted from Base64Encoder.java:
@@ -2572,8 +2579,8 @@ import software.amazon.ion.util.IonTextUtils;
         // b1 = (char)((convert &amp; 0x00FF0000) &gt;&gt; 16);  [32:1] &amp; 0x00FF0000 =&gt; [24:17] - 16 =&gt; [8:1]
         // byte1 uses the 6 bits in char1 + 2 highest bits (out of 6) from char2
         if (_debug) assert(decode_base64_length(c1, c2, c3, c4) &gt;= 1);
-<span class="fc" id="L2575">        int b1 = (((c1 &lt;&lt; 2) &amp; 0xfc) | ((c2 &gt;&gt; 4) &amp; 0x03));</span>
-<span class="fc" id="L2576">        return b1;</span>
+<span class="fc" id="L2582">        int b1 = (((c1 &lt;&lt; 2) &amp; 0xfc) | ((c2 &gt;&gt; 4) &amp; 0x03));</span>
+<span class="fc" id="L2583">        return b1;</span>
     }
     private final static int decode_base64_byte2(int c1, int c2, int c3, int c4) {
         //convert |= (c2 &lt;&lt; 12);  [6:1]+12 =&gt; [18:13]
@@ -2583,8 +2590,8 @@ import software.amazon.ion.util.IonTextUtils;
         // [12:7] - 8 -&gt; [4:-1] or [6:3] - 2 from c3
         //byte2 uses 4 low bits from c2 and 4 high bits from c3
         if (_debug) assert(decode_base64_length(c1, c2, c3, c4) &gt;= 2);
-<span class="fc" id="L2586">        int b2 = (((c2 &lt;&lt; 4) &amp; 0xf0) | ((c3 &gt;&gt; 2) &amp; 0x0f)) &amp; 0xff;</span>
-<span class="fc" id="L2587">        return b2;</span>
+<span class="fc" id="L2593">        int b2 = (((c2 &lt;&lt; 4) &amp; 0xf0) | ((c3 &gt;&gt; 2) &amp; 0x0f)) &amp; 0xff;</span>
+<span class="fc" id="L2594">        return b2;</span>
     }
     private final static int decode_base64_byte3(int c1, int c2, int c3, int c4) {
         // convert |= (c3 &lt;&lt; 6); [6:1]+6  =&gt; [12:7]
@@ -2592,112 +2599,112 @@ import software.amazon.ion.util.IonTextUtils;
         // b3 = (char)((convert &amp; 0x000000FF) &gt;&gt; 0);
         // b3 uses low 2 bits from c3 and all 6 bits of c4
         if (_debug) assert(decode_base64_length(c1, c2, c3, c4) &gt;= 3);
-<span class="fc" id="L2595">        int b3 = (((c3 &amp; 0x03) &lt;&lt; 6) | (c4 &amp; 0x3f)) &amp; 0xff;</span>
-<span class="fc" id="L2596">        return b3;</span>
+<span class="fc" id="L2602">        int b3 = (((c3 &amp; 0x03) &lt;&lt; 6) | (c4 &amp; 0x3f)) &amp; 0xff;</span>
+<span class="fc" id="L2603">        return b3;</span>
     }
 
     protected void save_point_start(SavePoint sp) throws IOException
     {
-<span class="pc bpc" id="L2601" title="3 of 6 branches missed.">        assert(sp != null &amp;&amp; sp.isClear());</span>
-<span class="fc" id="L2602">        long line_number = _line_count;</span>
-<span class="fc" id="L2603">        long line_start = _line_starting_position;</span>
-<span class="fc" id="L2604">        sp.start(line_number, line_start);</span>
-<span class="fc" id="L2605">    }</span>
+<span class="pc bpc" id="L2608" title="3 of 6 branches missed.">        assert(sp != null &amp;&amp; sp.isClear());</span>
+<span class="fc" id="L2609">        long line_number = _line_count;</span>
+<span class="fc" id="L2610">        long line_start = _line_starting_position;</span>
+<span class="fc" id="L2611">        sp.start(line_number, line_start);</span>
+<span class="fc" id="L2612">    }</span>
     protected void save_point_activate(SavePoint sp) throws IOException
     {
-<span class="pc bpc" id="L2608" title="3 of 6 branches missed.">        assert(sp != null &amp;&amp; sp.isDefined());</span>
-<span class="fc" id="L2609">        long line_number = _line_count;</span>
-<span class="fc" id="L2610">        long line_start  = _line_starting_position;</span>
+<span class="pc bpc" id="L2615" title="3 of 6 branches missed.">        assert(sp != null &amp;&amp; sp.isDefined());</span>
+<span class="fc" id="L2616">        long line_number = _line_count;</span>
+<span class="fc" id="L2617">        long line_start  = _line_starting_position;</span>
         // this will set the &quot;restore&quot; (aka prev) line and start offset so
         // that when we pop the save point we'll get the correct line &amp; char
-<span class="fc" id="L2613">        _stream._save_points.savePointPushActive(sp, line_number, line_start);</span>
-<span class="fc" id="L2614">        _line_count = sp.getStartLineNumber();</span>
-<span class="fc" id="L2615">        _line_starting_position = sp.getStartLineStart();</span>
-<span class="fc" id="L2616">    }</span>
+<span class="fc" id="L2620">        _stream._save_points.savePointPushActive(sp, line_number, line_start);</span>
+<span class="fc" id="L2621">        _line_count = sp.getStartLineNumber();</span>
+<span class="fc" id="L2622">        _line_starting_position = sp.getStartLineStart();</span>
+<span class="fc" id="L2623">    }</span>
     protected void save_point_deactivate(SavePoint sp) throws IOException
     {
-<span class="pc bpc" id="L2619" title="3 of 6 branches missed.">        assert(sp != null &amp;&amp; sp.isActive());</span>
+<span class="pc bpc" id="L2626" title="3 of 6 branches missed.">        assert(sp != null &amp;&amp; sp.isActive());</span>
 
-<span class="fc" id="L2621">        _stream._save_points.savePointPopActive(sp);</span>
-<span class="fc" id="L2622">        _line_count = sp.getPrevLineNumber();</span>
-<span class="fc" id="L2623">        _line_starting_position = sp.getPrevLineStart();</span>
-<span class="fc" id="L2624">    }</span>
+<span class="fc" id="L2628">        _stream._save_points.savePointPopActive(sp);</span>
+<span class="fc" id="L2629">        _line_count = sp.getPrevLineNumber();</span>
+<span class="fc" id="L2630">        _line_starting_position = sp.getPrevLineStart();</span>
+<span class="fc" id="L2631">    }</span>
 
     protected final void error(String message)
     {
-<span class="fc" id="L2628">        String message2 = message + input_position();</span>
-<span class="fc" id="L2629">        throw new IonReaderTextTokenException(message2);</span>
+<span class="fc" id="L2635">        String message2 = message + input_position();</span>
+<span class="fc" id="L2636">        throw new IonReaderTextTokenException(message2);</span>
     }
     protected final void unexpected_eof()
     {
-<span class="fc" id="L2633">        String message = &quot;unexpected EOF encountered &quot;+input_position();</span>
-<span class="fc" id="L2634">        throw new UnexpectedEofException(message);</span>
+<span class="fc" id="L2640">        String message = &quot;unexpected EOF encountered &quot;+input_position();</span>
+<span class="fc" id="L2641">        throw new UnexpectedEofException(message);</span>
     }
     protected final void bad_escape_sequence()
     {
-<span class="nc" id="L2638">        String message = &quot;bad escape character encountered &quot;+input_position();</span>
-<span class="nc" id="L2639">        throw new IonReaderTextTokenException(message);</span>
+<span class="nc" id="L2645">        String message = &quot;bad escape character encountered &quot;+input_position();</span>
+<span class="nc" id="L2646">        throw new IonReaderTextTokenException(message);</span>
     }
     protected final void bad_escape_sequence(int c)
     {
-<span class="fc" id="L2643">        String message =</span>
-<span class="fc" id="L2644">            &quot;bad escape character '&quot;+printCodePointAsString(c)+</span>
-<span class="fc" id="L2645">            &quot;' encountered &quot;+input_position();</span>
-<span class="fc" id="L2646">        throw new IonReaderTextTokenException(message);</span>
+<span class="fc" id="L2650">        String message =</span>
+<span class="fc" id="L2651">            &quot;bad escape character '&quot;+printCodePointAsString(c)+</span>
+<span class="fc" id="L2652">            &quot;' encountered &quot;+input_position();</span>
+<span class="fc" id="L2653">        throw new IonReaderTextTokenException(message);</span>
     }
     protected final void bad_token_start(int c)
     {
-<span class="fc" id="L2650">        String message =</span>
-<span class="fc" id="L2651">            &quot;bad character [&quot;+c+&quot;, &quot;+printCodePointAsString(c)+</span>
+<span class="fc" id="L2657">        String message =</span>
+<span class="fc" id="L2658">            &quot;bad character [&quot;+c+&quot;, &quot;+printCodePointAsString(c)+</span>
             &quot;] encountered where a token was supposed to start &quot;+
-<span class="fc" id="L2653">            input_position();</span>
-<span class="fc" id="L2654">        throw new IonReaderTextTokenException(message);</span>
+<span class="fc" id="L2660">            input_position();</span>
+<span class="fc" id="L2661">        throw new IonReaderTextTokenException(message);</span>
     }
     protected final void bad_token(int c)
     {
-<span class="fc" id="L2658">        String charStr = IonTextUtils.printCodePointAsString(c);</span>
-<span class="fc" id="L2659">        String message =</span>
-<span class="fc" id="L2660">            &quot;a bad character &quot; + charStr + &quot; was encountered &quot;+input_position();</span>
-<span class="fc" id="L2661">        throw new IonReaderTextTokenException(message);</span>
+<span class="fc" id="L2665">        String charStr = IonTextUtils.printCodePointAsString(c);</span>
+<span class="fc" id="L2666">        String message =</span>
+<span class="fc" id="L2667">            &quot;a bad character &quot; + charStr + &quot; was encountered &quot;+input_position();</span>
+<span class="fc" id="L2668">        throw new IonReaderTextTokenException(message);</span>
     }
 
     protected final void expected_but_found(String expected, int c)
     {
-<span class="fc" id="L2666">        String charStr = IonTextUtils.printCodePointAsString(c);</span>
-<span class="fc" id="L2667">        String message =</span>
-<span class="fc" id="L2668">            &quot;Expected &quot; + expected + &quot; but found &quot; + charStr + input_position();</span>
-<span class="fc" id="L2669">        throw new IonReaderTextTokenException(message);</span>
+<span class="fc" id="L2673">        String charStr = IonTextUtils.printCodePointAsString(c);</span>
+<span class="fc" id="L2674">        String message =</span>
+<span class="fc" id="L2675">            &quot;Expected &quot; + expected + &quot; but found &quot; + charStr + input_position();</span>
+<span class="fc" id="L2676">        throw new IonReaderTextTokenException(message);</span>
     }
 
     static public class IonReaderTextTokenException extends IonException {
         private static final long serialVersionUID = 1L;
         IonReaderTextTokenException(String msg) {
-<span class="fc" id="L2675">            super(msg);</span>
-<span class="fc" id="L2676">        }</span>
+<span class="fc" id="L2682">            super(msg);</span>
+<span class="fc" id="L2683">        }</span>
     }
 
-<span class="fc" id="L2679">    private enum ProhibitedCharacters {</span>
-<span class="fc" id="L2680">        SHORT_CHAR</span>
+<span class="fc" id="L2686">    private enum ProhibitedCharacters {</span>
+<span class="fc" id="L2687">        SHORT_CHAR</span>
         {
             boolean includes(int c)
             {
-<span class="fc bfc" id="L2684" title="All 4 branches covered.">                return isControlCharacter(c) &amp;&amp; !isWhitespace(c);</span>
+<span class="fc bfc" id="L2691" title="All 4 branches covered.">                return isControlCharacter(c) &amp;&amp; !isWhitespace(c);</span>
             }
         },
 
-<span class="fc" id="L2688">        LONG_CHAR</span>
+<span class="fc" id="L2695">        LONG_CHAR</span>
         {
             boolean includes(int c)
             {
-<span class="fc bfc" id="L2692" title="All 6 branches covered.">                return isControlCharacter(c) &amp;&amp; !isWhitespace(c) &amp;&amp; !isNewline(c);</span>
+<span class="fc bfc" id="L2699" title="All 6 branches covered.">                return isControlCharacter(c) &amp;&amp; !isWhitespace(c) &amp;&amp; !isNewline(c);</span>
             }
         },
 
-<span class="fc" id="L2696">        NONE</span>
+<span class="fc" id="L2703">        NONE</span>
         {
             boolean includes(int c)
             {
-<span class="fc" id="L2700">                return false;</span>
+<span class="fc" id="L2707">                return false;</span>
             }
         };
 
@@ -2705,17 +2712,17 @@ import software.amazon.ion.util.IonTextUtils;
 
         private static boolean isControlCharacter(int c)
         {
-<span class="fc bfc" id="L2708" title="All 4 branches covered.">            return c &lt;= 0x1F &amp;&amp; 0x00 &lt;= c;</span>
+<span class="fc bfc" id="L2715" title="All 4 branches covered.">            return c &lt;= 0x1F &amp;&amp; 0x00 &lt;= c;</span>
         }
 
         private static boolean isNewline(int c)
         {
-<span class="fc bfc" id="L2713" title="All 4 branches covered.">            return c == 0x0A || c == 0x0D;</span>
+<span class="fc bfc" id="L2720" title="All 4 branches covered.">            return c == 0x0A || c == 0x0D;</span>
         }
 
         private static boolean isWhitespace(int c)
         {
-<span class="pc bpc" id="L2718" title="1 of 8 branches missed.">            return c == 0x09 // tab</span>
+<span class="pc bpc" id="L2725" title="1 of 8 branches missed.">            return c == 0x09 // tab</span>
                 || c == 0x0B // vertical tab
                 || c == 0x0C // form feed
                 || c == 0x20 // space
@@ -2723,62 +2730,62 @@ import software.amazon.ion.util.IonTextUtils;
         }
     }
 
-<span class="pc bpc" id="L2726" title="1 of 2 branches missed.">    private enum Radix</span>
+<span class="pc bpc" id="L2733" title="1 of 2 branches missed.">    private enum Radix</span>
     {
-<span class="fc" id="L2728">        BINARY</span>
+<span class="fc" id="L2735">        BINARY</span>
         {
             boolean isPrefix(int c)
             {
-<span class="fc bfc" id="L2732" title="All 4 branches covered.">                return c == 'b' || c == 'B';</span>
+<span class="fc bfc" id="L2739" title="All 4 branches covered.">                return c == 'b' || c == 'B';</span>
             }
 
             boolean isValidDigit(int c)
             {
-<span class="fc" id="L2737">                return IonTokenConstsX.isBinaryDigit(c);</span>
+<span class="fc" id="L2744">                return IonTokenConstsX.isBinaryDigit(c);</span>
             }
 
             @Override
             char normalizeDigit(char c)
             {
-<span class="fc" id="L2743">                return c; // no normalization required</span>
+<span class="fc" id="L2750">                return c; // no normalization required</span>
             }
         },
 
-<span class="fc" id="L2747">        DECIMAL</span>
+<span class="fc" id="L2754">        DECIMAL</span>
         {
             boolean isPrefix(int c)
             {
-<span class="nc" id="L2751">                return false;</span>
+<span class="nc" id="L2758">                return false;</span>
             }
 
             boolean isValidDigit(int c)
             {
-<span class="fc" id="L2756">                return IonTokenConstsX.isDigit(c);</span>
+<span class="fc" id="L2763">                return IonTokenConstsX.isDigit(c);</span>
             }
 
             @Override
             char normalizeDigit(char c)
             {
-<span class="fc" id="L2762">                return c; // no normalization required</span>
+<span class="fc" id="L2769">                return c; // no normalization required</span>
             }
         },
 
-<span class="fc" id="L2766">        HEX</span>
+<span class="fc" id="L2773">        HEX</span>
         {
             boolean isPrefix(int c)
             {
-<span class="fc bfc" id="L2770" title="All 4 branches covered.">                return c == 'x' || c == 'X';</span>
+<span class="fc bfc" id="L2777" title="All 4 branches covered.">                return c == 'x' || c == 'X';</span>
             }
 
             boolean isValidDigit(int c)
             {
-<span class="fc" id="L2775">                return IonTokenConstsX.isHexDigit(c);</span>
+<span class="fc" id="L2782">                return IonTokenConstsX.isHexDigit(c);</span>
             }
 
             @Override
             char normalizeDigit(char c)
             {
-<span class="fc" id="L2781">                return Character.toLowerCase(c);</span>
+<span class="fc" id="L2788">                return Character.toLowerCase(c);</span>
             }
         };
 
@@ -2788,71 +2795,71 @@ import software.amazon.ion.util.IonTextUtils;
 
         void assertPrefix(int c)
         {
-<span class="pc bpc" id="L2791" title="2 of 4 branches missed.">            assert isPrefix(c);</span>
-<span class="fc" id="L2792">        }</span>
+<span class="pc bpc" id="L2798" title="2 of 4 branches missed.">            assert isPrefix(c);</span>
+<span class="fc" id="L2799">        }</span>
     }
 
     private int readNumeric(Appendable buffer, Radix radix) throws IOException
     {
-<span class="fc" id="L2797">        return readNumeric(buffer, radix, NumericState.START);</span>
+<span class="fc" id="L2804">        return readNumeric(buffer, radix, NumericState.START);</span>
     }
 
     private int readNumeric(Appendable buffer, Radix radix, NumericState startingState) throws IOException
     {
-<span class="fc" id="L2802">        NumericState state = startingState;</span>
+<span class="fc" id="L2809">        NumericState state = startingState;</span>
 
         for (;;)
         {
-<span class="fc" id="L2806">            int c = read_char();</span>
-<span class="pc bpc" id="L2807" title="1 of 4 branches missed.">            switch (state)</span>
+<span class="fc" id="L2813">            int c = read_char();</span>
+<span class="pc bpc" id="L2814" title="1 of 4 branches missed.">            switch (state)</span>
             {
                 case START:
-<span class="fc bfc" id="L2810" title="All 2 branches covered.">                    if (radix.isValidDigit(c))</span>
+<span class="fc bfc" id="L2817" title="All 2 branches covered.">                    if (radix.isValidDigit(c))</span>
                     {
-<span class="fc" id="L2812">                        buffer.append(radix.normalizeDigit((char) c));</span>
-<span class="fc" id="L2813">                        state = NumericState.DIGIT;</span>
+<span class="fc" id="L2819">                        buffer.append(radix.normalizeDigit((char) c));</span>
+<span class="fc" id="L2820">                        state = NumericState.DIGIT;</span>
                     }
                     else
                     {
-<span class="fc" id="L2817">                        return c;</span>
+<span class="fc" id="L2824">                        return c;</span>
                     }
                     break;
                 case DIGIT:
-<span class="fc bfc" id="L2821" title="All 2 branches covered.">                    if (radix.isValidDigit(c))</span>
+<span class="fc bfc" id="L2828" title="All 2 branches covered.">                    if (radix.isValidDigit(c))</span>
                     {
-<span class="fc" id="L2823">                        buffer.append(radix.normalizeDigit((char) c));</span>
-<span class="fc" id="L2824">                        state = NumericState.DIGIT;</span>
+<span class="fc" id="L2830">                        buffer.append(radix.normalizeDigit((char) c));</span>
+<span class="fc" id="L2831">                        state = NumericState.DIGIT;</span>
                     }
-<span class="fc bfc" id="L2826" title="All 2 branches covered.">                    else if (c == '_')</span>
+<span class="fc bfc" id="L2833" title="All 2 branches covered.">                    else if (c == '_')</span>
                     {
-<span class="fc" id="L2828">                        state = NumericState.UNDERSCORE;</span>
+<span class="fc" id="L2835">                        state = NumericState.UNDERSCORE;</span>
                     }
                     else
                     {
-<span class="fc" id="L2832">                        return c;</span>
+<span class="fc" id="L2839">                        return c;</span>
                     }
                     break;
                 case UNDERSCORE:
-<span class="fc bfc" id="L2836" title="All 2 branches covered.">                    if (radix.isValidDigit(c))</span>
+<span class="fc bfc" id="L2843" title="All 2 branches covered.">                    if (radix.isValidDigit(c))</span>
                     {
-<span class="fc" id="L2838">                        buffer.append(radix.normalizeDigit((char) c));</span>
-<span class="fc" id="L2839">                        state = NumericState.DIGIT;</span>
+<span class="fc" id="L2845">                        buffer.append(radix.normalizeDigit((char) c));</span>
+<span class="fc" id="L2846">                        state = NumericState.DIGIT;</span>
                     }
                     else
                     {
-<span class="fc" id="L2843">                        unread_char(c);</span>
-<span class="fc" id="L2844">                        return '_';</span>
+<span class="fc" id="L2850">                        unread_char(c);</span>
+<span class="fc" id="L2851">                        return '_';</span>
                     }
                     break;
             }
-<span class="fc" id="L2848">        }</span>
+<span class="fc" id="L2855">        }</span>
     }
 
-<span class="fc" id="L2851">    private enum NumericState</span>
+<span class="fc" id="L2858">    private enum NumericState</span>
     {
-<span class="fc" id="L2853">        START,</span>
-<span class="fc" id="L2854">        UNDERSCORE,</span>
-<span class="fc" id="L2855">        DIGIT,</span>
+<span class="fc" id="L2860">        START,</span>
+<span class="fc" id="L2861">        UNDERSCORE,</span>
+<span class="fc" id="L2862">        DIGIT,</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

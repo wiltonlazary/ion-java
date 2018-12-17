@@ -849,148 +849,151 @@ import java.lang.Character;
 <span class="fc" id="L849">        int c = -1;</span>
 
 <span class="pc bpc" id="L851" title="1 of 4 branches missed.">        switch (_lob_token) {</span>
+        // BLOB
         case IonTokenConstsX.TOKEN_OPEN_DOUBLE_BRACE:
-<span class="pc bpc" id="L853" title="1 of 2 branches missed.">            while (len-- &gt; 0) {</span>
-<span class="fc" id="L854">                c = _scanner.read_base64_byte();</span>
-<span class="fc bfc" id="L855" title="All 2 branches covered.">                if (c &lt; 0) break;</span>
-<span class="fc" id="L856">                buffer[offset++] = (byte)c;</span>
+<span class="pc bpc" id="L854" title="1 of 2 branches missed.">            while (len-- &gt; 0) {</span>
+<span class="fc" id="L855">                c = _scanner.read_base64_byte();</span>
+<span class="fc bfc" id="L856" title="All 2 branches covered.">                if (c &lt; 0) break;</span>
+<span class="fc" id="L857">                buffer[offset++] = (byte)c;</span>
             }
             break;
+        // CLOB
         case IonTokenConstsX.TOKEN_STRING_DOUBLE_QUOTE:
-<span class="fc bfc" id="L860" title="All 2 branches covered.">            while (len-- &gt; 0) {</span>
-<span class="fc" id="L861">                c = _scanner.read_double_quoted_char(true);</span>
-<span class="fc bfc" id="L862" title="All 2 branches covered.">                if (c &lt; 0) {</span>
-<span class="pc bpc" id="L863" title="3 of 6 branches missed.">                    if (c == CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_1</span>
+<span class="fc bfc" id="L862" title="All 2 branches covered.">            while (len-- &gt; 0) {</span>
+<span class="fc" id="L863">                c = _scanner.read_double_quoted_char(true);</span>
+<span class="fc bfc" id="L864" title="All 2 branches covered.">                if (c &lt; 0) {</span>
+<span class="pc bpc" id="L865" title="3 of 6 branches missed.">                    if (c == CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_1</span>
                      || c == CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_2
                      || c == CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_3
                     ) {
-<span class="nc" id="L867">                        continue;</span>
+<span class="nc" id="L869">                        continue;</span>
                     }
                     break;
                 }
-<span class="pc bpc" id="L871" title="3 of 6 branches missed.">                assert(c &gt;= 0 &amp;&amp; c &lt;= UNSIGNED_BYTE_MAX_VALUE);</span>
-<span class="fc" id="L872">                buffer[offset++] = (byte)c;</span>
+<span class="pc bpc" id="L873" title="2 of 4 branches missed.">                assert(c &lt;= UNSIGNED_BYTE_MAX_VALUE);</span>
+<span class="fc" id="L874">                buffer[offset++] = (byte)c;</span>
             }
             break;
+        // CLOB 
         case IonTokenConstsX.TOKEN_STRING_TRIPLE_QUOTE:
-<span class="fc bfc" id="L876" title="All 2 branches covered.">            while (len-- &gt; 0) {</span>
-<span class="fc" id="L877">                c = _scanner.read_triple_quoted_char(true);</span>
-<span class="fc bfc" id="L878" title="All 2 branches covered.">                if (c &lt; 0) {</span>
-<span class="pc bpc" id="L879" title="2 of 8 branches missed.">                    if (c == CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_1</span>
+<span class="fc bfc" id="L879" title="All 2 branches covered.">            while (len-- &gt; 0) {</span>
+<span class="fc" id="L880">                c = _scanner.read_triple_quoted_char(true);</span>
+<span class="fc bfc" id="L881" title="All 2 branches covered.">                if (c &lt; 0) {</span>
+<span class="pc bpc" id="L882" title="2 of 8 branches missed.">                    if (c == CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_1</span>
                      || c == CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_2
                      || c == CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_3
                      || c == CharacterSequence.CHAR_SEQ_STRING_NON_TERMINATOR
                     ) {
-<span class="fc" id="L884">                        continue;</span>
+<span class="fc" id="L887">                        continue;</span>
                     }
-<span class="pc bpc" id="L886" title="2 of 6 branches missed.">                    if (c == CharacterSequence.CHAR_SEQ_NEWLINE_SEQUENCE_1</span>
+<span class="pc bpc" id="L889" title="2 of 6 branches missed.">                    if (c == CharacterSequence.CHAR_SEQ_NEWLINE_SEQUENCE_1</span>
                      || c == CharacterSequence.CHAR_SEQ_NEWLINE_SEQUENCE_2
                      || c == CharacterSequence.CHAR_SEQ_NEWLINE_SEQUENCE_3
                     ) {
-<span class="fc" id="L890">                        buffer[offset++] = (byte)'\n';</span>
-<span class="fc" id="L891">                        continue;</span>
+<span class="fc" id="L893">                        buffer[offset++] = (byte)'\n';</span>
+<span class="fc" id="L894">                        continue;</span>
                     }
                     break;
                 }
-<span class="pc bpc" id="L895" title="3 of 6 branches missed.">                assert(c &gt;= 0 &amp;&amp; c &lt;= UNSIGNED_BYTE_MAX_VALUE);</span>
-<span class="fc" id="L896">                buffer[offset++] = (byte)c;</span>
+<span class="pc bpc" id="L898" title="3 of 6 branches missed.">                assert(c &gt;= 0 &amp;&amp; c &lt;= UNSIGNED_BYTE_MAX_VALUE);</span>
+<span class="fc" id="L899">                buffer[offset++] = (byte)c;</span>
             }
             break;
         default:
-<span class="nc" id="L900">            String message = &quot;invalid type [&quot;+_value_type.toString()+&quot;] for lob handling&quot;;</span>
-<span class="nc" id="L901">            throw new IonReaderTextTokenException(message);</span>
+<span class="nc" id="L903">            String message = &quot;invalid type [&quot;+_value_type.toString()+&quot;] for lob handling&quot;;</span>
+<span class="nc" id="L904">            throw new IonReaderTextTokenException(message);</span>
         }
-<span class="fc bfc" id="L903" title="All 2 branches covered.">        if (c == -1) {</span>
-<span class="fc" id="L904">            _scanner.tokenIsFinished();</span>
+<span class="fc bfc" id="L906" title="All 2 branches covered.">        if (c == -1) {</span>
+<span class="fc" id="L907">            _scanner.tokenIsFinished();</span>
         }
-<span class="fc" id="L906">        int read = offset - starting_offset;</span>
-<span class="fc" id="L907">        _lob_value_position += read;   // TODO: is _lob_value_position really needed?</span>
-<span class="fc" id="L908">        return read;</span>
+<span class="fc" id="L909">        int read = offset - starting_offset;</span>
+<span class="fc" id="L910">        _lob_value_position += read;   // TODO: is _lob_value_position really needed?</span>
+<span class="fc" id="L911">        return read;</span>
     }
 
     public IonValue getIonValue(IonSystem sys)
     {
-<span class="nc bnc" id="L913" title="All 2 branches missed.">        if (isNullValue()) {</span>
-<span class="nc bnc" id="L914" title="All 14 branches missed.">            switch (_value_type) {</span>
-<span class="nc" id="L915">            case NULL:      return sys.newNull();</span>
-<span class="nc" id="L916">            case BOOL:      return sys.newNullBool();</span>
-<span class="nc" id="L917">            case INT:       return sys.newNullInt();</span>
-<span class="nc" id="L918">            case FLOAT:     return sys.newNullFloat();</span>
-<span class="nc" id="L919">            case DECIMAL:   return sys.newNullDecimal();</span>
-<span class="nc" id="L920">            case TIMESTAMP: return sys.newNullTimestamp();</span>
-<span class="nc" id="L921">            case SYMBOL:    return sys.newNullSymbol();</span>
-<span class="nc" id="L922">            case STRING:    return sys.newNullString();</span>
-<span class="nc" id="L923">            case CLOB:      return sys.newNullClob();</span>
-<span class="nc" id="L924">            case BLOB:      return sys.newNullBlob();</span>
-<span class="nc" id="L925">            case LIST:      return sys.newNullList();</span>
-<span class="nc" id="L926">            case SEXP:      return sys.newNullSexp();</span>
-<span class="nc" id="L927">            case STRUCT:    return sys.newNullString();</span>
+<span class="nc bnc" id="L916" title="All 2 branches missed.">        if (isNullValue()) {</span>
+<span class="nc bnc" id="L917" title="All 14 branches missed.">            switch (_value_type) {</span>
+<span class="nc" id="L918">            case NULL:      return sys.newNull();</span>
+<span class="nc" id="L919">            case BOOL:      return sys.newNullBool();</span>
+<span class="nc" id="L920">            case INT:       return sys.newNullInt();</span>
+<span class="nc" id="L921">            case FLOAT:     return sys.newNullFloat();</span>
+<span class="nc" id="L922">            case DECIMAL:   return sys.newNullDecimal();</span>
+<span class="nc" id="L923">            case TIMESTAMP: return sys.newNullTimestamp();</span>
+<span class="nc" id="L924">            case SYMBOL:    return sys.newNullSymbol();</span>
+<span class="nc" id="L925">            case STRING:    return sys.newNullString();</span>
+<span class="nc" id="L926">            case CLOB:      return sys.newNullClob();</span>
+<span class="nc" id="L927">            case BLOB:      return sys.newNullBlob();</span>
+<span class="nc" id="L928">            case LIST:      return sys.newNullList();</span>
+<span class="nc" id="L929">            case SEXP:      return sys.newNullSexp();</span>
+<span class="nc" id="L930">            case STRUCT:    return sys.newNullString();</span>
             default:
-<span class="nc" id="L929">                throw new IonException(&quot;unrecognized type encountered&quot;);</span>
+<span class="nc" id="L932">                throw new IonException(&quot;unrecognized type encountered&quot;);</span>
             }
         }
 
-<span class="nc bnc" id="L933" title="All 14 branches missed.">        switch (_value_type) {</span>
-<span class="nc" id="L934">        case NULL:      return sys.newNull();</span>
-<span class="nc" id="L935">        case BOOL:      return sys.newBool(booleanValue());</span>
-<span class="nc" id="L936">        case INT:       return sys.newInt(longValue());</span>
-<span class="nc" id="L937">        case FLOAT:     return sys.newFloat(doubleValue());</span>
-<span class="nc" id="L938">        case DECIMAL:   return sys.newDecimal(decimalValue());</span>
+<span class="nc bnc" id="L936" title="All 14 branches missed.">        switch (_value_type) {</span>
+<span class="nc" id="L937">        case NULL:      return sys.newNull();</span>
+<span class="nc" id="L938">        case BOOL:      return sys.newBool(booleanValue());</span>
+<span class="nc" id="L939">        case INT:       return sys.newInt(longValue());</span>
+<span class="nc" id="L940">        case FLOAT:     return sys.newFloat(doubleValue());</span>
+<span class="nc" id="L941">        case DECIMAL:   return sys.newDecimal(decimalValue());</span>
         case TIMESTAMP:
-<span class="nc" id="L940">            IonTimestamp t = sys.newNullTimestamp();</span>
-<span class="nc" id="L941">            Timestamp ti = timestampValue();</span>
-<span class="nc" id="L942">            t.setValue(ti);</span>
-<span class="nc" id="L943">            return t;</span>
-<span class="nc" id="L944">        case SYMBOL:    return sys.newSymbol(stringValue());</span>
-<span class="nc" id="L945">        case STRING:    return sys.newString(stringValue());</span>
+<span class="nc" id="L943">            IonTimestamp t = sys.newNullTimestamp();</span>
+<span class="nc" id="L944">            Timestamp ti = timestampValue();</span>
+<span class="nc" id="L945">            t.setValue(ti);</span>
+<span class="nc" id="L946">            return t;</span>
+<span class="nc" id="L947">        case SYMBOL:    return sys.newSymbol(stringValue());</span>
+<span class="nc" id="L948">        case STRING:    return sys.newString(stringValue());</span>
         case CLOB:
-<span class="nc" id="L947">            IonClob clob = sys.newNullClob();</span>
+<span class="nc" id="L950">            IonClob clob = sys.newNullClob();</span>
             // FIXME inefficient: both newBytes and setBytes copy the data
-<span class="nc" id="L949">            clob.setBytes(newBytes());</span>
-<span class="nc" id="L950">            return clob;</span>
+<span class="nc" id="L952">            clob.setBytes(newBytes());</span>
+<span class="nc" id="L953">            return clob;</span>
         case BLOB:
-<span class="nc" id="L952">            IonBlob blob = sys.newNullBlob();</span>
+<span class="nc" id="L955">            IonBlob blob = sys.newNullBlob();</span>
             // FIXME inefficient: both newBytes and setBytes copy the data
-<span class="nc" id="L954">            blob.setBytes(newBytes());</span>
-<span class="nc" id="L955">            return blob;</span>
+<span class="nc" id="L957">            blob.setBytes(newBytes());</span>
+<span class="nc" id="L958">            return blob;</span>
         case LIST:
-<span class="nc" id="L957">            IonList list = sys.newNullList();</span>
-<span class="nc" id="L958">            fillContainerList(sys, list);</span>
-<span class="nc" id="L959">            return list;</span>
+<span class="nc" id="L960">            IonList list = sys.newNullList();</span>
+<span class="nc" id="L961">            fillContainerList(sys, list);</span>
+<span class="nc" id="L962">            return list;</span>
         case SEXP:
-<span class="nc" id="L961">            IonSexp sexp = sys.newNullSexp();</span>
-<span class="nc" id="L962">            fillContainerList(sys, sexp);</span>
-<span class="nc" id="L963">            return sexp;</span>
+<span class="nc" id="L964">            IonSexp sexp = sys.newNullSexp();</span>
+<span class="nc" id="L965">            fillContainerList(sys, sexp);</span>
+<span class="nc" id="L966">            return sexp;</span>
         case STRUCT:
-<span class="nc" id="L965">            IonStruct struct = sys.newNullStruct();</span>
-<span class="nc" id="L966">            fillContainerStruct(sys, struct);</span>
-<span class="nc" id="L967">            return struct;</span>
+<span class="nc" id="L968">            IonStruct struct = sys.newNullStruct();</span>
+<span class="nc" id="L969">            fillContainerStruct(sys, struct);</span>
+<span class="nc" id="L970">            return struct;</span>
         default:
-<span class="nc" id="L969">            throw new IonException(&quot;unrecognized type encountered&quot;);</span>
+<span class="nc" id="L972">            throw new IonException(&quot;unrecognized type encountered&quot;);</span>
         }
     }
     private final void fillContainerList(IonSystem sys, IonSequence list) {
-<span class="nc" id="L973">        this.stepIn();</span>
-<span class="nc bnc" id="L974" title="All 2 branches missed.">        while (this.next() != null) {</span>
-<span class="nc" id="L975">            IonValue v = this.getIonValue(sys);</span>
-<span class="nc" id="L976">            list.add(v);</span>
-<span class="nc" id="L977">        }</span>
-<span class="nc" id="L978">        this.stepOut();</span>
-<span class="nc" id="L979">    }</span>
+<span class="nc" id="L976">        this.stepIn();</span>
+<span class="nc bnc" id="L977" title="All 2 branches missed.">        while (this.next() != null) {</span>
+<span class="nc" id="L978">            IonValue v = this.getIonValue(sys);</span>
+<span class="nc" id="L979">            list.add(v);</span>
+<span class="nc" id="L980">        }</span>
+<span class="nc" id="L981">        this.stepOut();</span>
+<span class="nc" id="L982">    }</span>
     private final void fillContainerStruct(IonSystem sys, IonStruct struct) {
-<span class="nc" id="L981">        this.stepIn();</span>
-<span class="nc bnc" id="L982" title="All 2 branches missed.">        while (this.next() != null) {</span>
-<span class="nc" id="L983">            String name = this.getFieldName();</span>
-<span class="nc" id="L984">            IonValue v = this.getIonValue(sys);</span>
-<span class="nc" id="L985">            struct.add(name, v);</span>
-<span class="nc" id="L986">        }</span>
-<span class="nc" id="L987">        this.stepOut();</span>
-<span class="nc" id="L988">    }</span>
+<span class="nc" id="L984">        this.stepIn();</span>
+<span class="nc bnc" id="L985" title="All 2 branches missed.">        while (this.next() != null) {</span>
+<span class="nc" id="L986">            String name = this.getFieldName();</span>
+<span class="nc" id="L987">            IonValue v = this.getIonValue(sys);</span>
+<span class="nc" id="L988">            struct.add(name, v);</span>
+<span class="nc" id="L989">        }</span>
+<span class="nc" id="L990">        this.stepOut();</span>
+<span class="nc" id="L991">    }</span>
 
     // system readers don't skip any symbol tables
     public SymbolTable pop_passed_symbol_table()
     {
-<span class="fc" id="L993">        return null;</span>
+<span class="fc" id="L996">        return null;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

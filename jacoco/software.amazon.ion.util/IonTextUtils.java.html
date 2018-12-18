@@ -234,7 +234,7 @@ import software.amazon.ion.impl.PrivateIonTextAppender;
         throws IOException
     {
         // JSON only allows uHHHH numeric escapes.
-<span class="pc bpc" id="L237" title="4 of 12 branches missed.">        switch (c) {</span>
+<span class="pc bpc" id="L237" title="3 of 12 branches missed.">        switch (c) {</span>
             case 0:
 <span class="pc bpc" id="L239" title="1 of 2 branches missed.">                out.append(mode == EscapeMode.JSON ? &quot;\\u0000&quot; : &quot;\\0&quot;);</span>
 <span class="fc" id="L240">                return;</span>
@@ -265,13 +265,13 @@ import software.amazon.ion.impl.PrivateIonTextAppender;
 <span class="nc bnc" id="L265" title="All 2 branches missed.">                out.append(mode == EscapeMode.JSON ? &quot;\\u000b&quot; : &quot;\\v&quot;);</span>
 <span class="nc" id="L266">                return;</span>
             case '\&quot;':
-<span class="nc bnc" id="L268" title="All 4 branches missed.">                if (mode == EscapeMode.JSON || mode == EscapeMode.ION_STRING) {</span>
-<span class="nc" id="L269">                    out.append(&quot;\\\&quot;&quot;);</span>
-<span class="nc" id="L270">                    return;</span>
+<span class="pc bpc" id="L268" title="2 of 4 branches missed.">                if (mode == EscapeMode.JSON || mode == EscapeMode.ION_STRING) {</span>
+<span class="fc" id="L269">                    out.append(&quot;\\\&quot;&quot;);</span>
+<span class="fc" id="L270">                    return;</span>
                 }
                 break; // Treat as normal code point for long string or symbol.
             case '\'':
-<span class="pc bpc" id="L274" title="2 of 4 branches missed.">                if (mode == EscapeMode.ION_SYMBOL ||</span>
+<span class="pc bpc" id="L274" title="1 of 4 branches missed.">                if (mode == EscapeMode.ION_SYMBOL ||</span>
                     mode == EscapeMode.ION_LONG_STRING)
                 {
 <span class="fc" id="L277">                    out.append(&quot;\\\'&quot;);</span>

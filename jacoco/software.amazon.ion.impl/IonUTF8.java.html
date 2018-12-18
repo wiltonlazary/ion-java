@@ -53,10 +53,10 @@ import software.amazon.ion.IonException;
     private final static int LOW_SURROGATE                     = 0x0000DC00;  // 0b 1101 1100 0000 0000
 
     public final static boolean isHighSurrogate(int b) {
-<span class="nc bnc" id="L56" title="All 2 branches missed.">        return ((b &amp; SURROGATE_MASK) == HIGH_SURROGATE);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        return ((b &amp; SURROGATE_MASK) == HIGH_SURROGATE);</span>
     }
     public final static boolean isLowSurrogate(int b) {
-<span class="nc bnc" id="L59" title="All 2 branches missed.">        return ((b &amp; SURROGATE_MASK) == LOW_SURROGATE);</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        return ((b &amp; SURROGATE_MASK) == LOW_SURROGATE);</span>
     }
     public final static boolean isSurrogate(int b) {
 <span class="nc bnc" id="L62" title="All 4 branches missed.">        return (b &gt;= 0xD800 &amp;&amp; b &lt;= 0xDFFF);  // 55296 to 57343 or 2048 chars in all</span>

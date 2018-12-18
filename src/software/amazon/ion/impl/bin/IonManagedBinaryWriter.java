@@ -34,21 +34,9 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import software.amazon.ion.IonCatalog;
-import software.amazon.ion.IonException;
-import software.amazon.ion.IonType;
-import software.amazon.ion.SymbolTable;
-import software.amazon.ion.SymbolToken;
-import software.amazon.ion.Timestamp;
-import software.amazon.ion.UnknownSymbolException;
+import java.util.*;
+
+import software.amazon.ion.*;
 import software.amazon.ion.impl.PrivateUtils;
 import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamCloseMode;
 import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
@@ -338,7 +326,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
                             if (type != LIST)
                             {
                                 throw new IllegalArgumentException(
-                                    "Cannot step into Local Symbol Table 'symbols' field as non-list: " + type);
+                                    "Cannot step into Local Symbol Table 'imports' field as non-list: " + type);
                             }
                             self.userState = LOCALS_AT_IMPORTS;
                             break;
@@ -626,8 +614,12 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
     private ImportedSymbolContext               imports;
     private final Map<String, SymbolToken>      locals;
+    private ArrayList<String>                   localsSinceFlush;
     private boolean                             localsLocked;
     private SymbolTable                         localSymbolTableView;
+    private boolean                              hasBeenFlushed;
+    private boolean                              hasWrittenNewSymbolSinceFlushed;
+
 
     private final IonRawBinaryWriter            symbols;
     private final IonRawBinaryWriter            user;
@@ -674,9 +666,12 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
         this.bootstrapImports = builder.imports;
 
         this.locals = new LinkedHashMap<String, SymbolToken>();
+        this.localsSinceFlush = new ArrayList<String>();
         this.localsLocked = false;
         this.localSymbolTableView = new LocalSymbolTableView();
         this.symbolState = SymbolState.SYSTEM_SYMBOLS;
+        this.hasBeenFlushed                   = false;
+        this.hasWrittenNewSymbolSinceFlushed  = false;
 
         this.forceSystemOutput = false;
         this.closed = false;
@@ -688,7 +683,6 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
         this.userSymbols = new ArrayList<String>();
         this.userCurrentImport = new ImportDescriptor();
 
-        // TODO decide if initial LST should survive finish() and seed the next LST
         final SymbolTable lst = builder.initialSymbolTable;
         if (lst != null)
         {
@@ -822,7 +816,15 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
                 token = symbol(text, imports.localSidStart + locals.size());
                 locals.put(text, token);
 
-                symbols.writeString(text);
+                if(hasBeenFlushed) {
+                    if(!hasWrittenNewSymbolSinceFlushed) {
+                        hasWrittenNewSymbolSinceFlushed = true;
+                    }
+                    localsSinceFlush.add(text);
+                } else {
+                    symbols.writeString(text);
+                }
+
             }
             return token;
         }
@@ -1053,11 +1055,28 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
     // Stream Terminators
 
-    public void flush() throws IOException
-    {
-        if (getDepth() == 0 && localsLocked)
-        {
-            unsafeFlush();
+    public void flush() throws IOException {git
+        if (getDepth() == 0) {
+            if(hasBeenFlushed) {
+                if(!localsSinceFlush.isEmpty()) {
+                    SymbolToken lst = systemSymbol(3);
+                    symbols.addTypeAnnotationSymbol(lst);
+                    symbols.stepIn(IonType.STRUCT);
+                    symbols.setFieldNameSymbol(lst);
+                    symbols.stepIn(IonType.LIST);
+                    for (String sym : localsSinceFlush) {
+                        symbols.writeString(sym);
+                    }
+                    localsSinceFlush = new ArrayList<String>();
+                    symbols.stepOut();
+                    symbols.stepOut();
+                }
+            } else {
+                symbols.flush();
+                symbolState = SymbolState.LOCAL_SYMBOLS_FLUSHED;
+                user.flush();
+
+            }
         }
     }
 
@@ -1083,7 +1102,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
         {
             throw new IllegalStateException("IonWriter.finish() can only be called at top-level.");
         }
-        unsafeFlush();
+        flush();
         // Reset local symbols
         // TODO be more configurable with respect to local symbol table caching
         locals.clear();

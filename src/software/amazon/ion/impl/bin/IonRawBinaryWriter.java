@@ -830,7 +830,7 @@ import software.amazon.ion.Timestamp;
         }
         if (!currentAnnotations.isEmpty())
         {
-            throw new IonException("Cannot step out with field name set");
+            throw new IonException("Cannot step out with unpaired annotations");
         }
         final ContainerInfo container = currentContainer();
         if (container == null || !container.type.allowedInStepOut)

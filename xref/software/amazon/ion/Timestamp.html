@@ -580,7 +580,7 @@
 <a class="jxr_linenumber" name="L572" href="#L572">572</a>         <em class="jxr_comment">// a Calendar can handle. Set the _fraction here so that extra precision (if any) is not lost.</em>
 <a class="jxr_linenumber" name="L573" href="#L573">573</a>         <em class="jxr_comment">// However, don't set the fraction if the given BigDecimal does not have precision at least to the tenth of</em>
 <a class="jxr_linenumber" name="L574" href="#L574">574</a>         <em class="jxr_comment">// a second.</em>
-<a class="jxr_linenumber" name="L575" href="#L575">575</a>         <strong class="jxr_keyword">if</strong> (precision == Precision.SECOND &amp;&amp; millis.scale() &gt; -3) {
+<a class="jxr_linenumber" name="L575" href="#L575">575</a>         <strong class="jxr_keyword">if</strong> (precision.includes(Precision.SECOND) &amp;&amp; millis.scale() &gt; -3) {
 <a class="jxr_linenumber" name="L576" href="#L576">576</a>             BigDecimal secs = millis.movePointLeft(3);
 <a class="jxr_linenumber" name="L577" href="#L577">577</a>             BigDecimal secsDown = fastRoundZeroFloor(secs);
 <a class="jxr_linenumber" name="L578" href="#L578">578</a>             _fraction = secs.subtract(secsDown);
@@ -1865,7 +1865,7 @@
 <a class="jxr_linenumber" name="L1857" href="#L1857">1857</a>         out.append(<span class="jxr_string">":"</span>);
 <a class="jxr_linenumber" name="L1858" href="#L1858">1858</a>         print_digits(out, adjusted.getZMinute(), 2);
 <a class="jxr_linenumber" name="L1859" href="#L1859">1859</a>         <em class="jxr_comment">// ok, so how much time do we have ?</em>
-<a class="jxr_linenumber" name="L1860" href="#L1860">1860</a>         <strong class="jxr_keyword">if</strong> (adjusted._precision == Precision.SECOND) {
+<a class="jxr_linenumber" name="L1860" href="#L1860">1860</a>         <strong class="jxr_keyword">if</strong> (adjusted._precision.includes(Precision.SECOND)) {
 <a class="jxr_linenumber" name="L1861" href="#L1861">1861</a>             out.append(<span class="jxr_string">":"</span>);
 <a class="jxr_linenumber" name="L1862" href="#L1862">1862</a>             print_digits(out, adjusted.getZSecond(), 2);
 <a class="jxr_linenumber" name="L1863" href="#L1863">1863</a>             <strong class="jxr_keyword">if</strong> (adjusted._fraction != <strong class="jxr_keyword">null</strong>) {
@@ -1938,7 +1938,7 @@
 <a class="jxr_linenumber" name="L1930" href="#L1930">1930</a> <em class="jxr_javadoccomment">     * @param amount a number of milliseconds.</em>
 <a class="jxr_linenumber" name="L1931" href="#L1931">1931</a> <em class="jxr_javadoccomment">     */</em>
 <a class="jxr_linenumber" name="L1932" href="#L1932">1932</a>     <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">final</strong> <a name="Timestamp" href="../../../software/amazon/ion/Timestamp.html#Timestamp">Timestamp</a> addMillis(<strong class="jxr_keyword">long</strong> amount) {
-<a class="jxr_linenumber" name="L1933" href="#L1933">1933</a>         <strong class="jxr_keyword">if</strong> (amount == 0 &amp;&amp; _precision == Precision.SECOND &amp;&amp; _fraction != <strong class="jxr_keyword">null</strong> &amp;&amp; _fraction.scale() &gt;= 3) {
+<a class="jxr_linenumber" name="L1933" href="#L1933">1933</a>         <strong class="jxr_keyword">if</strong> (amount == 0 &amp;&amp; _precision.includes(Precision.SECOND) &amp;&amp; _fraction != <strong class="jxr_keyword">null</strong> &amp;&amp; _fraction.scale() &gt;= 3) {
 <a class="jxr_linenumber" name="L1934" href="#L1934">1934</a>             <em class="jxr_comment">// Zero milliseconds are to be added, and the precision does not need to be increased.</em>
 <a class="jxr_linenumber" name="L1935" href="#L1935">1935</a>             <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">this</strong>;
 <a class="jxr_linenumber" name="L1936" href="#L1936">1936</a>         }
@@ -2363,7 +2363,7 @@
 <a class="jxr_linenumber" name="L2355" href="#L2355">2355</a> 
 <a class="jxr_linenumber" name="L2356" href="#L2356">2356</a>     <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">static</strong> Precision checkFraction(Precision precision, BigDecimal fraction)
 <a class="jxr_linenumber" name="L2357" href="#L2357">2357</a>     {
-<a class="jxr_linenumber" name="L2358" href="#L2358">2358</a>         <strong class="jxr_keyword">if</strong> (precision == Precision.SECOND) {
+<a class="jxr_linenumber" name="L2358" href="#L2358">2358</a>         <strong class="jxr_keyword">if</strong> (precision.includes(Precision.SECOND)) {
 <a class="jxr_linenumber" name="L2359" href="#L2359">2359</a>             <strong class="jxr_keyword">if</strong> (fraction != <strong class="jxr_keyword">null</strong> &amp;&amp; (fraction.signum() == -1 || BigDecimal.ONE.compareTo(fraction) != 1)) {
 <a class="jxr_linenumber" name="L2360" href="#L2360">2360</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> IllegalArgumentException(String.format(<span class="jxr_string">"Fractional seconds %s must be greater than or equal to 0 and less than 1"</span>, fraction));
 <a class="jxr_linenumber" name="L2361" href="#L2361">2361</a>             }

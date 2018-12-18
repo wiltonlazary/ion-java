@@ -572,7 +572,7 @@ import software.amazon.ion.util.IonTextUtils;
         // a Calendar can handle. Set the _fraction here so that extra precision (if any) is not lost.
         // However, don't set the fraction if the given BigDecimal does not have precision at least to the tenth of
         // a second.
-<span class="pc bpc" id="L575" title="1 of 4 branches missed.">        if (precision == Precision.SECOND &amp;&amp; millis.scale() &gt; -3) {</span>
+<span class="pc bpc" id="L575" title="1 of 4 branches missed.">        if (precision.includes(Precision.SECOND) &amp;&amp; millis.scale() &gt; -3) {</span>
 <span class="fc" id="L576">            BigDecimal secs = millis.movePointLeft(3);</span>
 <span class="fc" id="L577">            BigDecimal secsDown = fastRoundZeroFloor(secs);</span>
 <span class="fc" id="L578">            _fraction = secs.subtract(secsDown);</span>
@@ -1857,7 +1857,7 @@ import software.amazon.ion.util.IonTextUtils;
 <span class="fc" id="L1857">        out.append(&quot;:&quot;);</span>
 <span class="fc" id="L1858">        print_digits(out, adjusted.getZMinute(), 2);</span>
         // ok, so how much time do we have ?
-<span class="fc bfc" id="L1860" title="All 2 branches covered.">        if (adjusted._precision == Precision.SECOND) {</span>
+<span class="fc bfc" id="L1860" title="All 2 branches covered.">        if (adjusted._precision.includes(Precision.SECOND)) {</span>
 <span class="fc" id="L1861">            out.append(&quot;:&quot;);</span>
 <span class="fc" id="L1862">            print_digits(out, adjusted.getZSecond(), 2);</span>
 <span class="fc bfc" id="L1863" title="All 2 branches covered.">            if (adjusted._fraction != null) {</span>
@@ -1930,7 +1930,7 @@ import software.amazon.ion.util.IonTextUtils;
      * @param amount a number of milliseconds.
      */
     public final Timestamp addMillis(long amount) {
-<span class="fc bfc" id="L1933" title="All 8 branches covered.">        if (amount == 0 &amp;&amp; _precision == Precision.SECOND &amp;&amp; _fraction != null &amp;&amp; _fraction.scale() &gt;= 3) {</span>
+<span class="fc bfc" id="L1933" title="All 8 branches covered.">        if (amount == 0 &amp;&amp; _precision.includes(Precision.SECOND) &amp;&amp; _fraction != null &amp;&amp; _fraction.scale() &gt;= 3) {</span>
             // Zero milliseconds are to be added, and the precision does not need to be increased.
 <span class="fc" id="L1935">            return this;</span>
         }
@@ -2355,7 +2355,7 @@ import software.amazon.ion.util.IonTextUtils;
 
     private static Precision checkFraction(Precision precision, BigDecimal fraction)
     {
-<span class="fc bfc" id="L2358" title="All 2 branches covered.">        if (precision == Precision.SECOND) {</span>
+<span class="fc bfc" id="L2358" title="All 2 branches covered.">        if (precision.includes(Precision.SECOND)) {</span>
 <span class="pc bpc" id="L2359" title="1 of 6 branches missed.">            if (fraction != null &amp;&amp; (fraction.signum() == -1 || BigDecimal.ONE.compareTo(fraction) != 1)) {</span>
 <span class="fc" id="L2360">                throw new IllegalArgumentException(String.format(&quot;Fractional seconds %s must be greater than or equal to 0 and less than 1&quot;, fraction));</span>
             }

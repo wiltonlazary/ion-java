@@ -57,7 +57,7 @@ software.amazon.ion:ion-java,software.amazon.ion,InvalidSystemSymbolException,19
 software.amazon.ion:ion-java,software.amazon.ion,IonValue,0,4,0,0,0,1,0,1,0,1
 software.amazon.ion:ion-java,software.amazon.ion,UnexpectedEofException,12,4,0,0,6,2,3,1,3,1
 software.amazon.ion:ion-java,software.amazon.ion,NullValueException,13,3,0,0,6,2,3,1,3,1
-software.amazon.ion:ion-java,software.amazon.ion,Timestamp,119,2550,39,369,22,551,42,254,3,86
+software.amazon.ion:ion-java,software.amazon.ion,Timestamp,119,2554,39,369,22,551,42,254,3,86
 software.amazon.ion:ion-java,software.amazon.ion,IonException,9,67,2,10,3,19,2,11,1,6
 software.amazon.ion:ion-java,software.amazon.ion,UnsupportedIonVersionException,13,6,0,0,2,3,2,1,2,1
 software.amazon.ion:ion-java,software.amazon.ion,SubstituteSymbolTableException,3,4,0,0,2,2,1,1,1,1

@@ -1055,7 +1055,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
     // Stream Terminators
 
-    public void flush() throws IOException {git
+    public void flush() throws IOException {
         if (getDepth() == 0) {
             if(hasBeenFlushed) {
                 if(!localsSinceFlush.isEmpty()) {

@@ -257,7 +257,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
             }
         };
 
-        public abstract void closeTable(IonRawBinaryWriter writer) throws IOException;
+        public abstract void  closeTable(IonRawBinaryWriter writer) throws IOException;
     }
 
     private static class ImportDescriptor
@@ -772,20 +772,18 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
                 }
             }
             // XXX no step out
-            symbolState = SymbolState.LOCAL_SYMBOLS_WITH_IMPORTS_ONLY;
-        }
-    }
-
-    private void startLocalSymbolTableSymbolListIfNeeded() throws IOException
-    {
-        if (symbolState == SymbolState.LOCAL_SYMBOLS_WITH_IMPORTS_ONLY)
-        {
             symbols.setFieldNameSymbol(systemSymbol(SYMBOLS_SID));
             symbols.stepIn(LIST);
-            // XXX no step out
-
+            symbolState = SymbolState.LOCAL_SYMBOLS;
+        } else if(symbolState == SymbolState.LOCAL_SYMBOLS_FLUSHED)
+        {
+            symbols.addTypeAnnotationSymbol(systemSymbol(ION_SYMBOL_TABLE_SID));
+            symbols.stepIn(STRUCT);
+            symbols.setFieldNameSymbol(systemSymbol(SYMBOLS_SID));
+            symbols.stepIn(LIST);
             symbolState = SymbolState.LOCAL_SYMBOLS;
         }
+
     }
 
     private SymbolToken intern(final String text)
@@ -817,8 +815,6 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
                 // if we got here, this is a new symbol and we better start up the locals
                 startLocalSymbolTableIfNeeded(/*writeIVM*/ true);
-                startLocalSymbolTableSymbolListIfNeeded();
-
                 token = symbol(text, imports.localSidStart + locals.size());
                 locals.put(text, token);
 
@@ -1055,10 +1051,14 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
     public void flush() throws IOException
     {
-        if (getDepth() == 0 && localsLocked)
-        {
-            unsafeFlush();
-        }
+        if (getDepth() != 0) throw new IllegalStateException("IonWriter.flush() can only be called at top-level.");
+        // make sure that until the local symbol state changes we no-op the table closing routine
+        symbolState = SymbolState.LOCAL_SYMBOLS_FLUSHED;
+        forceSystemOutput = false;
+        // push the data out
+        symbols.finish();
+        user.finish();
+
     }
 
     private void unsafeFlush() throws IOException
@@ -1083,7 +1083,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
         {
             throw new IllegalStateException("IonWriter.finish() can only be called at top-level.");
         }
-        unsafeFlush();
+        flush();
         // Reset local symbols
         // TODO be more configurable with respect to local symbol table caching
         locals.clear();

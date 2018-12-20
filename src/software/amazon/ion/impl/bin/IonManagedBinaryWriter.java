@@ -783,7 +783,6 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
             symbols.stepIn(LIST);
             symbolState = SymbolState.LOCAL_SYMBOLS;
         }
-
     }
 
     private SymbolToken intern(final String text)
@@ -1056,8 +1055,8 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
         symbolState = SymbolState.LOCAL_SYMBOLS_FLUSHED;
         forceSystemOutput = false;
         // push the data out
-        symbols.finish();
-        user.finish();
+        symbols.flush();
+        user.flush();
 
     }
 
@@ -1084,8 +1083,6 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
             throw new IllegalStateException("IonWriter.finish() can only be called at top-level.");
         }
         flush();
-        // Reset local symbols
-        // TODO be more configurable with respect to local symbol table caching
         locals.clear();
         localsLocked = false;
         symbolState = SymbolState.SYSTEM_SYMBOLS;

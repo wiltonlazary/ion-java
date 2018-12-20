@@ -1428,19 +1428,15 @@ import software.amazon.ion.Timestamp;
         }
     }
 
-    public void flush() throws IOException {}
-
-    public void finish() throws IOException
-    {
+    public void flush() throws IOException {
         if (closed)
         {
             return;
         }
         if (!containers.isEmpty())
         {
-            throw new IllegalStateException("Cannot finish within container: " + containers);
+            throw new IllegalStateException("Cannot flush within container: " + containers);
         }
-
         if (patchPoints.isEmpty())
         {
             // nothing to patch--write 'em out!
@@ -1467,7 +1463,15 @@ import software.amazon.ion.Timestamp;
         patchPoints.clear();
         patchBuffer.reset();
         buffer.reset();
+    }
 
+    public void finish() throws IOException
+    {
+        if (closed)
+        {
+            return;
+        }
+        flush();
         if (streamFlushMode == StreamFlushMode.FLUSH)
         {
             out.flush();

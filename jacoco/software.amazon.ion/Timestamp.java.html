@@ -1926,52 +1926,134 @@ import software.amazon.ion.util.IonTextUtils;
      * Returns a timestamp relative to this one by the given number of
      * milliseconds. Uses this Timestamp's configured Calendar to perform the
      * arithmetic.
+     * &lt;p&gt;
+     * This method always returns a Timestamp with the same precision as
+     * the original. After performing the arithmetic, the resulting Timestamp's
+     * seconds value will be truncated to the same fractional precision as the
+     * original. For example, adjusting {@code 2012-04-01T00:00:00Z} by one
+     * millisecond results in {@code 2012-04-01T00:00:00Z}; adjusting
+     * {@code 2012-04-01T00:00:00.0010Z} by -1 millisecond results in
+     * {@code 2012-04-01T00:00:00.0000Z}. To extend the precision when the
+     * original Timestamp has coarser than SECOND precision and to avoid
+     * truncation of the seconds value, use {@link #addSecond(int)}.
+     *
+     * @param amount a number of milliseconds.
+     */
+    public final Timestamp adjustMillis(long amount) {
+<span class="fc bfc" id="L1943" title="All 2 branches covered.">        if (amount == 0) return this;</span>
+<span class="fc" id="L1944">        Timestamp ts = addMillis(amount);</span>
+<span class="fc" id="L1945">        ts._precision = _precision;</span>
+<span class="fc" id="L1946">        ts.clearUnusedPrecision();</span>
+<span class="fc bfc" id="L1947" title="All 2 branches covered.">        if (_precision.includes(Precision.SECOND)) {</span>
+            // Maintain the same amount of fractional precision.
+<span class="fc bfc" id="L1949" title="All 2 branches covered.">            if (_fraction == null) {</span>
+<span class="fc" id="L1950">                ts._fraction = null;</span>
+            } else {
+                // Truncate the result only if it exceeds the fractional precision of the original.
+<span class="fc bfc" id="L1953" title="All 2 branches covered.">                if (ts._fraction.scale() &gt; _fraction.scale()) {</span>
+<span class="fc" id="L1954">                    ts._fraction = ts._fraction.setScale(_fraction.scale(), RoundingMode.FLOOR);</span>
+                }
+            }
+        }
+<span class="fc" id="L1958">        return ts;</span>
+    }
+
+    /**
+     * Returns a timestamp relative to this one by the given number of
+     * milliseconds. Uses this Timestamp's configured Calendar to perform the
+     * arithmetic.
+     * &lt;p&gt;
+     * This method always returns a Timestamp with SECOND precision and a seconds
+     * value precise at least to the millisecond. For example, adding one millisecond
+     * to {@code 2011T} results in {@code 2011-01-01T00:00:00.001-00:00}. To receive
+     * a Timestamp that always maintains the same precision as the original, use
+     * {@link #adjustMillis(long)}.
      *
      * @param amount a number of milliseconds.
      */
     public final Timestamp addMillis(long amount) {
-<span class="fc bfc" id="L1933" title="All 8 branches covered.">        if (amount == 0 &amp;&amp; _precision.includes(Precision.SECOND) &amp;&amp; _fraction != null &amp;&amp; _fraction.scale() &gt;= 3) {</span>
+<span class="fc bfc" id="L1975" title="All 8 branches covered.">        if (amount == 0 &amp;&amp; _precision.includes(Precision.SECOND) &amp;&amp; _fraction != null &amp;&amp; _fraction.scale() &gt;= 3) {</span>
             // Zero milliseconds are to be added, and the precision does not need to be increased.
-<span class="fc" id="L1935">            return this;</span>
+<span class="fc" id="L1977">            return this;</span>
         }
-<span class="fc" id="L1937">        long seconds = amount / 1000;</span>
-<span class="fc" id="L1938">        BigDecimal millis = BigDecimal.valueOf(amount % 1000).movePointLeft(3);</span>
-<span class="fc bfc" id="L1939" title="All 2 branches covered.">        if (_fraction != null) {</span>
-<span class="fc" id="L1940">            millis = _fraction.add(millis);</span>
+<span class="fc" id="L1979">        long seconds = amount / 1000;</span>
+<span class="fc" id="L1980">        BigDecimal millis = BigDecimal.valueOf(amount % 1000).movePointLeft(3);</span>
+<span class="fc bfc" id="L1981" title="All 2 branches covered.">        if (_fraction != null) {</span>
+<span class="fc" id="L1982">            millis = _fraction.add(millis);</span>
         }
         BigDecimal newFraction;
-<span class="fc bfc" id="L1943" title="All 2 branches covered.">        if (BigDecimal.ONE.compareTo(millis) &lt;= 0) {</span>
-<span class="fc" id="L1944">            newFraction = millis.subtract(BigDecimal.ONE);</span>
-<span class="fc" id="L1945">            seconds += 1;</span>
-<span class="fc bfc" id="L1946" title="All 2 branches covered.">        } else if (BigDecimal.ZERO.compareTo(millis) &gt; 0) {</span>
-<span class="fc" id="L1947">            newFraction = BigDecimal.ONE.add(millis);</span>
-<span class="fc" id="L1948">            seconds -= 1;</span>
+<span class="fc bfc" id="L1985" title="All 2 branches covered.">        if (BigDecimal.ONE.compareTo(millis) &lt;= 0) {</span>
+<span class="fc" id="L1986">            newFraction = millis.subtract(BigDecimal.ONE);</span>
+<span class="fc" id="L1987">            seconds += 1;</span>
+<span class="fc bfc" id="L1988" title="All 2 branches covered.">        } else if (BigDecimal.ZERO.compareTo(millis) &gt; 0) {</span>
+<span class="fc" id="L1989">            newFraction = BigDecimal.ONE.add(millis);</span>
+<span class="fc" id="L1990">            seconds -= 1;</span>
         } else {
-<span class="fc" id="L1950">            newFraction = millis;</span>
+<span class="fc" id="L1992">            newFraction = millis;</span>
         }
-<span class="fc" id="L1952">        Timestamp ts = addSecond(seconds);</span>
-<span class="fc" id="L1953">        ts._fraction = newFraction;</span>
-<span class="fc" id="L1954">        return ts;</span>
+<span class="fc" id="L1994">        Timestamp ts = addSecond(seconds);</span>
+<span class="fc bfc" id="L1995" title="All 2 branches covered.">        if (ts == this) {</span>
+            // When the precision does not need to be extended and there are no seconds to add,
+            // addSecond returns the same reference unchanged. Clone it to ensure it is not
+            // mutated.
+<span class="fc" id="L1999">            ts = clone();</span>
+        }
+<span class="fc" id="L2001">        ts._fraction = newFraction;</span>
+<span class="fc" id="L2002">        return ts;</span>
     }
 
     /**
-     * Adds the given amount to the given {@link Calendar} field and returns a new Timestamp.
+     * Adds the given amount to the given {@link Calendar} field and returns a new Timestamp
+     * with precision set to the maximum of the current precision and the given precision.
      * @param field the field.
      * @param amount an amount.
      * @param precision the precision corresponding to the given field.
      * @return a new Timestamp instance.
      */
     private Timestamp calendarAdd(int field, int amount, Precision precision) {
-<span class="fc bfc" id="L1965" title="All 4 branches covered.">        if (amount == 0 &amp;&amp; _precision == precision) return this;</span>
-<span class="fc" id="L1966">        Timestamp timestamp = make_localtime();</span>
-<span class="fc" id="L1967">        timestamp._calendar.add(field, amount);</span>
-<span class="fc" id="L1968">        checkCalendarYear(timestamp._calendar);</span>
-<span class="fc bfc" id="L1969" title="All 2 branches covered.">        if (_offset != null) {</span>
-<span class="fc" id="L1970">            timestamp.apply_offset(_offset);</span>
-<span class="fc" id="L1971">            timestamp._offset = _offset;</span>
+<span class="fc bfc" id="L2014" title="All 4 branches covered.">        if (amount == 0 &amp;&amp; _precision == precision) return this;</span>
+<span class="fc" id="L2015">        Timestamp timestamp = make_localtime();</span>
+<span class="fc" id="L2016">        timestamp._calendar.add(field, amount);</span>
+<span class="fc" id="L2017">        checkCalendarYear(timestamp._calendar);</span>
+<span class="fc bfc" id="L2018" title="All 2 branches covered.">        if (_offset != null) {</span>
+<span class="fc" id="L2019">            timestamp.apply_offset(_offset);</span>
+<span class="fc" id="L2020">            timestamp._offset = _offset;</span>
         }
-<span class="fc bfc" id="L1973" title="All 2 branches covered.">        timestamp._precision = _precision.includes(precision) ? timestamp._precision : precision;</span>
-<span class="fc" id="L1974">        return timestamp;</span>
+<span class="fc bfc" id="L2022" title="All 2 branches covered.">        timestamp._precision = _precision.includes(precision) ? timestamp._precision : precision;</span>
+<span class="fc" id="L2023">        return timestamp;</span>
+    }
+
+    /**
+     * Clears any fields more precise than this Timestamp's precision supports.
+     */
+    private void clearUnusedPrecision() {
+<span class="fc bfc" id="L2030" title="All 5 branches covered.">        switch (_precision) {</span>
+            case YEAR:
+<span class="fc" id="L2032">                _calendar.set(Calendar.MONTH, 0);</span>
+            case MONTH:
+<span class="fc" id="L2034">                _calendar.set(Calendar.DAY_OF_MONTH, 1);</span>
+            case DAY:
+<span class="fc" id="L2036">                _calendar.set(Calendar.HOUR_OF_DAY, 0);</span>
+<span class="fc" id="L2037">                _calendar.set(Calendar.MINUTE, 0);</span>
+            case MINUTE:
+<span class="fc" id="L2039">                _calendar.set(Calendar.SECOND, 0);</span>
+<span class="fc" id="L2040">                _fraction = null;</span>
+            case SECOND:
+        }
+<span class="fc" id="L2043">    }</span>
+
+    /**
+     * Adds the given amount to the given {@link Calendar} field and returns a new Timestamp
+     * with the same precision as the original Timestamp.
+     * @param field the field.
+     * @param amount an amount.
+     * @return a new Timestamp instance.
+     */
+    private Timestamp calendarAdjust(int field, int amount) {
+<span class="fc bfc" id="L2053" title="All 2 branches covered.">        if (amount == 0) return this;</span>
+<span class="fc" id="L2054">        Timestamp ts = calendarAdd(field, amount, _precision);</span>
+<span class="fc" id="L2055">        ts.clearUnusedPrecision();</span>
+<span class="fc" id="L2056">        return ts;</span>
     }
 
     /**
@@ -1980,68 +2062,176 @@ import software.amazon.ion.util.IonTextUtils;
      *
      * @param seconds a number of seconds.
      */
-    private final Timestamp addSecond(long seconds) {
-<span class="fc" id="L1984">        Timestamp ts = this;</span>
+    private Timestamp addSecond(long seconds) {
+<span class="fc" id="L2066">        Timestamp ts = this;</span>
         do {
             int incrementalSeconds;
-<span class="fc bfc" id="L1987" title="All 2 branches covered.">            if (seconds &gt; Integer.MAX_VALUE) {</span>
-<span class="fc" id="L1988">                incrementalSeconds = Integer.MAX_VALUE;</span>
-<span class="fc bfc" id="L1989" title="All 2 branches covered.">            } else if (seconds &lt; Integer.MIN_VALUE) {</span>
-<span class="fc" id="L1990">                incrementalSeconds = Integer.MIN_VALUE;</span>
+<span class="fc bfc" id="L2069" title="All 2 branches covered.">            if (seconds &gt; Integer.MAX_VALUE) {</span>
+<span class="fc" id="L2070">                incrementalSeconds = Integer.MAX_VALUE;</span>
+<span class="fc bfc" id="L2071" title="All 2 branches covered.">            } else if (seconds &lt; Integer.MIN_VALUE) {</span>
+<span class="fc" id="L2072">                incrementalSeconds = Integer.MIN_VALUE;</span>
             } else {
-<span class="fc" id="L1992">                incrementalSeconds = (int)seconds;</span>
+<span class="fc" id="L2074">                incrementalSeconds = (int)seconds;</span>
             }
-<span class="fc" id="L1994">            ts = ts.addSecond(incrementalSeconds);</span>
-<span class="fc" id="L1995">            seconds -= incrementalSeconds;</span>
-<span class="fc bfc" id="L1996" title="All 2 branches covered.">        } while (seconds != 0);</span>
-<span class="fc" id="L1997">        return ts;</span>
+<span class="fc" id="L2076">            ts = ts.addSecond(incrementalSeconds);</span>
+<span class="fc" id="L2077">            seconds -= incrementalSeconds;</span>
+<span class="fc bfc" id="L2078" title="All 2 branches covered.">        } while (seconds != 0);</span>
+<span class="fc" id="L2079">        return ts;</span>
     }
 
     /**
      * Returns a timestamp relative to this one by the given number of seconds.
      * Uses this Timestamp's configured Calendar to perform the arithmetic.
+     * &lt;p&gt;
+     * This method always returns a Timestamp with the same precision as
+     * the original. For example, adjusting {@code 2012-04-01T00:00Z} by one
+     * second results in {@code 2012-04-01T00:00Z}; adjusting
+     * {@code 2012-04-01T00:00:00Z} by -1 second results in
+     * {@code 2012-03-31T23:59:59Z}. To extend the precision when the original
+     * Timestamp has coarser than SECOND precision, use {@link #addSecond(int)}.
+     *
+     * @param amount a number of seconds.
+     */
+    public final Timestamp adjustSecond(int amount)
+    {
+<span class="fc" id="L2097">        return calendarAdjust(Calendar.SECOND, amount);</span>
+    }
+
+    /**
+     * Returns a timestamp relative to this one by the given number of seconds.
+     * Uses this Timestamp's configured Calendar to perform the arithmetic.
+     * &lt;p&gt;
+     * This method always returns a Timestamp with SECOND precision.
+     * For example, adding one second to {@code 2011T} results in
+     * {@code 2011-01-01T00:00:01-00:00}. To receive a Timestamp that always
+     * maintains the same precision as the original, use {@link #adjustSecond(int)}.
      *
      * @param amount a number of seconds.
      */
     public final Timestamp addSecond(int amount)
     {
-<span class="fc" id="L2008">        return calendarAdd(Calendar.SECOND, amount, Precision.SECOND);</span>
+<span class="fc" id="L2113">        return calendarAdd(Calendar.SECOND, amount, Precision.SECOND);</span>
     }
-
 
     /**
      * Returns a timestamp relative to this one by the given number of minutes.
      * Uses this Timestamp's configured Calendar to perform the arithmetic.
+     * &lt;p&gt;
+     * This method always returns a Timestamp with the same precision as
+     * the original. For example, adjusting {@code 2012-04-01T} by one minute
+     * results in {@code 2012-04-01T}; adjusting {@code 2012-04-01T00:00-00:00}
+     * by -1 minute results in {@code 2012-03-31T23:59-00:00}. To extend the
+     * precision when the original Timestamp has coarser than MINUTE precision,
+     * use {@link #addMinute(int)}.
+     *
+     * @param amount a number of minutes.
+     */
+    public final Timestamp adjustMinute(int amount)
+    {
+<span class="fc" id="L2131">        return calendarAdjust(Calendar.MINUTE, amount);</span>
+    }
+
+    /**
+     * Returns a timestamp relative to this one by the given number of minutes.
+     * Uses this Timestamp's configured Calendar to perform the arithmetic.
+     * &lt;p&gt;
+     * This method always returns a Timestamp with at least MINUTE precision.
+     * For example, adding one minute to {@code 2011T} results in
+     * {@code 2011-01-01T00:01-00:00}. To receive a Timestamp that always
+     * maintains the same precision as the original, use {@link #adjustMinute(int)}.
      *
      * @param amount a number of minutes.
      */
     public final Timestamp addMinute(int amount)
     {
-<span class="fc" id="L2020">        return calendarAdd(Calendar.MINUTE, amount, Precision.MINUTE);</span>
+<span class="fc" id="L2147">        return calendarAdd(Calendar.MINUTE, amount, Precision.MINUTE);</span>
     }
-
 
     /**
      * Returns a timestamp relative to this one by the given number of hours.
      * Uses this Timestamp's configured Calendar to perform the arithmetic.
+     * &lt;p&gt;
+     * This method always returns a Timestamp with the same precision as
+     * the original. For example, adjusting {@code 2012-04-01T} by one hour
+     * results in {@code 2012-04-01T}; adjusting {@code 2012-04-01T00:00-00:00}
+     * by -1 hour results in {@code 2012-03-31T23:00-00:00}. To extend the
+     * precision when the original Timestamp has coarser than MINUTE precision,
+     * use {@link #addHour(int)}.
+     *
+     * @param amount a number of hours.
+     */
+    public final Timestamp adjustHour(int amount)
+    {
+<span class="fc" id="L2165">        return calendarAdjust(Calendar.HOUR_OF_DAY, amount);</span>
+    }
+
+    /**
+     * Returns a timestamp relative to this one by the given number of hours.
+     * Uses this Timestamp's configured Calendar to perform the arithmetic.
+     * &lt;p&gt;
+     * This method always returns a Timestamp with at least MINUTE precision.
+     * For example, adding one hour to {@code 2011T} results in
+     * {@code 2011-01-01T01:00-00:00}. To receive a Timestamp that always
+     * maintains the same precision as the original, use {@link #adjustHour(int)}.
      *
      * @param amount a number of hours.
      */
     public final Timestamp addHour(int amount)
     {
-<span class="fc" id="L2032">        return calendarAdd(Calendar.HOUR_OF_DAY, amount, Precision.MINUTE);</span>
+<span class="fc" id="L2181">        return calendarAdd(Calendar.HOUR_OF_DAY, amount, Precision.MINUTE);</span>
     }
-
 
     /**
      * Returns a timestamp relative to this one by the given number of days.
      * Uses this Timestamp's configured Calendar to perform the arithmetic.
+     * &lt;p&gt;
+     * This method always returns a Timestamp with the same precision as
+     * the original. For example, adjusting {@code 2012-04T} by one day results
+     * in {@code 2012-04T}; adjusting {@code 2012-04-01T} by -1 days results in
+     * {@code 2012-03-31T}. To extend the precision when the original Timestamp
+     * has coarser than DAY precision, use {@link #addDay(int)}.
+     *
+     * @param amount a number of days.
+     */
+    public final Timestamp adjustDay(int amount)
+    {
+<span class="fc" id="L2198">        return calendarAdjust(Calendar.DAY_OF_MONTH, amount);</span>
+    }
+
+    /**
+     * Returns a timestamp relative to this one by the given number of days.
+     * Uses this Timestamp's configured Calendar to perform the arithmetic.
+     * &lt;p&gt;
+     * This method always returns a Timestamp with at least DAY precision.
+     * For example, adding one day to {@code 2011T} results in {@code 2011-01-02T}.
+     * To receive a Timestamp that always maintains the same precision as the
+     * original, use {@link #adjustDay(int)}.
      *
      * @param amount a number of days.
      */
     public final Timestamp addDay(int amount)
     {
-<span class="fc" id="L2044">        return calendarAdd(Calendar.DAY_OF_MONTH, amount, Precision.DAY);</span>
+<span class="fc" id="L2214">        return calendarAdd(Calendar.DAY_OF_MONTH, amount, Precision.DAY);</span>
+    }
+
+    /**
+     * Returns a timestamp relative to this one by the given number of months.
+     * The day field may be adjusted to account for different month length and
+     * leap days, as required by the configured Calendar's rules. For example,
+     * using the default {@link GregorianCalendar}, adjusting {@code 2011-01-31}
+     * by one month results in {@code 2011-02-28}.
+     * &lt;p&gt;
+     * This method always returns a Timestamp with the same precision as the
+     * original. For example, adjusting {@code 2011T} by one month results in
+     * {@code 2011T}; adding 12 months to {@code 2011T} results in {@code 2012T}.
+     * To extend the precision when the original Timestamp has coarser than MONTH
+     * precision, use {@link #addMonth(int)}.
+     *
+     * @param amount a number of months.
+     */
+    public final Timestamp adjustMonth(int amount)
+    {
+<span class="fc" id="L2234">        return calendarAdjust(Calendar.MONTH, amount);</span>
     }
 
     /**
@@ -2050,14 +2240,35 @@ import software.amazon.ion.util.IonTextUtils;
      * leap days, as required by the configured Calendar's rules. For example,
      * using the default {@link GregorianCalendar}, adding one month to
      * {@code 2011-01-31} results in {@code 2011-02-28}.
+     * &lt;p&gt;
+     * This method always returns a Timestamp with at least MONTH precision.
+     * For example, adding one month to {@code 2011T} results in {@code 2011-02T}.
+     * To receive a Timestamp that always maintains the same precision as the
+     * original, use {@link #adjustMonth(int)}.
      *
      * @param amount a number of months.
      */
     public final Timestamp addMonth(int amount)
     {
-<span class="fc" id="L2058">        return calendarAdd(Calendar.MONTH, amount, Precision.MONTH);</span>
+<span class="fc" id="L2253">        return calendarAdd(Calendar.MONTH, amount, Precision.MONTH);</span>
     }
 
+    /**
+     * Returns a timestamp relative to this one by the given number of years.
+     * The day field may be adjusted to account for leap days, as required by
+     * the configured Calendar's rules. For example, using the default
+     * {@link GregorianCalendar}, adjusting {@code 2012-02-29} by one year
+     * results in {@code 2013-02-28}.
+     * &lt;p&gt;
+     * Because YEAR is the coarsest precision possible, this method always
+     * returns a Timestamp with the same precision as the original and
+     * behaves identically to {@link #addYear(int)}.
+     *
+     * @param amount a number of years.
+     */
+    public final Timestamp adjustYear(int amount) {
+<span class="fc" id="L2270">        return addYear(amount);</span>
+    }
 
     /**
      * Returns a timestamp relative to this one by the given number of years.
@@ -2065,12 +2276,15 @@ import software.amazon.ion.util.IonTextUtils;
      * the configured Calendar's rules. For example, using the default
      * {@link GregorianCalendar}, adding one year to {@code 2012-02-29} results
      * in {@code 2013-02-28}.
+     * &lt;p&gt;
+     * This method always returns a Timestamp with the same precision as
+     * the original. See also: {@link #adjustYear(int)}.
      *
      * @param amount a number of years.
      */
     public final Timestamp addYear(int amount)
     {
-<span class="fc" id="L2073">        return calendarAdd(Calendar.YEAR, amount, Precision.YEAR);</span>
+<span class="fc" id="L2287">        return calendarAdd(Calendar.YEAR, amount, Precision.YEAR);</span>
     }
 
 
@@ -2088,33 +2302,33 @@ import software.amazon.ion.util.IonTextUtils;
         // produce an &quot;Avalanche&quot; effect for timestamps with small deltas, which
         // is found to be a common input data set.
 
-<span class="fc" id="L2091">        final int prime = 8191;</span>
-<span class="fc" id="L2092">        int result = HASH_SIGNATURE;</span>
+<span class="fc" id="L2305">        final int prime = 8191;</span>
+<span class="fc" id="L2306">        int result = HASH_SIGNATURE;</span>
 
-<span class="fc bfc" id="L2094" title="All 2 branches covered.">        result = prime * result + (_fraction != null</span>
-<span class="fc" id="L2095">            ? _fraction.hashCode()</span>
-<span class="fc" id="L2096">            : 0);</span>
+<span class="fc bfc" id="L2308" title="All 2 branches covered.">        result = prime * result + (_fraction != null</span>
+<span class="fc" id="L2309">            ? _fraction.hashCode()</span>
+<span class="fc" id="L2310">            : 0);</span>
 
-<span class="fc" id="L2098">        result ^= (result &lt;&lt; 19) ^ (result &gt;&gt; 13);</span>
+<span class="fc" id="L2312">        result ^= (result &lt;&lt; 19) ^ (result &gt;&gt; 13);</span>
 
-<span class="fc" id="L2100">        result = prime * result + this.getZYear();</span>
-<span class="fc" id="L2101">        result = prime * result + this.getZMonth();</span>
-<span class="fc" id="L2102">        result = prime * result + this.getZDay();</span>
-<span class="fc" id="L2103">        result = prime * result + this.getZHour();</span>
-<span class="fc" id="L2104">        result = prime * result + this.getZMinute();</span>
-<span class="fc" id="L2105">        result = prime * result + this.getZSecond();</span>
+<span class="fc" id="L2314">        result = prime * result + this.getZYear();</span>
+<span class="fc" id="L2315">        result = prime * result + this.getZMonth();</span>
+<span class="fc" id="L2316">        result = prime * result + this.getZDay();</span>
+<span class="fc" id="L2317">        result = prime * result + this.getZHour();</span>
+<span class="fc" id="L2318">        result = prime * result + this.getZMinute();</span>
+<span class="fc" id="L2319">        result = prime * result + this.getZSecond();</span>
 
-<span class="fc" id="L2107">        result ^= (result &lt;&lt; 19) ^ (result &gt;&gt; 13);</span>
+<span class="fc" id="L2321">        result ^= (result &lt;&lt; 19) ^ (result &gt;&gt; 13);</span>
 
-<span class="fc" id="L2109">        result = prime * result + this._precision.toString().hashCode();</span>
+<span class="fc" id="L2323">        result = prime * result + this._precision.toString().hashCode();</span>
 
-<span class="fc" id="L2111">        result ^= (result &lt;&lt; 19) ^ (result &gt;&gt; 13);</span>
+<span class="fc" id="L2325">        result ^= (result &lt;&lt; 19) ^ (result &gt;&gt; 13);</span>
 
-<span class="fc bfc" id="L2113" title="All 2 branches covered.">        result = prime * result + (_offset == null ? 0 : _offset.hashCode());</span>
+<span class="fc bfc" id="L2327" title="All 2 branches covered.">        result = prime * result + (_offset == null ? 0 : _offset.hashCode());</span>
 
-<span class="fc" id="L2115">        result ^= (result &lt;&lt; 19) ^ (result &gt;&gt; 13);</span>
+<span class="fc" id="L2329">        result ^= (result &lt;&lt; 19) ^ (result &gt;&gt; 13);</span>
 
-<span class="fc" id="L2117">        return result;</span>
+<span class="fc" id="L2331">        return result;</span>
     }
 
 
@@ -2172,19 +2386,19 @@ import software.amazon.ion.util.IonTextUtils;
     public int compareTo(Timestamp t)
     {
         // Test at millisecond precision first.
-<span class="fc" id="L2175">        long this_millis = this.getMillis();</span>
-<span class="fc" id="L2176">        long arg_millis = t.getMillis();</span>
-<span class="fc bfc" id="L2177" title="All 2 branches covered.">        if (this_millis != arg_millis) {</span>
-<span class="fc bfc" id="L2178" title="All 2 branches covered.">            return (this_millis &lt; arg_millis) ? -1 : 1;</span>
+<span class="fc" id="L2389">        long this_millis = this.getMillis();</span>
+<span class="fc" id="L2390">        long arg_millis = t.getMillis();</span>
+<span class="fc bfc" id="L2391" title="All 2 branches covered.">        if (this_millis != arg_millis) {</span>
+<span class="fc bfc" id="L2392" title="All 2 branches covered.">            return (this_millis &lt; arg_millis) ? -1 : 1;</span>
         }
 
         // Values are equivalent at millisecond precision, so compare fraction
 
         BigDecimal this_fraction =
-<span class="fc bfc" id="L2184" title="All 2 branches covered.">            ((this._fraction == null) ? BigDecimal.ZERO : this._fraction);</span>
+<span class="fc bfc" id="L2398" title="All 2 branches covered.">            ((this._fraction == null) ? BigDecimal.ZERO : this._fraction);</span>
         BigDecimal arg_fraction =
-<span class="fc bfc" id="L2186" title="All 2 branches covered.">            (( t._fraction == null) ? BigDecimal.ZERO :  t._fraction);</span>
-<span class="fc" id="L2187">        return this_fraction.compareTo(arg_fraction);</span>
+<span class="fc bfc" id="L2400" title="All 2 branches covered.">            (( t._fraction == null) ? BigDecimal.ZERO :  t._fraction);</span>
+<span class="fc" id="L2401">        return this_fraction.compareTo(arg_fraction);</span>
     }
 
 
@@ -2203,8 +2417,8 @@ import software.amazon.ion.util.IonTextUtils;
     @Override
     public boolean equals(Object t)
     {
-<span class="pc bpc" id="L2206" title="1 of 2 branches missed.">        if (!(t instanceof Timestamp)) return false;</span>
-<span class="fc" id="L2207">        return equals((Timestamp)t);</span>
+<span class="pc bpc" id="L2420" title="1 of 2 branches missed.">        if (!(t instanceof Timestamp)) return false;</span>
+<span class="fc" id="L2421">        return equals((Timestamp)t);</span>
     }
 
     /**
@@ -2246,127 +2460,127 @@ import software.amazon.ion.util.IonTextUtils;
      */
     public boolean equals(Timestamp t)
     {
-<span class="fc bfc" id="L2249" title="All 2 branches covered.">        if (this == t) return true;</span>
-<span class="pc bpc" id="L2250" title="1 of 2 branches missed.">        if (t == null) return false;</span>
+<span class="fc bfc" id="L2463" title="All 2 branches covered.">        if (this == t) return true;</span>
+<span class="pc bpc" id="L2464" title="1 of 2 branches missed.">        if (t == null) return false;</span>
 
         // if the precisions are not the same the values are not
         // precision doesn't matter WRT equality
-<span class="fc bfc" id="L2254" title="All 2 branches covered.">        if (this._precision != t._precision) return false;</span>
+<span class="fc bfc" id="L2468" title="All 2 branches covered.">        if (this._precision != t._precision) return false;</span>
 
         // if the local offset are not the same the values are not
-<span class="fc bfc" id="L2257" title="All 2 branches covered.">        if (this._offset == null) {</span>
-<span class="fc bfc" id="L2258" title="All 2 branches covered.">            if (t._offset != null)  return false;</span>
+<span class="fc bfc" id="L2471" title="All 2 branches covered.">        if (this._offset == null) {</span>
+<span class="fc bfc" id="L2472" title="All 2 branches covered.">            if (t._offset != null)  return false;</span>
         }
         else {
-<span class="fc bfc" id="L2261" title="All 2 branches covered.">            if (t._offset == null) return false;</span>
+<span class="fc bfc" id="L2475" title="All 2 branches covered.">            if (t._offset == null) return false;</span>
         }
 
         // so now we check the actual time value
-<span class="fc bfc" id="L2265" title="All 2 branches covered.">        if (this.getZYear()   != t.getZYear())    return false;</span>
-<span class="fc bfc" id="L2266" title="All 2 branches covered.">        if (this.getZMonth()  != t.getZMonth())   return false;</span>
-<span class="fc bfc" id="L2267" title="All 2 branches covered.">        if (this.getZDay()    != t.getZDay())     return false;</span>
-<span class="fc bfc" id="L2268" title="All 2 branches covered.">        if (this.getZHour()   != t.getZHour())    return false;</span>
-<span class="fc bfc" id="L2269" title="All 2 branches covered.">        if (this.getZMinute() != t.getZMinute())  return false;</span>
-<span class="fc bfc" id="L2270" title="All 2 branches covered.">        if (this.getZSecond() != t.getZSecond())  return false;</span>
+<span class="fc bfc" id="L2479" title="All 2 branches covered.">        if (this.getZYear()   != t.getZYear())    return false;</span>
+<span class="fc bfc" id="L2480" title="All 2 branches covered.">        if (this.getZMonth()  != t.getZMonth())   return false;</span>
+<span class="fc bfc" id="L2481" title="All 2 branches covered.">        if (this.getZDay()    != t.getZDay())     return false;</span>
+<span class="fc bfc" id="L2482" title="All 2 branches covered.">        if (this.getZHour()   != t.getZHour())    return false;</span>
+<span class="fc bfc" id="L2483" title="All 2 branches covered.">        if (this.getZMinute() != t.getZMinute())  return false;</span>
+<span class="fc bfc" id="L2484" title="All 2 branches covered.">        if (this.getZSecond() != t.getZSecond())  return false;</span>
 
         // and if we have a local offset, check the value here
-<span class="fc bfc" id="L2273" title="All 2 branches covered.">        if (this._offset != null) {</span>
-<span class="fc bfc" id="L2274" title="All 2 branches covered.">            if (this._offset.intValue() != t._offset.intValue()) return false;</span>
+<span class="fc bfc" id="L2487" title="All 2 branches covered.">        if (this._offset != null) {</span>
+<span class="fc bfc" id="L2488" title="All 2 branches covered.">            if (this._offset.intValue() != t._offset.intValue()) return false;</span>
         }
 
         // we only look at the fraction if we know that it's actually there
 
-<span class="fc bfc" id="L2279" title="All 8 branches covered.">        if ((this._fraction != null &amp;&amp; t._fraction == null)</span>
+<span class="fc bfc" id="L2493" title="All 8 branches covered.">        if ((this._fraction != null &amp;&amp; t._fraction == null)</span>
             || (this._fraction == null &amp;&amp; t._fraction != null)) {
             // one of the fractions are null
-<span class="fc" id="L2282">            return false;</span>
+<span class="fc" id="L2496">            return false;</span>
         }
-<span class="pc bpc" id="L2284" title="1 of 4 branches missed.">        if (this._fraction == null &amp;&amp; t._fraction == null) {</span>
+<span class="pc bpc" id="L2498" title="1 of 4 branches missed.">        if (this._fraction == null &amp;&amp; t._fraction == null) {</span>
             // both are null
-<span class="fc" id="L2286">            return true;</span>
+<span class="fc" id="L2500">            return true;</span>
         }
-<span class="fc" id="L2288">        return this._fraction.equals(t._fraction);</span>
+<span class="fc" id="L2502">        return this._fraction.equals(t._fraction);</span>
     }
 
     private static void checkCalendarYear(Calendar calendar) {
-<span class="fc" id="L2292">        int year = calendar.get(Calendar.YEAR);</span>
-<span class="fc bfc" id="L2293" title="All 2 branches covered.">        if (calendar.get(Calendar.ERA) == GregorianCalendar.BC) {</span>
-<span class="fc" id="L2294">            year *= -1;</span>
+<span class="fc" id="L2506">        int year = calendar.get(Calendar.YEAR);</span>
+<span class="fc bfc" id="L2507" title="All 2 branches covered.">        if (calendar.get(Calendar.ERA) == GregorianCalendar.BC) {</span>
+<span class="fc" id="L2508">            year *= -1;</span>
         }
-<span class="fc" id="L2296">        checkAndCastYear(year);</span>
-<span class="fc" id="L2297">    }</span>
+<span class="fc" id="L2510">        checkAndCastYear(year);</span>
+<span class="fc" id="L2511">    }</span>
 
     private static short checkAndCastYear(int year)
     {
-<span class="fc bfc" id="L2301" title="All 4 branches covered.">        if (year &lt; 1 || year &gt; 9999)</span>
+<span class="fc bfc" id="L2515" title="All 4 branches covered.">        if (year &lt; 1 || year &gt; 9999)</span>
         {
-<span class="fc" id="L2303">            throw new IllegalArgumentException(String.format(&quot;Year %s must be between 1 and 9999 inclusive&quot;, year));</span>
+<span class="fc" id="L2517">            throw new IllegalArgumentException(String.format(&quot;Year %s must be between 1 and 9999 inclusive&quot;, year));</span>
         }
 
-<span class="fc" id="L2306">        return (short) year;</span>
+<span class="fc" id="L2520">        return (short) year;</span>
     }
 
     private static byte checkAndCastMonth(int month)
     {
-<span class="fc bfc" id="L2311" title="All 4 branches covered.">        if (month &lt; 1 || month &gt; 12)</span>
+<span class="fc bfc" id="L2525" title="All 4 branches covered.">        if (month &lt; 1 || month &gt; 12)</span>
         {
-<span class="fc" id="L2313">            throw new IllegalArgumentException(String.format(&quot;Month %s must be between 1 and 12 inclusive&quot;, month));</span>
+<span class="fc" id="L2527">            throw new IllegalArgumentException(String.format(&quot;Month %s must be between 1 and 12 inclusive&quot;, month));</span>
         }
 
-<span class="fc" id="L2316">        return (byte) month;</span>
+<span class="fc" id="L2530">        return (byte) month;</span>
     }
 
     private void checkCalendarDay(int day) {
-<span class="fc" id="L2320">        int lastDayInMonth = _calendar.getActualMaximum(Calendar.DAY_OF_MONTH);</span>
-<span class="fc bfc" id="L2321" title="All 4 branches covered.">        if (day &gt; lastDayInMonth || day &lt; _calendar.getActualMinimum(Calendar.DAY_OF_MONTH)) {</span>
-<span class="fc" id="L2322">            throw new IllegalArgumentException(String.format(&quot;Day %s for year %s and month %s must be between 1 and %s inclusive&quot;, day, getZYear(), getZMonth(), lastDayInMonth));</span>
+<span class="fc" id="L2534">        int lastDayInMonth = _calendar.getActualMaximum(Calendar.DAY_OF_MONTH);</span>
+<span class="fc bfc" id="L2535" title="All 4 branches covered.">        if (day &gt; lastDayInMonth || day &lt; _calendar.getActualMinimum(Calendar.DAY_OF_MONTH)) {</span>
+<span class="fc" id="L2536">            throw new IllegalArgumentException(String.format(&quot;Day %s for year %s and month %s must be between 1 and %s inclusive&quot;, day, getZYear(), getZMonth(), lastDayInMonth));</span>
         }
-<span class="fc" id="L2324">    }</span>
+<span class="fc" id="L2538">    }</span>
 
     private static byte checkAndCastHour(int hour)
     {
-<span class="pc bpc" id="L2328" title="1 of 4 branches missed.">        if (hour &lt; 0 || hour &gt; 23)</span>
+<span class="pc bpc" id="L2542" title="1 of 4 branches missed.">        if (hour &lt; 0 || hour &gt; 23)</span>
         {
-<span class="fc" id="L2330">            throw new IllegalArgumentException(String.format(&quot;Hour %s must be between 0 and 23 inclusive&quot;, hour));</span>
+<span class="fc" id="L2544">            throw new IllegalArgumentException(String.format(&quot;Hour %s must be between 0 and 23 inclusive&quot;, hour));</span>
         }
 
-<span class="fc" id="L2333">        return (byte) hour;</span>
+<span class="fc" id="L2547">        return (byte) hour;</span>
     }
 
     private static byte checkAndCastMinute(int minute)
     {
-<span class="pc bpc" id="L2338" title="1 of 4 branches missed.">        if (minute &lt; 0 || minute &gt; 59)</span>
+<span class="pc bpc" id="L2552" title="1 of 4 branches missed.">        if (minute &lt; 0 || minute &gt; 59)</span>
         {
-<span class="fc" id="L2340">            throw new IllegalArgumentException(String.format(&quot;Minute %s must be between between 0 and 59 inclusive&quot;, minute));</span>
+<span class="fc" id="L2554">            throw new IllegalArgumentException(String.format(&quot;Minute %s must be between between 0 and 59 inclusive&quot;, minute));</span>
         }
 
-<span class="fc" id="L2343">        return (byte) minute;</span>
+<span class="fc" id="L2557">        return (byte) minute;</span>
     }
 
     private static byte checkAndCastSecond(int second)
     {
-<span class="fc bfc" id="L2348" title="All 4 branches covered.">        if (second &lt; 0 || second &gt; 59)</span>
+<span class="fc bfc" id="L2562" title="All 4 branches covered.">        if (second &lt; 0 || second &gt; 59)</span>
         {
-<span class="fc" id="L2350">            throw new IllegalArgumentException(String.format(&quot;Second %s must be between between 0 and 59 inclusive&quot;, second));</span>
+<span class="fc" id="L2564">            throw new IllegalArgumentException(String.format(&quot;Second %s must be between between 0 and 59 inclusive&quot;, second));</span>
         }
 
-<span class="fc" id="L2353">        return (byte) second;</span>
+<span class="fc" id="L2567">        return (byte) second;</span>
     }
 
     private static Precision checkFraction(Precision precision, BigDecimal fraction)
     {
-<span class="fc bfc" id="L2358" title="All 2 branches covered.">        if (precision.includes(Precision.SECOND)) {</span>
-<span class="pc bpc" id="L2359" title="1 of 6 branches missed.">            if (fraction != null &amp;&amp; (fraction.signum() == -1 || BigDecimal.ONE.compareTo(fraction) != 1)) {</span>
-<span class="fc" id="L2360">                throw new IllegalArgumentException(String.format(&quot;Fractional seconds %s must be greater than or equal to 0 and less than 1&quot;, fraction));</span>
+<span class="fc bfc" id="L2572" title="All 2 branches covered.">        if (precision.includes(Precision.SECOND)) {</span>
+<span class="pc bpc" id="L2573" title="1 of 6 branches missed.">            if (fraction != null &amp;&amp; (fraction.signum() == -1 || BigDecimal.ONE.compareTo(fraction) != 1)) {</span>
+<span class="fc" id="L2574">                throw new IllegalArgumentException(String.format(&quot;Fractional seconds %s must be greater than or equal to 0 and less than 1&quot;, fraction));</span>
             }
         }
         else {
-<span class="pc bpc" id="L2364" title="1 of 2 branches missed.">            if (fraction != null) {</span>
-<span class="nc" id="L2365">                throw new IllegalArgumentException(&quot;Fraction must be null for non-second precision: &quot; + fraction);</span>
+<span class="pc bpc" id="L2578" title="1 of 2 branches missed.">            if (fraction != null) {</span>
+<span class="nc" id="L2579">                throw new IllegalArgumentException(&quot;Fraction must be null for non-second precision: &quot; + fraction);</span>
             }
         }
 
-<span class="fc" id="L2369">        return precision;</span>
+<span class="fc" id="L2583">        return precision;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

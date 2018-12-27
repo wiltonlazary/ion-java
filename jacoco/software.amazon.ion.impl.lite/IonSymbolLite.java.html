@@ -152,14 +152,14 @@ import software.amazon.ion.impl.PrivateUtils;
 
 <span class="fc" id="L153">            SymbolTable symbols = symbolTableProvider.getSymbolTable();</span>
 <span class="fc" id="L154">            name = symbols.findKnownSymbol(_sid);</span>
-<span class="pc bpc" id="L155" title="1 of 2 branches missed.">            if (name != null)</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            if (name != null)</span>
             {
                 // if this is a mutable value we'll hang onto
                 // our now known symbol table so we don't have
                 // to look it up again.
                 // If the value is immutable, honor that contract.
-<span class="nc bnc" id="L161" title="All 2 branches missed.">                if (_isLocked() == false) {</span>
-<span class="nc" id="L162">                    _set_value(name);</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">                if (_isLocked() == false) {</span>
+<span class="fc" id="L162">                    _set_value(name);</span>
                 }
             }
         }

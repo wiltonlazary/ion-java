@@ -410,22 +410,29 @@ import software.amazon.ion.impl.PrivateUtils;
     @Override
     public final void writeTo(IonWriter writer)
     {
-        try
-        {
-<span class="fc" id="L415">            writer.writeSymbol(SystemSymbols.ION_1_0);  // TODO amzn/ion-java#8 ???</span>
-<span class="nc" id="L416">        } catch (IOException ioe) {</span>
-<span class="nc" id="L417">            throw new IonException(ioe);</span>
-<span class="fc" id="L418">        }</span>
-<span class="fc bfc" id="L419" title="All 2 branches covered.">        for (IonValue iv : this) {</span>
-<span class="fc" id="L420">            iv.writeTo(writer);</span>
-<span class="fc" id="L421">        }</span>
-<span class="fc" id="L422">    }</span>
+<span class="fc bfc" id="L413" title="All 2 branches covered.">        if (writer.getSymbolTable().isSystemTable()) {</span>
+            // If the writer was configured with a non-default symbol table, writing an IVM here will
+            // reset that symbol table. If the datagram contains any symbols with unknown text that
+            // refer to slots in shared symbol table imports declared by the discarded table, an
+            // error will be raised unnecessarily. To avoid that, only write an IVM when the writer's
+            // symbol table is already the system symbol table.
+            // TODO evaluate whether an IVM should ever be written here. amzn/ion-java#200
+            try {
+<span class="fc" id="L421">                writer.writeSymbol(SystemSymbols.ION_1_0);</span>
+<span class="nc" id="L422">            } catch (IOException ioe) {</span>
+<span class="nc" id="L423">                throw new IonException(ioe);</span>
+<span class="fc" id="L424">            }</span>
+        }
+<span class="fc bfc" id="L426" title="All 2 branches covered.">        for (IonValue iv : this) {</span>
+<span class="fc" id="L427">            iv.writeTo(writer);</span>
+<span class="fc" id="L428">        }</span>
+<span class="fc" id="L429">    }</span>
 
     @Override
     final void writeBodyTo(IonWriter writer, SymbolTableProvider symbolTableProvider)
         throws IOException
     {
-<span class="nc" id="L428">        throw new UnsupportedOperationException(&quot;IonDatagram does not operate with a Symbol Table&quot;);</span>
+<span class="nc" id="L435">        throw new UnsupportedOperationException(&quot;IonDatagram does not operate with a Symbol Table&quot;);</span>
     }
 
 
@@ -440,66 +447,66 @@ import software.amazon.ion.impl.PrivateUtils;
     public int byteSize() throws IonException
     {
         // TODO this is horrible, users will end up encoding multiple times!
-<span class="fc" id="L443">        ReverseBinaryEncoder encoder =</span>
+<span class="fc" id="L450">        ReverseBinaryEncoder encoder =</span>
             new ReverseBinaryEncoder(REVERSE_BINARY_ENCODER_INITIAL_SIZE);
-<span class="fc" id="L445">        encoder.serialize(this);</span>
-<span class="fc" id="L446">        return encoder.byteSize();</span>
+<span class="fc" id="L452">        encoder.serialize(this);</span>
+<span class="fc" id="L453">        return encoder.byteSize();</span>
     }
 
     public byte[] getBytes() throws IonException
     {
-<span class="fc" id="L451">        ReverseBinaryEncoder encoder =</span>
+<span class="fc" id="L458">        ReverseBinaryEncoder encoder =</span>
             new ReverseBinaryEncoder(REVERSE_BINARY_ENCODER_INITIAL_SIZE);
-<span class="fc" id="L453">        encoder.serialize(this);</span>
-<span class="fc" id="L454">        return encoder.toNewByteArray();</span>
+<span class="fc" id="L460">        encoder.serialize(this);</span>
+<span class="fc" id="L461">        return encoder.toNewByteArray();</span>
     }
 
     public int getBytes(OutputStream out) throws IOException, IonException
     {
-<span class="fc" id="L459">        ReverseBinaryEncoder encoder =</span>
+<span class="fc" id="L466">        ReverseBinaryEncoder encoder =</span>
             new ReverseBinaryEncoder(REVERSE_BINARY_ENCODER_INITIAL_SIZE);
-<span class="fc" id="L461">        encoder.serialize(this);</span>
-<span class="fc" id="L462">        return encoder.writeBytes(out);</span>
+<span class="fc" id="L468">        encoder.serialize(this);</span>
+<span class="fc" id="L469">        return encoder.writeBytes(out);</span>
     }
 
     // TODO: optimize this, if there's a real use case
     //       deprecate this is there isn't (which I suspect is actually the case)
     public IonValue systemGet(int index) throws IndexOutOfBoundsException
     {
-<span class="fc" id="L469">        ListIterator&lt;IonValue&gt; iterator = systemIterator();</span>
-<span class="fc" id="L470">        IonValue value = null;</span>
+<span class="fc" id="L476">        ListIterator&lt;IonValue&gt; iterator = systemIterator();</span>
+<span class="fc" id="L477">        IonValue value = null;</span>
 
-<span class="pc bpc" id="L472" title="1 of 2 branches missed.">        if (index &lt; 0) {</span>
-<span class="nc" id="L473">            throw new IndexOutOfBoundsException(&quot;&quot;+index);</span>
+<span class="pc bpc" id="L479" title="1 of 2 branches missed.">        if (index &lt; 0) {</span>
+<span class="nc" id="L480">            throw new IndexOutOfBoundsException(&quot;&quot;+index);</span>
         }
 
         int ii;
-<span class="fc bfc" id="L477" title="All 2 branches covered.">        for (ii=0; ii&lt;=index; ii++) {</span>
-<span class="pc bpc" id="L478" title="1 of 2 branches missed.">            if (!iterator.hasNext()) {</span>
-<span class="nc" id="L479">                throw new IndexOutOfBoundsException(&quot;&quot;+index);</span>
+<span class="fc bfc" id="L484" title="All 2 branches covered.">        for (ii=0; ii&lt;=index; ii++) {</span>
+<span class="pc bpc" id="L485" title="1 of 2 branches missed.">            if (!iterator.hasNext()) {</span>
+<span class="nc" id="L486">                throw new IndexOutOfBoundsException(&quot;&quot;+index);</span>
             }
-<span class="fc" id="L481">            value = iterator.next();</span>
+<span class="fc" id="L488">            value = iterator.next();</span>
         }
-<span class="fc" id="L483">        return value;</span>
+<span class="fc" id="L490">        return value;</span>
     }
 
     public ListIterator&lt;IonValue&gt; systemIterator()
     {
-<span class="fc" id="L488">        return new SystemContentIterator(isReadOnly());</span>
+<span class="fc" id="L495">        return new SystemContentIterator(isReadOnly());</span>
     }
 
     // TODO: optimize this, if there's a real use case
     //       deprecate this is there isn't (which I suspect is actually the case)
     public int systemSize()
     {
-<span class="fc" id="L495">        int count = 0;</span>
-<span class="fc" id="L496">        ListIterator&lt;IonValue&gt; iterator = systemIterator();</span>
-<span class="fc bfc" id="L497" title="All 2 branches covered.">        while (iterator.hasNext()) {</span>
+<span class="fc" id="L502">        int count = 0;</span>
+<span class="fc" id="L503">        ListIterator&lt;IonValue&gt; iterator = systemIterator();</span>
+<span class="fc bfc" id="L504" title="All 2 branches covered.">        while (iterator.hasNext()) {</span>
             @SuppressWarnings(&quot;unused&quot;)
-<span class="fc" id="L499">            IonValue value = iterator.next();</span>
-<span class="fc" id="L500">            count++;</span>
-<span class="fc" id="L501">        }</span>
-<span class="fc" id="L502">        return count;</span>
+<span class="fc" id="L506">            IonValue value = iterator.next();</span>
+<span class="fc" id="L507">            count++;</span>
+<span class="fc" id="L508">        }</span>
+<span class="fc" id="L509">        return count;</span>
     }
 
     /*
@@ -508,14 +515,14 @@ import software.amazon.ion.impl.PrivateUtils;
      */
     void setSymbolTableAtIndex(int elementid, SymbolTable symbols)
     {
-<span class="nc bnc" id="L511" title="All 4 branches missed.">        assert(elementid &lt; get_child_count());</span>
-<span class="nc" id="L512">        TopLevelContext context = TopLevelContext.wrap(symbols, this);</span>
-<span class="nc" id="L513">        TopLevelContext startContext = (TopLevelContext) _children[elementid].getContext();</span>
+<span class="nc bnc" id="L518" title="All 4 branches missed.">        assert(elementid &lt; get_child_count());</span>
+<span class="nc" id="L519">        TopLevelContext context = TopLevelContext.wrap(symbols, this);</span>
+<span class="nc" id="L520">        TopLevelContext startContext = (TopLevelContext) _children[elementid].getContext();</span>
 
-<span class="nc bnc" id="L515" title="All 4 branches missed.">        while (elementid &lt; get_child_count() &amp;&amp; _children[elementid].getContext() == startContext){</span>
-<span class="nc" id="L516">            _children[elementid++].setContext(context);</span>
+<span class="nc bnc" id="L522" title="All 4 branches missed.">        while (elementid &lt; get_child_count() &amp;&amp; _children[elementid].getContext() == startContext){</span>
+<span class="nc" id="L523">            _children[elementid++].setContext(context);</span>
         }
-<span class="nc" id="L518">    }</span>
+<span class="nc" id="L525">    }</span>
 
     //////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////
@@ -527,10 +534,10 @@ import software.amazon.ion.impl.PrivateUtils;
 
     protected synchronized IonSymbolLite get_ivm()
     {
-<span class="fc bfc" id="L530" title="All 2 branches covered.">        if (_ivm == null) {</span>
-<span class="fc" id="L531">            _ivm = getSystem().newSymbol(ION_1_0);</span>
+<span class="fc bfc" id="L537" title="All 2 branches covered.">        if (_ivm == null) {</span>
+<span class="fc" id="L538">            _ivm = getSystem().newSymbol(ION_1_0);</span>
         }
-<span class="fc" id="L533">        return _ivm;</span>
+<span class="fc" id="L540">        return _ivm;</span>
     }
 
     /**
@@ -572,7 +579,7 @@ import software.amazon.ion.impl.PrivateUtils;
      *  NOTE this closely resembles the iterator defined in IonSequenceLite,
      *  so changes here are likely to be needed in IonSequenceLite as well.
      */
-<span class="pc bpc" id="L575" title="1 of 2 branches missed.">    protected final class SystemContentIterator</span>
+<span class="pc bpc" id="L582" title="1 of 2 branches missed.">    protected final class SystemContentIterator</span>
         implements ListIterator&lt;IonValue&gt;
     {
         private final boolean                __readOnly;
@@ -582,174 +589,174 @@ import software.amazon.ion.impl.PrivateUtils;
         private       SystemIteratorPosition __temp_pos;
 
         public SystemContentIterator(boolean readOnly)
-<span class="fc" id="L585">        {</span>
-<span class="pc bpc" id="L586" title="1 of 4 branches missed.">            if (_isLocked() &amp;&amp; !readOnly) {</span>
-<span class="nc" id="L587">                throw new IllegalStateException(&quot;you can't open an updatable iterator on a read only value&quot;);</span>
+<span class="fc" id="L592">        {</span>
+<span class="pc bpc" id="L593" title="1 of 4 branches missed.">            if (_isLocked() &amp;&amp; !readOnly) {</span>
+<span class="nc" id="L594">                throw new IllegalStateException(&quot;you can't open an updatable iterator on a read only value&quot;);</span>
             }
-<span class="fc" id="L589">            __readOnly = readOnly;</span>
+<span class="fc" id="L596">            __readOnly = readOnly;</span>
 
-<span class="fc" id="L591">            __temp_pos = new SystemIteratorPosition(this); // we flip back and forth between two positions to avoid allocating these on every value (or more)</span>
-<span class="fc" id="L592">            __pos = new SystemIteratorPosition(this);</span>
-<span class="fc" id="L593">            __pos.load_initial_position();</span>
-<span class="fc" id="L594">        }</span>
+<span class="fc" id="L598">            __temp_pos = new SystemIteratorPosition(this); // we flip back and forth between two positions to avoid allocating these on every value (or more)</span>
+<span class="fc" id="L599">            __pos = new SystemIteratorPosition(this);</span>
+<span class="fc" id="L600">            __pos.load_initial_position();</span>
+<span class="fc" id="L601">        }</span>
 
         private IonSystem getSystem()
         {
-<span class="nc" id="L598">            return IonDatagramLite.this.getSystem();</span>
+<span class="nc" id="L605">            return IonDatagramLite.this.getSystem();</span>
         }
 
         protected IonValueLite set_position(SystemIteratorPosition newPos)
         {
             // swap our active position with our temp position
-<span class="fc" id="L604">            __temp_pos = __pos;</span>
-<span class="fc" id="L605">            __pos = newPos;</span>
+<span class="fc" id="L611">            __temp_pos = __pos;</span>
+<span class="fc" id="L612">            __pos = newPos;</span>
 
             // load out current value from the position, and return it
-<span class="fc" id="L608">            __current = __pos.load_position();</span>
-<span class="fc" id="L609">            return __current;</span>
+<span class="fc" id="L615">            __current = __pos.load_position();</span>
+<span class="fc" id="L616">            return __current;</span>
         }
 
         private void force_position_sync()
         {
-<span class="fc" id="L614">            int user_index = __pos.__user_index;</span>
-<span class="pc bpc" id="L615" title="1 of 4 branches missed.">            if (user_index &lt; 0 || user_index &gt;= _child_count) {</span>
-<span class="fc" id="L616">                return;</span>
+<span class="fc" id="L621">            int user_index = __pos.__user_index;</span>
+<span class="pc bpc" id="L622" title="1 of 4 branches missed.">            if (user_index &lt; 0 || user_index &gt;= _child_count) {</span>
+<span class="fc" id="L623">                return;</span>
             }
-<span class="fc" id="L618">            IonValueLite user_value = __pos.__current_user_value;</span>
-<span class="pc bpc" id="L619" title="2 of 4 branches missed.">            if (user_value == null || user_value == _children[user_index]) {</span>
-<span class="fc" id="L620">                return;</span>
+<span class="fc" id="L625">            IonValueLite user_value = __pos.__current_user_value;</span>
+<span class="pc bpc" id="L626" title="2 of 4 branches missed.">            if (user_value == null || user_value == _children[user_index]) {</span>
+<span class="fc" id="L627">                return;</span>
             }
-<span class="nc bnc" id="L622" title="All 2 branches missed.">            if (__readOnly) {</span>
-<span class="nc" id="L623">                throw new IonException(&quot;read only sequence was changed&quot;);</span>
+<span class="nc bnc" id="L629" title="All 2 branches missed.">            if (__readOnly) {</span>
+<span class="nc" id="L630">                throw new IonException(&quot;read only sequence was changed&quot;);</span>
             }
-<span class="nc" id="L625">            __pos.force_position_sync_helper();</span>
-<span class="nc" id="L626">        }</span>
+<span class="nc" id="L632">            __pos.force_position_sync_helper();</span>
+<span class="nc" id="L633">        }</span>
 
         public void add(IonValue element)
         {
-<span class="nc" id="L630">            throw new UnsupportedOperationException();</span>
+<span class="nc" id="L637">            throw new UnsupportedOperationException();</span>
         }
 
         public final boolean hasNext()
         {
-<span class="fc" id="L635">            return __pos.has_next();</span>
+<span class="fc" id="L642">            return __pos.has_next();</span>
         }
 
         public IonValue next()
         {
-<span class="fc" id="L640">            SystemIteratorPosition pos = next_index_helper();</span>
-<span class="pc bpc" id="L641" title="1 of 2 branches missed.">            if (pos == null) {</span>
-<span class="nc" id="L642">                throw new NoSuchElementException();</span>
+<span class="fc" id="L647">            SystemIteratorPosition pos = next_index_helper();</span>
+<span class="pc bpc" id="L648" title="1 of 2 branches missed.">            if (pos == null) {</span>
+<span class="nc" id="L649">                throw new NoSuchElementException();</span>
             }
-<span class="fc" id="L644">            IonValueLite current_value = set_position(pos);</span>
-<span class="pc bpc" id="L645" title="2 of 4 branches missed.">            assert(current_value == this.__current);</span>
-<span class="fc" id="L646">            return current_value;</span>
+<span class="fc" id="L651">            IonValueLite current_value = set_position(pos);</span>
+<span class="pc bpc" id="L652" title="2 of 4 branches missed.">            assert(current_value == this.__current);</span>
+<span class="fc" id="L653">            return current_value;</span>
         }
 
         public final int nextIndex()
         {
-<span class="nc" id="L651">            SystemIteratorPosition pos = next_index_helper();</span>
-<span class="nc bnc" id="L652" title="All 2 branches missed.">            if (pos == null) {</span>
+<span class="nc" id="L658">            SystemIteratorPosition pos = next_index_helper();</span>
+<span class="nc bnc" id="L659" title="All 2 branches missed.">            if (pos == null) {</span>
                 // we can do this because we hold the __pos
                 // even when we run off the end, it will be
                 // positioned at the value that wasn't there
-<span class="nc" id="L656">                return __pos.get_external_pos() + 1;</span>
+<span class="nc" id="L663">                return __pos.get_external_pos() + 1;</span>
             }
-<span class="nc" id="L658">            int idx = pos.get_external_pos();</span>
-<span class="nc" id="L659">            return idx;</span>
+<span class="nc" id="L665">            int idx = pos.get_external_pos();</span>
+<span class="nc" id="L666">            return idx;</span>
         }
 
         private final SystemIteratorPosition next_index_helper()
         {
-<span class="fc" id="L664">            SystemIteratorPosition next = null;</span>
-<span class="fc" id="L665">            force_position_sync();</span>
+<span class="fc" id="L671">            SystemIteratorPosition next = null;</span>
+<span class="fc" id="L672">            force_position_sync();</span>
 
-<span class="pc bpc" id="L667" title="1 of 2 branches missed.">            if (__pos.has_next() == false) {</span>
-<span class="nc" id="L668">                return null;</span>
+<span class="pc bpc" id="L674" title="1 of 2 branches missed.">            if (__pos.has_next() == false) {</span>
+<span class="nc" id="L675">                return null;</span>
             }
 
             // at this point we will have a next so prep out position now
-<span class="fc" id="L672">            next = __temp_pos;</span>
-<span class="pc bpc" id="L673" title="3 of 6 branches missed.">            assert(next != null &amp;&amp; next != __pos);</span>
-<span class="fc" id="L674">            next.copyFrom(__pos);</span>
+<span class="fc" id="L679">            next = __temp_pos;</span>
+<span class="pc bpc" id="L680" title="3 of 6 branches missed.">            assert(next != null &amp;&amp; next != __pos);</span>
+<span class="fc" id="L681">            next.copyFrom(__pos);</span>
 
             // see if there's a system value waiting for use
-<span class="fc" id="L677">            next.__local_index++;</span>
-<span class="fc bfc" id="L678" title="All 2 branches covered.">            if (next.__local_index &lt; next.__local_value_count) {</span>
-<span class="fc" id="L679">                return next;</span>
+<span class="fc" id="L684">            next.__local_index++;</span>
+<span class="fc bfc" id="L685" title="All 2 branches covered.">            if (next.__local_index &lt; next.__local_value_count) {</span>
+<span class="fc" id="L686">                return next;</span>
             }
 
             // if there's not system value there must be another user value
             // so we shouldn't get here since has_next() should have failed
-<span class="pc bpc" id="L684" title="2 of 4 branches missed.">            assert(next.__user_index &lt;= get_child_count());</span>
+<span class="pc bpc" id="L691" title="2 of 4 branches missed.">            assert(next.__user_index &lt;= get_child_count());</span>
 
             // if we were on a system value then we're just stepping onto the
             // since has_next() already declared we do have a waiting value
-<span class="fc" id="L688">            next.__user_index++;</span>
-<span class="fc" id="L689">            next.load_updated_position();</span>
+<span class="fc" id="L695">            next.__user_index++;</span>
+<span class="fc" id="L696">            next.load_updated_position();</span>
             // we step onto the first local value
-<span class="fc" id="L691">            next.__local_index = 0;</span>
-<span class="fc" id="L692">            return next;</span>
+<span class="fc" id="L698">            next.__local_index = 0;</span>
+<span class="fc" id="L699">            return next;</span>
         }
 
         public final boolean hasPrevious()
         {
-<span class="nc" id="L697">            return __pos.has_prev();</span>
+<span class="nc" id="L704">            return __pos.has_prev();</span>
         }
 
         public IonValue previous()
         {
-<span class="nc" id="L702">            SystemIteratorPosition pos = previous_index_helper();</span>
-<span class="nc bnc" id="L703" title="All 2 branches missed.">            if (pos == null) {</span>
-<span class="nc" id="L704">                throw new NoSuchElementException();</span>
+<span class="nc" id="L709">            SystemIteratorPosition pos = previous_index_helper();</span>
+<span class="nc bnc" id="L710" title="All 2 branches missed.">            if (pos == null) {</span>
+<span class="nc" id="L711">                throw new NoSuchElementException();</span>
             }
-<span class="nc" id="L706">            IonValueLite current_value = set_position(pos);</span>
-<span class="nc bnc" id="L707" title="All 4 branches missed.">            assert(current_value == this.__current);</span>
-<span class="nc" id="L708">            return current_value;</span>
+<span class="nc" id="L713">            IonValueLite current_value = set_position(pos);</span>
+<span class="nc bnc" id="L714" title="All 4 branches missed.">            assert(current_value == this.__current);</span>
+<span class="nc" id="L715">            return current_value;</span>
         }
 
         public final int previousIndex()
         {
-<span class="nc" id="L713">            SystemIteratorPosition pos = previous_index_helper();</span>
-<span class="nc bnc" id="L714" title="All 2 branches missed.">            if (pos == null) {</span>
-<span class="nc" id="L715">                return -1;</span>
+<span class="nc" id="L720">            SystemIteratorPosition pos = previous_index_helper();</span>
+<span class="nc bnc" id="L721" title="All 2 branches missed.">            if (pos == null) {</span>
+<span class="nc" id="L722">                return -1;</span>
             }
-<span class="nc" id="L717">            int idx = pos.get_external_pos();</span>
-<span class="nc" id="L718">            return idx;</span>
+<span class="nc" id="L724">            int idx = pos.get_external_pos();</span>
+<span class="nc" id="L725">            return idx;</span>
         }
 
         private final SystemIteratorPosition previous_index_helper()
         {
-<span class="nc" id="L723">            SystemIteratorPosition prev = null;</span>
+<span class="nc" id="L730">            SystemIteratorPosition prev = null;</span>
 
-<span class="nc" id="L725">            force_position_sync();</span>
-<span class="nc bnc" id="L726" title="All 2 branches missed.">            if (__pos.has_prev() == false) {</span>
-<span class="nc" id="L727">                return null;</span>
+<span class="nc" id="L732">            force_position_sync();</span>
+<span class="nc bnc" id="L733" title="All 2 branches missed.">            if (__pos.has_prev() == false) {</span>
+<span class="nc" id="L734">                return null;</span>
             }
 
             // at this point we will have a prev so prep out position now
-<span class="nc" id="L731">            prev = __temp_pos;</span>
-<span class="nc bnc" id="L732" title="All 6 branches missed.">            assert(prev != null &amp;&amp; prev != __pos);</span>
-<span class="nc" id="L733">            prev.copyFrom(__pos);</span>
+<span class="nc" id="L738">            prev = __temp_pos;</span>
+<span class="nc bnc" id="L739" title="All 6 branches missed.">            assert(prev != null &amp;&amp; prev != __pos);</span>
+<span class="nc" id="L740">            prev.copyFrom(__pos);</span>
 
-<span class="nc" id="L735">            prev.__local_index--;</span>
-<span class="nc bnc" id="L736" title="All 2 branches missed.">            if (prev.__local_index &gt;= 0) {</span>
-<span class="nc" id="L737">                return prev;</span>
+<span class="nc" id="L742">            prev.__local_index--;</span>
+<span class="nc bnc" id="L743" title="All 2 branches missed.">            if (prev.__local_index &gt;= 0) {</span>
+<span class="nc" id="L744">                return prev;</span>
             }
 
             // if there's not system value there must be another user value
             // we would have bailed with has_prev returned false above otherwise
-<span class="nc bnc" id="L742" title="All 4 branches missed.">            assert(prev.__user_index &gt; 0);</span>
+<span class="nc bnc" id="L749" title="All 4 branches missed.">            assert(prev.__user_index &gt; 0);</span>
 
             // if this is the 2nd prev then we really have to back up
-<span class="nc" id="L745">            prev.__index_adjustment -= prev.__local_value_count;</span>
-<span class="nc" id="L746">            prev.__user_index--;</span>
-<span class="nc" id="L747">            prev.load_updated_position();</span>
+<span class="nc" id="L752">            prev.__index_adjustment -= prev.__local_value_count;</span>
+<span class="nc" id="L753">            prev.__user_index--;</span>
+<span class="nc" id="L754">            prev.load_updated_position();</span>
 
             // going backwards we &quot;start&quot; at the end of our local list
-<span class="nc" id="L750">            prev.__local_index = prev.__local_value_count - 1;</span>
+<span class="nc" id="L757">            prev.__local_index = prev.__local_value_count - 1;</span>
 
-<span class="nc" id="L752">            return prev;</span>
+<span class="nc" id="L759">            return prev;</span>
         }
 
         /**
@@ -764,67 +771,67 @@ import software.amazon.ion.impl.PrivateUtils;
          */
         public void remove()
         {
-<span class="nc bnc" id="L767" title="All 2 branches missed.">            if (__readOnly) {</span>
-<span class="nc" id="L768">                throw new UnsupportedOperationException();</span>
+<span class="nc bnc" id="L774" title="All 2 branches missed.">            if (__readOnly) {</span>
+<span class="nc" id="L775">                throw new UnsupportedOperationException();</span>
             }
-<span class="nc" id="L770">            force_position_sync();</span>
+<span class="nc" id="L777">            force_position_sync();</span>
 
-<span class="nc bnc" id="L772" title="All 4 branches missed.">            if (__current == null || __pos == null) {</span>
-<span class="nc" id="L773">                throw new NoSuchElementException();</span>
+<span class="nc bnc" id="L779" title="All 4 branches missed.">            if (__current == null || __pos == null) {</span>
+<span class="nc" id="L780">                throw new NoSuchElementException();</span>
             }
-<span class="nc bnc" id="L775" title="All 2 branches missed.">            if (__pos.on_system_value()) {</span>
-<span class="nc" id="L776">                throw new UnsupportedOperationException();</span>
+<span class="nc bnc" id="L782" title="All 2 branches missed.">            if (__pos.on_system_value()) {</span>
+<span class="nc" id="L783">                throw new UnsupportedOperationException();</span>
             }
 
-<span class="nc" id="L779">            int idx = __pos.__user_index;</span>
-<span class="nc bnc" id="L780" title="All 4 branches missed.">            assert(idx &gt;= 0);</span>
+<span class="nc" id="L786">            int idx = __pos.__user_index;</span>
+<span class="nc bnc" id="L787" title="All 4 branches missed.">            assert(idx &gt;= 0);</span>
 
-<span class="nc" id="L782">            IonValueLite concrete = __current;</span>
-<span class="nc" id="L783">            int concrete_idx = concrete._elementid();</span>
-<span class="nc bnc" id="L784" title="All 4 branches missed.">            assert(concrete_idx == idx);</span>
+<span class="nc" id="L789">            IonValueLite concrete = __current;</span>
+<span class="nc" id="L790">            int concrete_idx = concrete._elementid();</span>
+<span class="nc bnc" id="L791" title="All 4 branches missed.">            assert(concrete_idx == idx);</span>
 
             // here we remove the member from the container's list of elements
-<span class="nc" id="L787">            remove_child(idx);</span>
-<span class="nc" id="L788">            patch_elements_helper(concrete_idx);</span>
+<span class="nc" id="L794">            remove_child(idx);</span>
+<span class="nc" id="L795">            patch_elements_helper(concrete_idx);</span>
 
             // when we remove the current value we remove
             // its associated system values and this
             // may change the index adjustment
-<span class="nc" id="L793">            __pos.__index_adjustment -= __pos.__local_value_count;</span>
-<span class="nc bnc" id="L794" title="All 2 branches missed.">            if (__pos.__user_index &lt; get_child_count() - 1)</span>
+<span class="nc" id="L800">            __pos.__index_adjustment -= __pos.__local_value_count;</span>
+<span class="nc bnc" id="L801" title="All 2 branches missed.">            if (__pos.__user_index &lt; get_child_count() - 1)</span>
             {
-<span class="nc" id="L796">                __pos.load_updated_position();</span>
-<span class="nc" id="L797">                __pos.__local_index = -1;</span>
+<span class="nc" id="L803">                __pos.load_updated_position();</span>
+<span class="nc" id="L804">                __pos.__local_index = -1;</span>
             }
-<span class="nc" id="L799">            __current = null;</span>
-<span class="nc" id="L800">        }</span>
+<span class="nc" id="L806">            __current = null;</span>
+<span class="nc" id="L807">        }</span>
 
         public void set(IonValue element)
         {
-<span class="nc" id="L804">            throw new UnsupportedOperationException();</span>
+<span class="nc" id="L811">            throw new UnsupportedOperationException();</span>
         }
         protected int get_datagram_child_count()
         {
-<span class="fc" id="L808">            return get_child_count();</span>
+<span class="fc" id="L815">            return get_child_count();</span>
         }
         protected IonValueLite get_datagram_child(int idx)
         {
-<span class="fc" id="L812">            return get_child(idx);</span>
+<span class="fc" id="L819">            return get_child(idx);</span>
         }
         protected IonSystem get_datagram_system()
         {
-<span class="fc" id="L816">            return _system;</span>
+<span class="fc" id="L823">            return _system;</span>
         }
         protected boolean datagram_contains(IonValueLite value)
         {
-<span class="nc" id="L820">            return contains(value);</span>
+<span class="nc" id="L827">            return contains(value);</span>
         }
         protected IonSymbolLite get_datagram_ivm()
         {
-<span class="fc" id="L824">            return get_ivm();</span>
+<span class="fc" id="L831">            return get_ivm();</span>
         }
     }
-<span class="pc bpc" id="L827" title="1 of 2 branches missed.">    static class SystemIteratorPosition</span>
+<span class="pc bpc" id="L834" title="1 of 2 branches missed.">    static class SystemIteratorPosition</span>
     {
         /**
          * this position points to the user value that
@@ -851,7 +858,7 @@ import software.amazon.ion.impl.PrivateUtils;
         protected       int                   __index_adjustment;      // delta between the user_content_pos and the external_pos
 
         protected       int                   __local_index;           // index of the next value in the system array (__local_system_value), if __on_system_value
-<span class="fc" id="L854">        protected       IonValueLite[]        __local_values = new IonValueLite[3]; // more than the value, a symbol table, and a version marker would be MOST unusual</span>
+<span class="fc" id="L861">        protected       IonValueLite[]        __local_values = new IonValueLite[3]; // more than the value, a symbol table, and a version marker would be MOST unusual</span>
         protected       int                   __local_value_count;
 
         protected       int                   __user_index;            // index of next value in the user content array (_children)
@@ -860,135 +867,135 @@ import software.amazon.ion.impl.PrivateUtils;
         protected       int                   __current_symbols_index;
 
         SystemIteratorPosition(SystemContentIterator iterator)
-<span class="fc" id="L863">        {</span>
-<span class="fc" id="L864">            __iterator = iterator;</span>
-<span class="fc" id="L865">        }</span>
+<span class="fc" id="L870">        {</span>
+<span class="fc" id="L871">            __iterator = iterator;</span>
+<span class="fc" id="L872">        }</span>
 
         void load_initial_position()
         {
-<span class="fc" id="L869">            __user_index = 0;</span>
-<span class="fc" id="L870">            __local_index = -1; // we're before the first value</span>
-<span class="fc" id="L871">            __current_symbols_index = -1;</span>
-<span class="fc" id="L872">            load_updated_position();</span>
-<span class="fc" id="L873">        }</span>
+<span class="fc" id="L876">            __user_index = 0;</span>
+<span class="fc" id="L877">            __local_index = -1; // we're before the first value</span>
+<span class="fc" id="L878">            __current_symbols_index = -1;</span>
+<span class="fc" id="L879">            load_updated_position();</span>
+<span class="fc" id="L880">        }</span>
 
         protected int get_external_pos()
         {
             int user_index;
-<span class="nc" id="L878">            user_index  = __user_index;</span>
-<span class="nc" id="L879">            user_index += __index_adjustment;</span>
-<span class="nc" id="L880">            user_index -= __local_value_count;</span>
-<span class="nc" id="L881">            user_index += __local_index;</span>
-<span class="nc" id="L882">            return user_index;</span>
+<span class="nc" id="L885">            user_index  = __user_index;</span>
+<span class="nc" id="L886">            user_index += __index_adjustment;</span>
+<span class="nc" id="L887">            user_index -= __local_value_count;</span>
+<span class="nc" id="L888">            user_index += __local_index;</span>
+<span class="nc" id="L889">            return user_index;</span>
         }
 
         protected boolean on_system_value()
         {
-<span class="nc bnc" id="L887" title="All 2 branches missed.">            return (__current_user_value != __local_values[0]);</span>
+<span class="nc bnc" id="L894" title="All 2 branches missed.">            return (__current_user_value != __local_values[0]);</span>
         }
         protected boolean has_next()
         {
-<span class="fc bfc" id="L891" title="All 2 branches covered.">            if (__local_index + 1 &lt; __local_value_count) {</span>
-<span class="fc" id="L892">                return true;</span>
+<span class="fc bfc" id="L898" title="All 2 branches covered.">            if (__local_index + 1 &lt; __local_value_count) {</span>
+<span class="fc" id="L899">                return true;</span>
             }
-<span class="fc bfc" id="L894" title="All 2 branches covered.">            if (__user_index + 1 &lt; __iterator.get_datagram_child_count()) {</span>
-<span class="fc" id="L895">                return true;</span>
+<span class="fc bfc" id="L901" title="All 2 branches covered.">            if (__user_index + 1 &lt; __iterator.get_datagram_child_count()) {</span>
+<span class="fc" id="L902">                return true;</span>
             }
-<span class="fc" id="L897">            return false;</span>
+<span class="fc" id="L904">            return false;</span>
         }
         protected boolean has_prev()
         {
             // if we're not at the beginning of the datagram list
             // we always have another user value
-<span class="nc bnc" id="L903" title="All 2 branches missed.">            if (__user_index &gt; 0) {</span>
-<span class="nc" id="L904">                return true;</span>
+<span class="nc bnc" id="L910" title="All 2 branches missed.">            if (__user_index &gt; 0) {</span>
+<span class="nc" id="L911">                return true;</span>
             }
-<span class="nc bnc" id="L906" title="All 2 branches missed.">            if (__local_index &gt; 0) {</span>
-<span class="nc" id="L907">                return true;</span>
+<span class="nc bnc" id="L913" title="All 2 branches missed.">            if (__local_index &gt; 0) {</span>
+<span class="nc" id="L914">                return true;</span>
             }
             // we're out of both user and system values
-<span class="nc" id="L910">            return false;</span>
+<span class="nc" id="L917">            return false;</span>
         }
 
         protected void copyFrom(SystemIteratorPosition source)
         {
-<span class="fc" id="L915">            this.__index_adjustment         = source.__index_adjustment;</span>
-<span class="fc" id="L916">            this.__user_index               = source.__user_index;</span>
-<span class="fc" id="L917">            this.__local_index              = source.__local_index;</span>
-<span class="fc" id="L918">            this.__current_user_value       = source.__current_user_value;</span>
-<span class="fc" id="L919">            this.__current_symbols          = source.__current_symbols;</span>
-<span class="fc" id="L920">            this.__current_symbols_index    = source.__current_symbols_index;</span>
+<span class="fc" id="L922">            this.__index_adjustment         = source.__index_adjustment;</span>
+<span class="fc" id="L923">            this.__user_index               = source.__user_index;</span>
+<span class="fc" id="L924">            this.__local_index              = source.__local_index;</span>
+<span class="fc" id="L925">            this.__current_user_value       = source.__current_user_value;</span>
+<span class="fc" id="L926">            this.__current_symbols          = source.__current_symbols;</span>
+<span class="fc" id="L927">            this.__current_symbols_index    = source.__current_symbols_index;</span>
 
             // for the local system values each position needs its own
             // array, but the can share the value references
-<span class="pc bpc" id="L924" title="1 of 2 branches missed.">            if (source.__local_value_count &gt; 0) {</span>
-<span class="pc bpc" id="L925" title="1 of 4 branches missed.">                if (this.__local_values == null || source.__local_value_count &gt;= this.__local_values.length) {</span>
-<span class="fc" id="L926">                    this.__local_values = new IonValueLite[source.__local_values.length];</span>
+<span class="pc bpc" id="L931" title="1 of 2 branches missed.">            if (source.__local_value_count &gt; 0) {</span>
+<span class="pc bpc" id="L932" title="1 of 4 branches missed.">                if (this.__local_values == null || source.__local_value_count &gt;= this.__local_values.length) {</span>
+<span class="fc" id="L933">                    this.__local_values = new IonValueLite[source.__local_values.length];</span>
                 }
-<span class="fc" id="L928">                System.arraycopy(source.__local_values, 0, this.__local_values, 0, source.__local_value_count);</span>
+<span class="fc" id="L935">                System.arraycopy(source.__local_values, 0, this.__local_values, 0, source.__local_value_count);</span>
             }
-<span class="fc" id="L930">            this.__local_value_count = source.__local_value_count;</span>
-<span class="fc" id="L931">        }</span>
+<span class="fc" id="L937">            this.__local_value_count = source.__local_value_count;</span>
+<span class="fc" id="L938">        }</span>
 
         private void load_updated_position()
         {
-<span class="fc" id="L935">            IonValueLite prev_value = __current_user_value;</span>
+<span class="fc" id="L942">            IonValueLite prev_value = __current_user_value;</span>
             // we load our referenced user value (@ __user_index if
             // it exists).
-<span class="pc bpc" id="L938" title="2 of 6 branches missed.">            if (__user_index &lt; 0 || (__user_index &gt; 0 &amp;&amp; __user_index &gt;=  __iterator.get_datagram_child_count())) {</span>
-<span class="nc" id="L939">                throw new IonException(&quot;attempt to position iterator past end of values&quot;);</span>
+<span class="pc bpc" id="L945" title="2 of 6 branches missed.">            if (__user_index &lt; 0 || (__user_index &gt; 0 &amp;&amp; __user_index &gt;=  __iterator.get_datagram_child_count())) {</span>
+<span class="nc" id="L946">                throw new IonException(&quot;attempt to position iterator past end of values&quot;);</span>
             }
-<span class="fc bfc" id="L941" title="All 2 branches covered.">            if (__user_index &lt; __iterator.get_datagram_child_count()) {</span>
-<span class="fc" id="L942">                __current_user_value = __iterator.get_datagram_child(__user_index);</span>
-<span class="pc bpc" id="L943" title="2 of 4 branches missed.">                assert(__current_user_value != null);</span>
+<span class="fc bfc" id="L948" title="All 2 branches covered.">            if (__user_index &lt; __iterator.get_datagram_child_count()) {</span>
+<span class="fc" id="L949">                __current_user_value = __iterator.get_datagram_child(__user_index);</span>
+<span class="pc bpc" id="L950" title="2 of 4 branches missed.">                assert(__current_user_value != null);</span>
             }
             else {
                 // when there are no user values and we're at index == 0
-<span class="pc bpc" id="L947" title="3 of 6 branches missed.">                assert(__user_index == 0 &amp;&amp; __iterator.get_datagram_child_count() == 0);</span>
-<span class="fc" id="L948">                __current_user_value = null;</span>
+<span class="pc bpc" id="L954" title="3 of 6 branches missed.">                assert(__user_index == 0 &amp;&amp; __iterator.get_datagram_child_count() == 0);</span>
+<span class="fc" id="L955">                __current_user_value = null;</span>
             }
 
-<span class="fc" id="L951">            int old_count = __local_value_count;</span>
-<span class="fc" id="L952">            __local_value_count = 0;</span>
-<span class="fc bfc" id="L953" title="All 2 branches covered.">            if (__current_user_value != null) {</span>
-<span class="fc" id="L954">                push_system_value(__current_user_value);</span>
+<span class="fc" id="L958">            int old_count = __local_value_count;</span>
+<span class="fc" id="L959">            __local_value_count = 0;</span>
+<span class="fc bfc" id="L960" title="All 2 branches covered.">            if (__current_user_value != null) {</span>
+<span class="fc" id="L961">                push_system_value(__current_user_value);</span>
             }
-<span class="fc" id="L956">            load_current_symbol_table(prev_value);</span>
+<span class="fc" id="L963">            load_current_symbol_table(prev_value);</span>
 
-<span class="fc bfc" id="L958" title="All 2 branches covered.">            for (int ii=__local_value_count; ii&lt;old_count; ii++) {</span>
-<span class="fc" id="L959">                __local_values[ii] = null;</span>
+<span class="fc bfc" id="L965" title="All 2 branches covered.">            for (int ii=__local_value_count; ii&lt;old_count; ii++) {</span>
+<span class="fc" id="L966">                __local_values[ii] = null;</span>
             }
-<span class="fc" id="L961">            __index_adjustment += __local_value_count - 1;</span>
+<span class="fc" id="L968">            __index_adjustment += __local_value_count - 1;</span>
 
-<span class="fc" id="L963">            return;</span>
+<span class="fc" id="L970">            return;</span>
         }
 
         void load_current_symbol_table(IonValueLite prev_user_value)
         {
-<span class="fc" id="L968">            IonValueLite curr_value  = __current_user_value;</span>
-<span class="fc" id="L969">            int          curr_index  = __user_index;</span>
+<span class="fc" id="L975">            IonValueLite curr_value  = __current_user_value;</span>
+<span class="fc" id="L976">            int          curr_index  = __user_index;</span>
 
-<span class="fc" id="L971">            IonValueLite prev_value  = prev_user_value;</span>
-<span class="fc" id="L972">            SymbolTable  prev_symtab = __current_symbols;</span>
-<span class="fc" id="L973">            int          prev_index  = __current_symbols_index;</span>
+<span class="fc" id="L978">            IonValueLite prev_value  = prev_user_value;</span>
+<span class="fc" id="L979">            SymbolTable  prev_symtab = __current_symbols;</span>
+<span class="fc" id="L980">            int          prev_index  = __current_symbols_index;</span>
 
             // set our new position symbol table
-<span class="fc" id="L976">            __current_symbols  = null;</span>
-<span class="fc" id="L977">            __current_symbols_index = curr_index;</span>
-<span class="fc" id="L978">            SymbolTable  curr_symtab = null;</span>
-<span class="fc bfc" id="L979" title="All 2 branches covered.">           if (curr_value != null) {</span>
-<span class="fc" id="L980">                curr_symtab = curr_value.getAssignedSymbolTable();</span>
-<span class="fc" id="L981">                __current_symbols = curr_symtab;</span>
+<span class="fc" id="L983">            __current_symbols  = null;</span>
+<span class="fc" id="L984">            __current_symbols_index = curr_index;</span>
+<span class="fc" id="L985">            SymbolTable  curr_symtab = null;</span>
+<span class="fc bfc" id="L986" title="All 2 branches covered.">           if (curr_value != null) {</span>
+<span class="fc" id="L987">                curr_symtab = curr_value.getAssignedSymbolTable();</span>
+<span class="fc" id="L988">                __current_symbols = curr_symtab;</span>
             }
 
             // if we need to we reset the previous values here
             // this happens when the caller is scanning backwards
-<span class="pc bpc" id="L986" title="1 of 2 branches missed.">            if (curr_index - 1 != prev_index) {</span>
-<span class="nc" id="L987">                prev_index = curr_index - 1;</span>
-<span class="nc" id="L988">                prev_symtab = null;</span>
-<span class="nc bnc" id="L989" title="All 4 branches missed.">                if (prev_index &gt;= 0 &amp;&amp; prev_index &lt; __iterator.get_datagram_child_count()) {</span>
-<span class="nc" id="L990">                    prev_value  = __iterator.get_datagram_child(prev_index);</span>
-<span class="nc" id="L991">                    prev_symtab = prev_value.getAssignedSymbolTable();</span>
+<span class="pc bpc" id="L993" title="1 of 2 branches missed.">            if (curr_index - 1 != prev_index) {</span>
+<span class="nc" id="L994">                prev_index = curr_index - 1;</span>
+<span class="nc" id="L995">                prev_symtab = null;</span>
+<span class="nc bnc" id="L996" title="All 4 branches missed.">                if (prev_index &gt;= 0 &amp;&amp; prev_index &lt; __iterator.get_datagram_child_count()) {</span>
+<span class="nc" id="L997">                    prev_value  = __iterator.get_datagram_child(prev_index);</span>
+<span class="nc" id="L998">                    prev_symtab = prev_value.getAssignedSymbolTable();</span>
                 }
             }
 
@@ -1000,131 +1007,131 @@ import software.amazon.ion.impl.PrivateUtils;
             // user list.  Until there's a difference we don't
             // push the symbol tables (because they've already
             // been processed as real values).
-<span class="fc bfc" id="L1003" title="All 2 branches covered.">            if (curr_symtab != prev_symtab) {</span>
-<span class="fc" id="L1004">                SymbolTable new_symbol_table = curr_symtab;</span>
-<span class="pc bpc" id="L1005" title="1 of 2 branches missed.">                while (new_symbol_table != null)</span>
+<span class="fc bfc" id="L1010" title="All 2 branches covered.">            if (curr_symtab != prev_symtab) {</span>
+<span class="fc" id="L1011">                SymbolTable new_symbol_table = curr_symtab;</span>
+<span class="pc bpc" id="L1012" title="1 of 2 branches missed.">                while (new_symbol_table != null)</span>
                 {
-<span class="fc" id="L1007">                    final boolean new_symbol_table_is_system = new_symbol_table.isSystemTable();</span>
+<span class="fc" id="L1014">                    final boolean new_symbol_table_is_system = new_symbol_table.isSystemTable();</span>
                     IonValue rep;
-<span class="pc bpc" id="L1009" title="1 of 2 branches missed.">                    if (new_symbol_table_is_system) {</span>
-<span class="nc" id="L1010">                        rep = __iterator.get_datagram_ivm();</span>
+<span class="pc bpc" id="L1016" title="1 of 2 branches missed.">                    if (new_symbol_table_is_system) {</span>
+<span class="nc" id="L1017">                        rep = __iterator.get_datagram_ivm();</span>
                     }
                     else {
-<span class="fc" id="L1013">                        rep = PrivateUtils.symtabTree(new_symbol_table);</span>
+<span class="fc" id="L1020">                        rep = PrivateUtils.symtabTree(new_symbol_table);</span>
                     }
-<span class="pc bpc" id="L1015" title="3 of 6 branches missed.">                    assert(rep != null &amp;&amp; __iterator.get_datagram_system() == rep.getSystem());</span>
+<span class="pc bpc" id="L1022" title="3 of 6 branches missed.">                    assert(rep != null &amp;&amp; __iterator.get_datagram_system() == rep.getSystem());</span>
 
-<span class="pc bpc" id="L1017" title="4 of 6 branches missed.">                    if (rep == prev_value || (is_ivm(curr_value) &amp;&amp; new_symbol_table_is_system)) {</span>
-<span class="nc bnc" id="L1018" title="All 2 branches missed.">                        int prev_idx = (prev_value == null) ? -1 : (prev_value._elementid() - 1);</span>
-<span class="nc bnc" id="L1019" title="All 2 branches missed.">                        if (prev_idx &gt;= 0) {</span>
-<span class="nc" id="L1020">                            prev_value = __iterator.get_datagram_child(prev_idx);</span>
+<span class="pc bpc" id="L1024" title="4 of 6 branches missed.">                    if (rep == prev_value || (is_ivm(curr_value) &amp;&amp; new_symbol_table_is_system)) {</span>
+<span class="nc bnc" id="L1025" title="All 2 branches missed.">                        int prev_idx = (prev_value == null) ? -1 : (prev_value._elementid() - 1);</span>
+<span class="nc bnc" id="L1026" title="All 2 branches missed.">                        if (prev_idx &gt;= 0) {</span>
+<span class="nc" id="L1027">                            prev_value = __iterator.get_datagram_child(prev_idx);</span>
                         }
                         else {
-<span class="nc" id="L1023">                            prev_value = null;</span>
+<span class="nc" id="L1030">                            prev_value = null;</span>
                         }
-<span class="nc" id="L1025">                    }</span>
+<span class="nc" id="L1032">                    }</span>
                     else {
-<span class="fc" id="L1027">                        push_system_value((IonValueLite)rep);</span>
-<span class="fc" id="L1028">                        prev_value = null; // end of the matches</span>
+<span class="fc" id="L1034">                        push_system_value((IonValueLite)rep);</span>
+<span class="fc" id="L1035">                        prev_value = null; // end of the matches</span>
                     }
-<span class="fc" id="L1030">                    new_symbol_table = rep.getSymbolTable();</span>
-<span class="pc bpc" id="L1031" title="2 of 4 branches missed.">                    if (new_symbol_table == null || new_symbol_table.isSystemTable()) {</span>
-<span class="fc" id="L1032">                        break;</span>
+<span class="fc" id="L1037">                    new_symbol_table = rep.getSymbolTable();</span>
+<span class="pc bpc" id="L1038" title="2 of 4 branches missed.">                    if (new_symbol_table == null || new_symbol_table.isSystemTable()) {</span>
+<span class="fc" id="L1039">                        break;</span>
                     }
-<span class="nc" id="L1034">                }</span>
+<span class="nc" id="L1041">                }</span>
             }
             // and at the front we need to put in the ion version marker
-<span class="pc bpc" id="L1037" title="1 of 4 branches missed.">            if (curr_index == 0 &amp;&amp; !is_ivm(curr_value)) {</span>
+<span class="pc bpc" id="L1044" title="1 of 4 branches missed.">            if (curr_index == 0 &amp;&amp; !is_ivm(curr_value)) {</span>
                 // TODO this is wrong, because we may have already pushed
                 // a rep above. This is just making up an additional symtab
                 // where one was not placed by the user.
-<span class="fc" id="L1041">                IonValueLite ivm = __iterator.get_datagram_ivm();</span>
-<span class="fc" id="L1042">                push_system_value(ivm);</span>
+<span class="fc" id="L1048">                IonValueLite ivm = __iterator.get_datagram_ivm();</span>
+<span class="fc" id="L1049">                push_system_value(ivm);</span>
             }
-<span class="fc" id="L1044">        }</span>
+<span class="fc" id="L1051">        }</span>
 
         private static final boolean is_ivm(IonValue value)
         {
-<span class="fc bfc" id="L1048" title="All 2 branches covered.">            if (value instanceof IonSymbol</span>
-<span class="fc bfc" id="L1049" title="All 2 branches covered.">                &amp;&amp; value.getTypeAnnotationSymbols().length == 0) {</span>
+<span class="fc bfc" id="L1055" title="All 2 branches covered.">            if (value instanceof IonSymbol</span>
+<span class="fc bfc" id="L1056" title="All 2 branches covered.">                &amp;&amp; value.getTypeAnnotationSymbols().length == 0) {</span>
                 // $ion_1_0 is read as an IVM only if it is not annotated
-<span class="fc" id="L1051">                IonSymbol sym = (IonSymbol)value;</span>
-<span class="fc" id="L1052">                SymbolToken tok = sym.symbolValue();</span>
-<span class="pc bpc" id="L1053" title="1 of 4 branches missed.">                if (tok != null &amp;&amp; ION_1_0.equals(tok.getText()))</span>
+<span class="fc" id="L1058">                IonSymbol sym = (IonSymbol)value;</span>
+<span class="fc" id="L1059">                SymbolToken tok = sym.symbolValue();</span>
+<span class="pc bpc" id="L1060" title="1 of 4 branches missed.">                if (tok != null &amp;&amp; ION_1_0.equals(tok.getText()))</span>
                 {
-<span class="nc" id="L1055">                    return true;</span>
+<span class="nc" id="L1062">                    return true;</span>
                 }
             }
-<span class="fc" id="L1058">            return false;</span>
+<span class="fc" id="L1065">            return false;</span>
         }
 
         private void push_system_value(IonValueLite value)
         {
-<span class="pc bpc" id="L1063" title="1 of 2 branches missed.">            if (__local_value_count &gt;= __local_values.length) {</span>
-<span class="nc bnc" id="L1064" title="All 2 branches missed.">                int new_size = (__local_values == null) ? 2 : (__local_values.length * 2);</span>
-<span class="nc bnc" id="L1065" title="All 4 branches missed.">                assert( new_size &gt; __local_value_count); // we should only need to add 1 value at a time</span>
-<span class="nc" id="L1066">                IonValueLite[] temp = new IonValueLite[new_size];</span>
-<span class="nc bnc" id="L1067" title="All 2 branches missed.">                if (__local_value_count &gt; 0) {</span>
-<span class="nc" id="L1068">                    System.arraycopy(__local_values, 0, temp, 0, __local_value_count);</span>
+<span class="pc bpc" id="L1070" title="1 of 2 branches missed.">            if (__local_value_count &gt;= __local_values.length) {</span>
+<span class="nc bnc" id="L1071" title="All 2 branches missed.">                int new_size = (__local_values == null) ? 2 : (__local_values.length * 2);</span>
+<span class="nc bnc" id="L1072" title="All 4 branches missed.">                assert( new_size &gt; __local_value_count); // we should only need to add 1 value at a time</span>
+<span class="nc" id="L1073">                IonValueLite[] temp = new IonValueLite[new_size];</span>
+<span class="nc bnc" id="L1074" title="All 2 branches missed.">                if (__local_value_count &gt; 0) {</span>
+<span class="nc" id="L1075">                    System.arraycopy(__local_values, 0, temp, 0, __local_value_count);</span>
                 }
-<span class="nc" id="L1070">                __local_values = temp;</span>
+<span class="nc" id="L1077">                __local_values = temp;</span>
             }
-<span class="fc" id="L1072">            __local_values[__local_value_count++] = value;</span>
-<span class="fc" id="L1073">        }</span>
+<span class="fc" id="L1079">            __local_values[__local_value_count++] = value;</span>
+<span class="fc" id="L1080">        }</span>
 
         protected IonValueLite load_position()
         {
-<span class="fc" id="L1077">            IonValueLite current = null;</span>
+<span class="fc" id="L1084">            IonValueLite current = null;</span>
 
-<span class="pc bpc" id="L1079" title="2 of 4 branches missed.">            assert(__local_index &lt; __local_value_count);</span>
+<span class="pc bpc" id="L1086" title="2 of 4 branches missed.">            assert(__local_index &lt; __local_value_count);</span>
 
-<span class="fc" id="L1081">            current = __local_values[__local_value_count - __local_index - 1];</span>
+<span class="fc" id="L1088">            current = __local_values[__local_value_count - __local_index - 1];</span>
 
-<span class="fc" id="L1083">            return current;</span>
+<span class="fc" id="L1090">            return current;</span>
         }
 
         private final void force_position_sync_helper()
         {
-<span class="nc bnc" id="L1088" title="All 2 branches missed.">            if (!__iterator.datagram_contains(__current_user_value)) {</span>
-<span class="nc" id="L1089">                throw new IonException(&quot;current user value removed outside this iterator - position lost&quot;);</span>
+<span class="nc bnc" id="L1095" title="All 2 branches missed.">            if (!__iterator.datagram_contains(__current_user_value)) {</span>
+<span class="nc" id="L1096">                throw new IonException(&quot;current user value removed outside this iterator - position lost&quot;);</span>
             }
-<span class="nc" id="L1091">            int old_index = __user_index;</span>
-<span class="nc" id="L1092">            int new_index = __current_user_value._elementid();</span>
+<span class="nc" id="L1098">            int old_index = __user_index;</span>
+<span class="nc" id="L1099">            int new_index = __current_user_value._elementid();</span>
 
-<span class="nc bnc" id="L1094" title="All 2 branches missed.">            if (old_index != new_index) {</span>
+<span class="nc bnc" id="L1101" title="All 2 branches missed.">            if (old_index != new_index) {</span>
                 // if our current value moved we have to recompute
                 // the adjustment from scratch since we don't really
                 // have any idea why this moved in either direction.
-<span class="nc" id="L1098">                int adjustment = 0;</span>
-<span class="nc" id="L1099">                SymbolTable curr, prev = null;</span>
-<span class="nc bnc" id="L1100" title="All 2 branches missed.">                for (int ii=0; ii&lt;new_index; ii--) {</span>
-<span class="nc" id="L1101">                    curr = __iterator.get_datagram_child(ii).getSymbolTable();</span>
-<span class="nc bnc" id="L1102" title="All 2 branches missed.">                    if (curr != prev) {</span>
-<span class="nc" id="L1103">                        IonSystem sys = __iterator.getSystem();</span>
-<span class="nc" id="L1104">                        adjustment += count_system_values(sys, prev, curr);</span>
+<span class="nc" id="L1105">                int adjustment = 0;</span>
+<span class="nc" id="L1106">                SymbolTable curr, prev = null;</span>
+<span class="nc bnc" id="L1107" title="All 2 branches missed.">                for (int ii=0; ii&lt;new_index; ii--) {</span>
+<span class="nc" id="L1108">                    curr = __iterator.get_datagram_child(ii).getSymbolTable();</span>
+<span class="nc bnc" id="L1109" title="All 2 branches missed.">                    if (curr != prev) {</span>
+<span class="nc" id="L1110">                        IonSystem sys = __iterator.getSystem();</span>
+<span class="nc" id="L1111">                        adjustment += count_system_values(sys, prev, curr);</span>
                     }
-<span class="nc" id="L1106">                    prev = curr;</span>
+<span class="nc" id="L1113">                    prev = curr;</span>
                 }
-<span class="nc" id="L1108">                __index_adjustment = adjustment + __local_value_count;</span>
-<span class="nc" id="L1109">                __user_index = new_index;</span>
+<span class="nc" id="L1115">                __index_adjustment = adjustment + __local_value_count;</span>
+<span class="nc" id="L1116">                __user_index = new_index;</span>
             }
-<span class="nc" id="L1111">        }</span>
+<span class="nc" id="L1118">        }</span>
 
         private static int count_system_values(IonSystem sys,
                                                SymbolTable prev,
                                                SymbolTable curr)
         {
-<span class="nc" id="L1117">            int count = 0;</span>
-<span class="nc bnc" id="L1118" title="All 2 branches missed.">            while (curr.isLocalTable()) {</span>
-<span class="nc" id="L1119">                count++;</span>
-<span class="nc" id="L1120">                curr = PrivateUtils.symtabTree(curr).getSymbolTable();</span>
+<span class="nc" id="L1124">            int count = 0;</span>
+<span class="nc bnc" id="L1125" title="All 2 branches missed.">            while (curr.isLocalTable()) {</span>
+<span class="nc" id="L1126">                count++;</span>
+<span class="nc" id="L1127">                curr = PrivateUtils.symtabTree(curr).getSymbolTable();</span>
             }
             // we should terminate when the symbol tables symbol table is the system symbol table
-<span class="nc bnc" id="L1123" title="All 4 branches missed.">            assert(curr != null);</span>
-<span class="nc bnc" id="L1124" title="All 4 branches missed.">            if (prev == null || prev.getIonVersionId().equals(curr.getIonVersionId())) {</span>
-<span class="nc" id="L1125">                count++;</span>
+<span class="nc bnc" id="L1130" title="All 4 branches missed.">            assert(curr != null);</span>
+<span class="nc bnc" id="L1131" title="All 4 branches missed.">            if (prev == null || prev.getIonVersionId().equals(curr.getIonVersionId())) {</span>
+<span class="nc" id="L1132">                count++;</span>
             }
-<span class="nc" id="L1127">            return count;</span>
+<span class="nc" id="L1134">            return count;</span>
         }
     }
 }

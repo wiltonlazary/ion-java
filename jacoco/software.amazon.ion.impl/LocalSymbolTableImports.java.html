@@ -74,48 +74,13 @@ import software.amazon.ion.SymbolToken;
      */
     LocalSymbolTableImports(List&lt;SymbolTable&gt; importTables)
 <span class="fc" id="L76">    {</span>
-<span class="fc" id="L77">        validateImports(importTables);</span>
+<span class="fc" id="L77">        int importTablesSize = importTables.size();</span>
 
-<span class="fc" id="L79">        int importTablesSize = importTables.size();</span>
+<span class="fc" id="L79">        myImports = importTables.toArray(new SymbolTable[importTablesSize]);</span>
 
-        // detects and adapts local tables so they are importable
-<span class="fc" id="L82">        myImports = new SymbolTable[importTablesSize];</span>
-<span class="fc bfc" id="L83" title="All 2 branches covered.">        for(int i = 0; i &lt; importTables.size(); i++)</span>
-        {
-<span class="fc" id="L85">            SymbolTable symbolTable = importTables.get(i);</span>
-<span class="fc bfc" id="L86" title="All 2 branches covered.">            if(symbolTable.isLocalTable())</span>
-            {
-<span class="fc" id="L88">                myImports[i] = LocalSymbolTableImportAdapter.of((LocalSymbolTable) symbolTable);</span>
-            }
-            else
-            {
-<span class="fc" id="L92">                myImports[i] = symbolTable;</span>
-            }
-        }
-
-<span class="fc" id="L96">        myBaseSids = new int[importTablesSize];</span>
-<span class="fc" id="L97">        myMaxId = prepBaseSids(myBaseSids, myImports);</span>
-<span class="fc" id="L98">    }</span>
-
-    /**
-     * Validates the import list to ensure that if there is a {@link LocalSymbolTable} in it then it's a single import
-     * apart from the system table
-     */
-    private void validateImports(final List&lt;SymbolTable&gt; importTables)
-    {
-<span class="fc" id="L106">        int sizeWithoutSystemTables = importTables.size();</span>
-<span class="fc" id="L107">        int numberOfLocalTables = 0;</span>
-
-<span class="fc bfc" id="L109" title="All 2 branches covered.">        for(SymbolTable table : importTables)</span>
-        {
-<span class="fc bfc" id="L111" title="All 2 branches covered.">            if(table.isLocalTable()) numberOfLocalTables++;</span>
-<span class="fc bfc" id="L112" title="All 2 branches covered.">            if(table.isSystemTable()) sizeWithoutSystemTables--;</span>
-<span class="fc" id="L113">        }</span>
-
-<span class="fc bfc" id="L115" title="All 4 branches covered.">        if(numberOfLocalTables &gt; 0 &amp;&amp; sizeWithoutSystemTables != 1){</span>
-<span class="fc" id="L116">            throw new IllegalArgumentException(&quot;when importing LocalSymbolTables it needs to be the only import&quot;);</span>
-        }
-<span class="fc" id="L118">    }</span>
+<span class="fc" id="L81">        myBaseSids = new int[importTablesSize];</span>
+<span class="fc" id="L82">        myMaxId = prepBaseSids(myBaseSids, myImports);</span>
+<span class="fc" id="L83">    }</span>
 
     /**
      * @param defaultSystemSymtab
@@ -134,53 +99,34 @@ import software.amazon.ion.SymbolToken;
      */
     LocalSymbolTableImports(SymbolTable defaultSystemSymtab,
                             SymbolTable... imports)
-<span class="fc" id="L137">    {</span>
-<span class="pc bpc" id="L138" title="2 of 4 branches missed.">        assert defaultSystemSymtab.isSystemTable()</span>
+<span class="fc" id="L102">    {</span>
+<span class="pc bpc" id="L103" title="2 of 4 branches missed.">        assert defaultSystemSymtab.isSystemTable()</span>
             : &quot;defaultSystemSymtab isn't a system symtab&quot;;
 
-<span class="fc bfc" id="L141" title="All 4 branches covered.">        if (imports != null &amp;&amp; imports.length &gt; 0)</span>
+<span class="fc bfc" id="L106" title="All 4 branches covered.">        if (imports != null &amp;&amp; imports.length &gt; 0)</span>
         {
-            final int offset;
-            final SymbolTable systemTable;
-<span class="fc bfc" id="L145" title="All 2 branches covered.">            if (imports[0].isSystemTable())</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            if (imports[0].isSystemTable())</span>
             {
-<span class="fc" id="L147">                offset = 0;</span>
-<span class="fc" id="L148">                systemTable = imports[0];</span>
+                // copy imports as-is
+<span class="fc" id="L111">                myImports = imports.clone();</span>
             }
             else
             {
-<span class="fc" id="L152">                offset = 1;</span>
-<span class="fc" id="L153">                systemTable = defaultSystemSymtab;</span>
+                // use defaultSystemSymtab and append imports
+<span class="fc" id="L116">                myImports = new SymbolTable[imports.length + 1];</span>
+<span class="fc" id="L117">                myImports[0] = defaultSystemSymtab;</span>
+<span class="fc" id="L118">                System.arraycopy(imports, 0, myImports, 1, imports.length);</span>
             }
-
-<span class="fc" id="L156">            myImports = new SymbolTable[imports.length + offset];</span>
-<span class="fc" id="L157">            myImports[0] = systemTable;</span>
-
-            // no need to consider the offset here as it only comes in play when there is a system table
-<span class="fc" id="L160">            validateImports(Arrays.asList(imports));</span>
-
-<span class="fc bfc" id="L162" title="All 2 branches covered.">            for(int i = 1 - offset; i &lt; imports.length; i++)</span>
-            {
-<span class="fc" id="L164">                SymbolTable symbolTable = imports[i];</span>
-<span class="fc bfc" id="L165" title="All 2 branches covered.">                if(symbolTable instanceof LocalSymbolTable)</span>
-                {
-<span class="fc" id="L167">                    myImports[i + offset] = LocalSymbolTableImportAdapter.of((LocalSymbolTable) symbolTable);</span>
-                }
-                else
-                {
-<span class="fc" id="L171">                    myImports[i + offset] = symbolTable;</span>
-                }
-            }
-<span class="fc" id="L174">        }</span>
+        }
         else
         {
             // use defaultSystemSymtab only
-<span class="fc" id="L178">            myImports = new SymbolTable[] { defaultSystemSymtab };</span>
+<span class="fc" id="L124">            myImports = new SymbolTable[] { defaultSystemSymtab };</span>
         }
 
-<span class="fc" id="L181">        myBaseSids = new int[myImports.length];</span>
-<span class="fc" id="L182">        myMaxId = prepBaseSids(myBaseSids, myImports);</span>
-<span class="fc" id="L183">    }</span>
+<span class="fc" id="L127">        myBaseSids = new int[myImports.length];</span>
+<span class="fc" id="L128">        myMaxId = prepBaseSids(myBaseSids, myImports);</span>
+<span class="fc" id="L129">    }</span>
 
     /**
      * Collects the necessary maxId info. from the passed-in {@code imports}
@@ -193,62 +139,62 @@ import software.amazon.ion.SymbolToken;
      */
     private static int prepBaseSids(int[] baseSids, SymbolTable[] imports)
     {
-<span class="fc" id="L196">        SymbolTable firstImport = imports[0];</span>
+<span class="fc" id="L142">        SymbolTable firstImport = imports[0];</span>
 
-<span class="pc bpc" id="L198" title="2 of 4 branches missed.">        assert firstImport.isSystemTable()</span>
+<span class="pc bpc" id="L144" title="2 of 4 branches missed.">        assert firstImport.isSystemTable()</span>
             : &quot;first symtab must be a system symtab&quot;;
 
-<span class="fc" id="L201">        baseSids[0] = 0;</span>
-<span class="fc" id="L202">        int total = firstImport.getMaxId();</span>
+<span class="fc" id="L147">        baseSids[0] = 0;</span>
+<span class="fc" id="L148">        int total = firstImport.getMaxId();</span>
 
-<span class="fc bfc" id="L204" title="All 2 branches covered.">        for (int i = 1; i &lt; imports.length; i++)</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        for (int i = 1; i &lt; imports.length; i++)</span>
         {
-<span class="fc" id="L206">            SymbolTable importedTable = imports[i];</span>
+<span class="fc" id="L152">            SymbolTable importedTable = imports[i];</span>
 
-<span class="fc bfc" id="L208" title="All 2 branches covered.">            if (importedTable.isSystemTable())</span>
+<span class="fc bfc" id="L154" title="All 4 branches covered.">            if (importedTable.isLocalTable() || importedTable.isSystemTable())</span>
             {
-<span class="fc" id="L210">                String message = &quot;only non-system shared tables can be imported&quot;;</span>
-<span class="fc" id="L211">                throw new IllegalArgumentException(message);</span>
+<span class="fc" id="L156">                String message = &quot;only non-system shared tables can be imported&quot;;</span>
+<span class="fc" id="L157">                throw new IllegalArgumentException(message);</span>
             }
 
-<span class="fc" id="L214">            baseSids[i] = total;</span>
-<span class="fc" id="L215">            total += imports[i].getMaxId();</span>
+<span class="fc" id="L160">            baseSids[i] = total;</span>
+<span class="fc" id="L161">            total += imports[i].getMaxId();</span>
         }
 
-<span class="fc" id="L218">        return total;</span>
+<span class="fc" id="L164">        return total;</span>
     }
 
     //==========================================================================
 
     String findKnownSymbol(int sid)
     {
-<span class="fc" id="L225">        String name = null;</span>
+<span class="fc" id="L171">        String name = null;</span>
 
-<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (sid &lt;= myMaxId)</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        if (sid &lt;= myMaxId)</span>
         {
-<span class="fc" id="L229">            int i, previousBaseSid = 0;</span>
-<span class="fc bfc" id="L230" title="All 2 branches covered.">            for (i = 1; i &lt; myImports.length; i++)</span>
+<span class="fc" id="L175">            int i, previousBaseSid = 0;</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            for (i = 1; i &lt; myImports.length; i++)</span>
             {
-<span class="fc" id="L232">                int baseSid = myBaseSids[i];</span>
-<span class="fc bfc" id="L233" title="All 2 branches covered.">                if (sid &lt;= baseSid)</span>
+<span class="fc" id="L178">                int baseSid = myBaseSids[i];</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">                if (sid &lt;= baseSid)</span>
                 {
-<span class="fc" id="L235">                    break;</span>
+<span class="fc" id="L181">                    break;</span>
                 }
-<span class="fc" id="L237">                previousBaseSid = baseSid;</span>
+<span class="fc" id="L183">                previousBaseSid = baseSid;</span>
             }
 
             // if we run over myImports.length, the sid is in the last symtab
-<span class="fc" id="L241">            int importScopedSid = sid - previousBaseSid;</span>
-<span class="fc" id="L242">            name = myImports[i-1].findKnownSymbol(importScopedSid);</span>
+<span class="fc" id="L187">            int importScopedSid = sid - previousBaseSid;</span>
+<span class="fc" id="L188">            name = myImports[i-1].findKnownSymbol(importScopedSid);</span>
         }
 
-<span class="fc" id="L245">        return name;</span>
+<span class="fc" id="L191">        return name;</span>
     }
 
     int findSymbol(String name)
     {
-<span class="fc" id="L250">        SymbolToken tok = find(name);</span>
-<span class="fc bfc" id="L251" title="All 2 branches covered.">        return (tok == null ? UNKNOWN_SYMBOL_ID : tok.getSid());</span>
+<span class="fc" id="L196">        SymbolToken tok = find(name);</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        return (tok == null ? UNKNOWN_SYMBOL_ID : tok.getSid());</span>
     }
 
     /**
@@ -266,27 +212,27 @@ import software.amazon.ion.SymbolToken;
      */
     SymbolToken find(String text)
     {
-<span class="fc bfc" id="L269" title="All 2 branches covered.">        for (int i = 0; i &lt; myImports.length; i++)</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        for (int i = 0; i &lt; myImports.length; i++)</span>
         {
-<span class="fc" id="L271">            SymbolTable importedTable = myImports[i];</span>
-<span class="fc" id="L272">            SymbolToken tok = importedTable.find(text);</span>
+<span class="fc" id="L217">            SymbolTable importedTable = myImports[i];</span>
+<span class="fc" id="L218">            SymbolToken tok = importedTable.find(text);</span>
 
-<span class="fc bfc" id="L274" title="All 2 branches covered.">            if (tok != null)</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            if (tok != null)</span>
             {
-<span class="fc" id="L276">                int sid = tok.getSid() + myBaseSids[i];</span>
-<span class="fc" id="L277">                text = tok.getText(); // Use interned instance</span>
+<span class="fc" id="L222">                int sid = tok.getSid() + myBaseSids[i];</span>
+<span class="fc" id="L223">                text = tok.getText(); // Use interned instance</span>
 
-<span class="pc bpc" id="L279" title="2 of 4 branches missed.">                assert text != null;</span>
+<span class="pc bpc" id="L225" title="2 of 4 branches missed.">                assert text != null;</span>
 
-<span class="fc" id="L281">                return new SymbolTokenImpl(text, sid);</span>
+<span class="fc" id="L227">                return new SymbolTokenImpl(text, sid);</span>
             }
         }
-<span class="fc" id="L284">        return null;</span>
+<span class="fc" id="L230">        return null;</span>
     }
 
     int getMaxId()
     {
-<span class="fc" id="L289">        return myMaxId;</span>
+<span class="fc" id="L235">        return myMaxId;</span>
     }
 
     /**
@@ -294,8 +240,8 @@ import software.amazon.ion.SymbolToken;
      */
     SymbolTable getSystemSymbolTable()
     {
-<span class="pc bpc" id="L297" title="2 of 4 branches missed.">        assert myImports[0].isSystemTable();</span>
-<span class="fc" id="L298">        return myImports[0];</span>
+<span class="pc bpc" id="L243" title="2 of 4 branches missed.">        assert myImports[0].isSystemTable();</span>
+<span class="fc" id="L244">        return myImports[0];</span>
     }
 
     /**
@@ -305,14 +251,14 @@ import software.amazon.ion.SymbolToken;
      */
     SymbolTable[] getImportedTables()
     {
-<span class="fc" id="L308">        int count = myImports.length - 1; // we don't include system symtab</span>
-<span class="fc" id="L309">        SymbolTable[] imports = new SymbolTable[count];</span>
-<span class="fc bfc" id="L310" title="All 2 branches covered.">        if (count &gt; 0)</span>
+<span class="fc" id="L254">        int count = myImports.length - 1; // we don't include system symtab</span>
+<span class="fc" id="L255">        SymbolTable[] imports = new SymbolTable[count];</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        if (count &gt; 0)</span>
         {
             // defensive copy
-<span class="fc" id="L313">            System.arraycopy(myImports, 1, imports, 0, count);</span>
+<span class="fc" id="L259">            System.arraycopy(myImports, 1, imports, 0, count);</span>
         }
-<span class="fc" id="L315">        return imports;</span>
+<span class="fc" id="L261">        return imports;</span>
     }
 
     /**
@@ -329,13 +275,13 @@ import software.amazon.ion.SymbolToken;
      */
     SymbolTable[] getImportedTablesNoCopy()
     {
-<span class="fc" id="L332">        return myImports;</span>
+<span class="fc" id="L278">        return myImports;</span>
     }
 
     @Override
     public String toString()
     {
-<span class="nc" id="L338">        return Arrays.toString(myImports);</span>
+<span class="nc" id="L284">        return Arrays.toString(myImports);</span>
     }
 
     /**
@@ -346,7 +292,7 @@ import software.amazon.ion.SymbolToken;
      */
     boolean equalImports(LocalSymbolTableImports other)
     {
-<span class="fc" id="L349">        return Arrays.equals(myImports, other.myImports);</span>
+<span class="fc" id="L295">        return Arrays.equals(myImports, other.myImports);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

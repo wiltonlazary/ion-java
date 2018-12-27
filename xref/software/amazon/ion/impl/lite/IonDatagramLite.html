@@ -418,724 +418,731 @@
 <a class="jxr_linenumber" name="L410" href="#L410">410</a>     @Override
 <a class="jxr_linenumber" name="L411" href="#L411">411</a>     <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">void</strong> writeTo(<a name="IonWriter" href="../../../../../software/amazon/ion/IonWriter.html#IonWriter">IonWriter</a> writer)
 <a class="jxr_linenumber" name="L412" href="#L412">412</a>     {
-<a class="jxr_linenumber" name="L413" href="#L413">413</a>         <strong class="jxr_keyword">try</strong>
-<a class="jxr_linenumber" name="L414" href="#L414">414</a>         {
-<a class="jxr_linenumber" name="L415" href="#L415">415</a>             writer.writeSymbol(SystemSymbols.ION_1_0);  <em class="jxr_comment">// TODO amzn/ion-java#8 ???</em>
-<a class="jxr_linenumber" name="L416" href="#L416">416</a>         } <strong class="jxr_keyword">catch</strong> (IOException ioe) {
-<a class="jxr_linenumber" name="L417" href="#L417">417</a>             <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> <a name="IonException" href="../../../../../software/amazon/ion/IonException.html#IonException">IonException</a>(ioe);
-<a class="jxr_linenumber" name="L418" href="#L418">418</a>         }
-<a class="jxr_linenumber" name="L419" href="#L419">419</a>         <strong class="jxr_keyword">for</strong> (<a name="IonValue" href="../../../../../software/amazon/ion/IonValue.html#IonValue">IonValue</a> iv : <strong class="jxr_keyword">this</strong>) {
-<a class="jxr_linenumber" name="L420" href="#L420">420</a>             iv.writeTo(writer);
-<a class="jxr_linenumber" name="L421" href="#L421">421</a>         }
-<a class="jxr_linenumber" name="L422" href="#L422">422</a>     }
-<a class="jxr_linenumber" name="L423" href="#L423">423</a> 
-<a class="jxr_linenumber" name="L424" href="#L424">424</a>     @Override
-<a class="jxr_linenumber" name="L425" href="#L425">425</a>     <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">void</strong> writeBodyTo(<a name="IonWriter" href="../../../../../software/amazon/ion/IonWriter.html#IonWriter">IonWriter</a> writer, SymbolTableProvider symbolTableProvider)
-<a class="jxr_linenumber" name="L426" href="#L426">426</a>         <strong class="jxr_keyword">throws</strong> IOException
-<a class="jxr_linenumber" name="L427" href="#L427">427</a>     {
-<a class="jxr_linenumber" name="L428" href="#L428">428</a>         <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> UnsupportedOperationException(<span class="jxr_string">"IonDatagram does not operate with a Symbol Table"</span>);
+<a class="jxr_linenumber" name="L413" href="#L413">413</a>         <strong class="jxr_keyword">if</strong> (writer.getSymbolTable().isSystemTable()) {
+<a class="jxr_linenumber" name="L414" href="#L414">414</a>             <em class="jxr_comment">// If the writer was configured with a non-default symbol table, writing an IVM here will</em>
+<a class="jxr_linenumber" name="L415" href="#L415">415</a>             <em class="jxr_comment">// reset that symbol table. If the datagram contains any symbols with unknown text that</em>
+<a class="jxr_linenumber" name="L416" href="#L416">416</a>             <em class="jxr_comment">// refer to slots in shared symbol table imports declared by the discarded table, an</em>
+<a class="jxr_linenumber" name="L417" href="#L417">417</a>             <em class="jxr_comment">// error will be raised unnecessarily. To avoid that, only write an IVM when the writer's</em>
+<a class="jxr_linenumber" name="L418" href="#L418">418</a>             <em class="jxr_comment">// symbol table is already the system symbol table.</em>
+<a class="jxr_linenumber" name="L419" href="#L419">419</a>             <em class="jxr_comment">// TODO evaluate whether an IVM should ever be written here. amzn/ion-java#200</em>
+<a class="jxr_linenumber" name="L420" href="#L420">420</a>             <strong class="jxr_keyword">try</strong> {
+<a class="jxr_linenumber" name="L421" href="#L421">421</a>                 writer.writeSymbol(SystemSymbols.ION_1_0);
+<a class="jxr_linenumber" name="L422" href="#L422">422</a>             } <strong class="jxr_keyword">catch</strong> (IOException ioe) {
+<a class="jxr_linenumber" name="L423" href="#L423">423</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> <a name="IonException" href="../../../../../software/amazon/ion/IonException.html#IonException">IonException</a>(ioe);
+<a class="jxr_linenumber" name="L424" href="#L424">424</a>             }
+<a class="jxr_linenumber" name="L425" href="#L425">425</a>         }
+<a class="jxr_linenumber" name="L426" href="#L426">426</a>         <strong class="jxr_keyword">for</strong> (<a name="IonValue" href="../../../../../software/amazon/ion/IonValue.html#IonValue">IonValue</a> iv : <strong class="jxr_keyword">this</strong>) {
+<a class="jxr_linenumber" name="L427" href="#L427">427</a>             iv.writeTo(writer);
+<a class="jxr_linenumber" name="L428" href="#L428">428</a>         }
 <a class="jxr_linenumber" name="L429" href="#L429">429</a>     }
 <a class="jxr_linenumber" name="L430" href="#L430">430</a> 
-<a class="jxr_linenumber" name="L431" href="#L431">431</a> 
-<a class="jxr_linenumber" name="L432" href="#L432">432</a>     <em class="jxr_comment">//////////////////////////////////////////////////////////////////////////////</em>
-<a class="jxr_linenumber" name="L433" href="#L433">433</a>     <em class="jxr_comment">//////////////////////////////////////////////////////////////////////////////</em>
-<a class="jxr_linenumber" name="L434" href="#L434">434</a> 
-<a class="jxr_linenumber" name="L435" href="#L435">435</a>     <em class="jxr_comment">//  these are the datagram methods</em>
-<a class="jxr_linenumber" name="L436" href="#L436">436</a> 
-<a class="jxr_linenumber" name="L437" href="#L437">437</a>     <em class="jxr_comment">//////////////////////////////////////////////////////////////////////////////</em>
-<a class="jxr_linenumber" name="L438" href="#L438">438</a>     <em class="jxr_comment">//////////////////////////////////////////////////////////////////////////////</em>
-<a class="jxr_linenumber" name="L439" href="#L439">439</a> 
-<a class="jxr_linenumber" name="L440" href="#L440">440</a>     <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">int</strong> byteSize() <strong class="jxr_keyword">throws</strong> <a name="IonException" href="../../../../../software/amazon/ion/IonException.html#IonException">IonException</a>
-<a class="jxr_linenumber" name="L441" href="#L441">441</a>     {
-<a class="jxr_linenumber" name="L442" href="#L442">442</a>         <em class="jxr_comment">// TODO this is horrible, users will end up encoding multiple times!</em>
-<a class="jxr_linenumber" name="L443" href="#L443">443</a>         <a name="ReverseBinaryEncoder" href="../../../../../software/amazon/ion/impl/lite/ReverseBinaryEncoder.html#ReverseBinaryEncoder">ReverseBinaryEncoder</a> encoder =
-<a class="jxr_linenumber" name="L444" href="#L444">444</a>             <strong class="jxr_keyword">new</strong> <a name="ReverseBinaryEncoder" href="../../../../../software/amazon/ion/impl/lite/ReverseBinaryEncoder.html#ReverseBinaryEncoder">ReverseBinaryEncoder</a>(REVERSE_BINARY_ENCODER_INITIAL_SIZE);
-<a class="jxr_linenumber" name="L445" href="#L445">445</a>         encoder.serialize(<strong class="jxr_keyword">this</strong>);
-<a class="jxr_linenumber" name="L446" href="#L446">446</a>         <strong class="jxr_keyword">return</strong> encoder.byteSize();
-<a class="jxr_linenumber" name="L447" href="#L447">447</a>     }
-<a class="jxr_linenumber" name="L448" href="#L448">448</a> 
-<a class="jxr_linenumber" name="L449" href="#L449">449</a>     <strong class="jxr_keyword">public</strong> byte[] getBytes() <strong class="jxr_keyword">throws</strong> <a name="IonException" href="../../../../../software/amazon/ion/IonException.html#IonException">IonException</a>
-<a class="jxr_linenumber" name="L450" href="#L450">450</a>     {
-<a class="jxr_linenumber" name="L451" href="#L451">451</a>         <a name="ReverseBinaryEncoder" href="../../../../../software/amazon/ion/impl/lite/ReverseBinaryEncoder.html#ReverseBinaryEncoder">ReverseBinaryEncoder</a> encoder =
-<a class="jxr_linenumber" name="L452" href="#L452">452</a>             <strong class="jxr_keyword">new</strong> <a name="ReverseBinaryEncoder" href="../../../../../software/amazon/ion/impl/lite/ReverseBinaryEncoder.html#ReverseBinaryEncoder">ReverseBinaryEncoder</a>(REVERSE_BINARY_ENCODER_INITIAL_SIZE);
-<a class="jxr_linenumber" name="L453" href="#L453">453</a>         encoder.serialize(<strong class="jxr_keyword">this</strong>);
-<a class="jxr_linenumber" name="L454" href="#L454">454</a>         <strong class="jxr_keyword">return</strong> encoder.toNewByteArray();
-<a class="jxr_linenumber" name="L455" href="#L455">455</a>     }
-<a class="jxr_linenumber" name="L456" href="#L456">456</a> 
-<a class="jxr_linenumber" name="L457" href="#L457">457</a>     <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">int</strong> getBytes(OutputStream out) <strong class="jxr_keyword">throws</strong> IOException, <a name="IonException" href="../../../../../software/amazon/ion/IonException.html#IonException">IonException</a>
-<a class="jxr_linenumber" name="L458" href="#L458">458</a>     {
-<a class="jxr_linenumber" name="L459" href="#L459">459</a>         <a name="ReverseBinaryEncoder" href="../../../../../software/amazon/ion/impl/lite/ReverseBinaryEncoder.html#ReverseBinaryEncoder">ReverseBinaryEncoder</a> encoder =
-<a class="jxr_linenumber" name="L460" href="#L460">460</a>             <strong class="jxr_keyword">new</strong> <a name="ReverseBinaryEncoder" href="../../../../../software/amazon/ion/impl/lite/ReverseBinaryEncoder.html#ReverseBinaryEncoder">ReverseBinaryEncoder</a>(REVERSE_BINARY_ENCODER_INITIAL_SIZE);
-<a class="jxr_linenumber" name="L461" href="#L461">461</a>         encoder.serialize(<strong class="jxr_keyword">this</strong>);
-<a class="jxr_linenumber" name="L462" href="#L462">462</a>         <strong class="jxr_keyword">return</strong> encoder.writeBytes(out);
-<a class="jxr_linenumber" name="L463" href="#L463">463</a>     }
-<a class="jxr_linenumber" name="L464" href="#L464">464</a> 
-<a class="jxr_linenumber" name="L465" href="#L465">465</a>     <em class="jxr_comment">// TODO: optimize this, if there's a real use case</em>
-<a class="jxr_linenumber" name="L466" href="#L466">466</a>     <em class="jxr_comment">//       deprecate this is there isn't (which I suspect is actually the case)</em>
-<a class="jxr_linenumber" name="L467" href="#L467">467</a>     <strong class="jxr_keyword">public</strong> <a name="IonValue" href="../../../../../software/amazon/ion/IonValue.html#IonValue">IonValue</a> systemGet(<strong class="jxr_keyword">int</strong> index) <strong class="jxr_keyword">throws</strong> IndexOutOfBoundsException
-<a class="jxr_linenumber" name="L468" href="#L468">468</a>     {
-<a class="jxr_linenumber" name="L469" href="#L469">469</a>         ListIterator&lt;IonValue&gt; iterator = systemIterator();
-<a class="jxr_linenumber" name="L470" href="#L470">470</a>         <a name="IonValue" href="../../../../../software/amazon/ion/IonValue.html#IonValue">IonValue</a> value = <strong class="jxr_keyword">null</strong>;
+<a class="jxr_linenumber" name="L431" href="#L431">431</a>     @Override
+<a class="jxr_linenumber" name="L432" href="#L432">432</a>     <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">void</strong> writeBodyTo(<a name="IonWriter" href="../../../../../software/amazon/ion/IonWriter.html#IonWriter">IonWriter</a> writer, SymbolTableProvider symbolTableProvider)
+<a class="jxr_linenumber" name="L433" href="#L433">433</a>         <strong class="jxr_keyword">throws</strong> IOException
+<a class="jxr_linenumber" name="L434" href="#L434">434</a>     {
+<a class="jxr_linenumber" name="L435" href="#L435">435</a>         <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> UnsupportedOperationException(<span class="jxr_string">"IonDatagram does not operate with a Symbol Table"</span>);
+<a class="jxr_linenumber" name="L436" href="#L436">436</a>     }
+<a class="jxr_linenumber" name="L437" href="#L437">437</a> 
+<a class="jxr_linenumber" name="L438" href="#L438">438</a> 
+<a class="jxr_linenumber" name="L439" href="#L439">439</a>     <em class="jxr_comment">//////////////////////////////////////////////////////////////////////////////</em>
+<a class="jxr_linenumber" name="L440" href="#L440">440</a>     <em class="jxr_comment">//////////////////////////////////////////////////////////////////////////////</em>
+<a class="jxr_linenumber" name="L441" href="#L441">441</a> 
+<a class="jxr_linenumber" name="L442" href="#L442">442</a>     <em class="jxr_comment">//  these are the datagram methods</em>
+<a class="jxr_linenumber" name="L443" href="#L443">443</a> 
+<a class="jxr_linenumber" name="L444" href="#L444">444</a>     <em class="jxr_comment">//////////////////////////////////////////////////////////////////////////////</em>
+<a class="jxr_linenumber" name="L445" href="#L445">445</a>     <em class="jxr_comment">//////////////////////////////////////////////////////////////////////////////</em>
+<a class="jxr_linenumber" name="L446" href="#L446">446</a> 
+<a class="jxr_linenumber" name="L447" href="#L447">447</a>     <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">int</strong> byteSize() <strong class="jxr_keyword">throws</strong> <a name="IonException" href="../../../../../software/amazon/ion/IonException.html#IonException">IonException</a>
+<a class="jxr_linenumber" name="L448" href="#L448">448</a>     {
+<a class="jxr_linenumber" name="L449" href="#L449">449</a>         <em class="jxr_comment">// TODO this is horrible, users will end up encoding multiple times!</em>
+<a class="jxr_linenumber" name="L450" href="#L450">450</a>         <a name="ReverseBinaryEncoder" href="../../../../../software/amazon/ion/impl/lite/ReverseBinaryEncoder.html#ReverseBinaryEncoder">ReverseBinaryEncoder</a> encoder =
+<a class="jxr_linenumber" name="L451" href="#L451">451</a>             <strong class="jxr_keyword">new</strong> <a name="ReverseBinaryEncoder" href="../../../../../software/amazon/ion/impl/lite/ReverseBinaryEncoder.html#ReverseBinaryEncoder">ReverseBinaryEncoder</a>(REVERSE_BINARY_ENCODER_INITIAL_SIZE);
+<a class="jxr_linenumber" name="L452" href="#L452">452</a>         encoder.serialize(<strong class="jxr_keyword">this</strong>);
+<a class="jxr_linenumber" name="L453" href="#L453">453</a>         <strong class="jxr_keyword">return</strong> encoder.byteSize();
+<a class="jxr_linenumber" name="L454" href="#L454">454</a>     }
+<a class="jxr_linenumber" name="L455" href="#L455">455</a> 
+<a class="jxr_linenumber" name="L456" href="#L456">456</a>     <strong class="jxr_keyword">public</strong> byte[] getBytes() <strong class="jxr_keyword">throws</strong> <a name="IonException" href="../../../../../software/amazon/ion/IonException.html#IonException">IonException</a>
+<a class="jxr_linenumber" name="L457" href="#L457">457</a>     {
+<a class="jxr_linenumber" name="L458" href="#L458">458</a>         <a name="ReverseBinaryEncoder" href="../../../../../software/amazon/ion/impl/lite/ReverseBinaryEncoder.html#ReverseBinaryEncoder">ReverseBinaryEncoder</a> encoder =
+<a class="jxr_linenumber" name="L459" href="#L459">459</a>             <strong class="jxr_keyword">new</strong> <a name="ReverseBinaryEncoder" href="../../../../../software/amazon/ion/impl/lite/ReverseBinaryEncoder.html#ReverseBinaryEncoder">ReverseBinaryEncoder</a>(REVERSE_BINARY_ENCODER_INITIAL_SIZE);
+<a class="jxr_linenumber" name="L460" href="#L460">460</a>         encoder.serialize(<strong class="jxr_keyword">this</strong>);
+<a class="jxr_linenumber" name="L461" href="#L461">461</a>         <strong class="jxr_keyword">return</strong> encoder.toNewByteArray();
+<a class="jxr_linenumber" name="L462" href="#L462">462</a>     }
+<a class="jxr_linenumber" name="L463" href="#L463">463</a> 
+<a class="jxr_linenumber" name="L464" href="#L464">464</a>     <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">int</strong> getBytes(OutputStream out) <strong class="jxr_keyword">throws</strong> IOException, <a name="IonException" href="../../../../../software/amazon/ion/IonException.html#IonException">IonException</a>
+<a class="jxr_linenumber" name="L465" href="#L465">465</a>     {
+<a class="jxr_linenumber" name="L466" href="#L466">466</a>         <a name="ReverseBinaryEncoder" href="../../../../../software/amazon/ion/impl/lite/ReverseBinaryEncoder.html#ReverseBinaryEncoder">ReverseBinaryEncoder</a> encoder =
+<a class="jxr_linenumber" name="L467" href="#L467">467</a>             <strong class="jxr_keyword">new</strong> <a name="ReverseBinaryEncoder" href="../../../../../software/amazon/ion/impl/lite/ReverseBinaryEncoder.html#ReverseBinaryEncoder">ReverseBinaryEncoder</a>(REVERSE_BINARY_ENCODER_INITIAL_SIZE);
+<a class="jxr_linenumber" name="L468" href="#L468">468</a>         encoder.serialize(<strong class="jxr_keyword">this</strong>);
+<a class="jxr_linenumber" name="L469" href="#L469">469</a>         <strong class="jxr_keyword">return</strong> encoder.writeBytes(out);
+<a class="jxr_linenumber" name="L470" href="#L470">470</a>     }
 <a class="jxr_linenumber" name="L471" href="#L471">471</a> 
-<a class="jxr_linenumber" name="L472" href="#L472">472</a>         <strong class="jxr_keyword">if</strong> (index &lt; 0) {
-<a class="jxr_linenumber" name="L473" href="#L473">473</a>             <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> IndexOutOfBoundsException(<span class="jxr_string">""</span>+index);
-<a class="jxr_linenumber" name="L474" href="#L474">474</a>         }
-<a class="jxr_linenumber" name="L475" href="#L475">475</a> 
-<a class="jxr_linenumber" name="L476" href="#L476">476</a>         <strong class="jxr_keyword">int</strong> ii;
-<a class="jxr_linenumber" name="L477" href="#L477">477</a>         <strong class="jxr_keyword">for</strong> (ii=0; ii&lt;=index; ii++) {
-<a class="jxr_linenumber" name="L478" href="#L478">478</a>             <strong class="jxr_keyword">if</strong> (!iterator.hasNext()) {
-<a class="jxr_linenumber" name="L479" href="#L479">479</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> IndexOutOfBoundsException(<span class="jxr_string">""</span>+index);
-<a class="jxr_linenumber" name="L480" href="#L480">480</a>             }
-<a class="jxr_linenumber" name="L481" href="#L481">481</a>             value = iterator.next();
-<a class="jxr_linenumber" name="L482" href="#L482">482</a>         }
-<a class="jxr_linenumber" name="L483" href="#L483">483</a>         <strong class="jxr_keyword">return</strong> value;
-<a class="jxr_linenumber" name="L484" href="#L484">484</a>     }
-<a class="jxr_linenumber" name="L485" href="#L485">485</a> 
-<a class="jxr_linenumber" name="L486" href="#L486">486</a>     <strong class="jxr_keyword">public</strong> ListIterator&lt;IonValue&gt; systemIterator()
-<a class="jxr_linenumber" name="L487" href="#L487">487</a>     {
-<a class="jxr_linenumber" name="L488" href="#L488">488</a>         <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">new</strong> SystemContentIterator(isReadOnly());
-<a class="jxr_linenumber" name="L489" href="#L489">489</a>     }
-<a class="jxr_linenumber" name="L490" href="#L490">490</a> 
-<a class="jxr_linenumber" name="L491" href="#L491">491</a>     <em class="jxr_comment">// TODO: optimize this, if there's a real use case</em>
-<a class="jxr_linenumber" name="L492" href="#L492">492</a>     <em class="jxr_comment">//       deprecate this is there isn't (which I suspect is actually the case)</em>
-<a class="jxr_linenumber" name="L493" href="#L493">493</a>     <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">int</strong> systemSize()
+<a class="jxr_linenumber" name="L472" href="#L472">472</a>     <em class="jxr_comment">// TODO: optimize this, if there's a real use case</em>
+<a class="jxr_linenumber" name="L473" href="#L473">473</a>     <em class="jxr_comment">//       deprecate this is there isn't (which I suspect is actually the case)</em>
+<a class="jxr_linenumber" name="L474" href="#L474">474</a>     <strong class="jxr_keyword">public</strong> <a name="IonValue" href="../../../../../software/amazon/ion/IonValue.html#IonValue">IonValue</a> systemGet(<strong class="jxr_keyword">int</strong> index) <strong class="jxr_keyword">throws</strong> IndexOutOfBoundsException
+<a class="jxr_linenumber" name="L475" href="#L475">475</a>     {
+<a class="jxr_linenumber" name="L476" href="#L476">476</a>         ListIterator&lt;IonValue&gt; iterator = systemIterator();
+<a class="jxr_linenumber" name="L477" href="#L477">477</a>         <a name="IonValue" href="../../../../../software/amazon/ion/IonValue.html#IonValue">IonValue</a> value = <strong class="jxr_keyword">null</strong>;
+<a class="jxr_linenumber" name="L478" href="#L478">478</a> 
+<a class="jxr_linenumber" name="L479" href="#L479">479</a>         <strong class="jxr_keyword">if</strong> (index &lt; 0) {
+<a class="jxr_linenumber" name="L480" href="#L480">480</a>             <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> IndexOutOfBoundsException(<span class="jxr_string">""</span>+index);
+<a class="jxr_linenumber" name="L481" href="#L481">481</a>         }
+<a class="jxr_linenumber" name="L482" href="#L482">482</a> 
+<a class="jxr_linenumber" name="L483" href="#L483">483</a>         <strong class="jxr_keyword">int</strong> ii;
+<a class="jxr_linenumber" name="L484" href="#L484">484</a>         <strong class="jxr_keyword">for</strong> (ii=0; ii&lt;=index; ii++) {
+<a class="jxr_linenumber" name="L485" href="#L485">485</a>             <strong class="jxr_keyword">if</strong> (!iterator.hasNext()) {
+<a class="jxr_linenumber" name="L486" href="#L486">486</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> IndexOutOfBoundsException(<span class="jxr_string">""</span>+index);
+<a class="jxr_linenumber" name="L487" href="#L487">487</a>             }
+<a class="jxr_linenumber" name="L488" href="#L488">488</a>             value = iterator.next();
+<a class="jxr_linenumber" name="L489" href="#L489">489</a>         }
+<a class="jxr_linenumber" name="L490" href="#L490">490</a>         <strong class="jxr_keyword">return</strong> value;
+<a class="jxr_linenumber" name="L491" href="#L491">491</a>     }
+<a class="jxr_linenumber" name="L492" href="#L492">492</a> 
+<a class="jxr_linenumber" name="L493" href="#L493">493</a>     <strong class="jxr_keyword">public</strong> ListIterator&lt;IonValue&gt; systemIterator()
 <a class="jxr_linenumber" name="L494" href="#L494">494</a>     {
-<a class="jxr_linenumber" name="L495" href="#L495">495</a>         <strong class="jxr_keyword">int</strong> count = 0;
-<a class="jxr_linenumber" name="L496" href="#L496">496</a>         ListIterator&lt;IonValue&gt; iterator = systemIterator();
-<a class="jxr_linenumber" name="L497" href="#L497">497</a>         <strong class="jxr_keyword">while</strong> (iterator.hasNext()) {
-<a class="jxr_linenumber" name="L498" href="#L498">498</a>             @SuppressWarnings(<span class="jxr_string">"unused"</span>)
-<a class="jxr_linenumber" name="L499" href="#L499">499</a>             <a name="IonValue" href="../../../../../software/amazon/ion/IonValue.html#IonValue">IonValue</a> value = iterator.next();
-<a class="jxr_linenumber" name="L500" href="#L500">500</a>             count++;
-<a class="jxr_linenumber" name="L501" href="#L501">501</a>         }
-<a class="jxr_linenumber" name="L502" href="#L502">502</a>         <strong class="jxr_keyword">return</strong> count;
-<a class="jxr_linenumber" name="L503" href="#L503">503</a>     }
-<a class="jxr_linenumber" name="L504" href="#L504">504</a> 
-<a class="jxr_linenumber" name="L505" href="#L505">505</a>     <em class="jxr_comment">/*</em>
-<a class="jxr_linenumber" name="L506" href="#L506">506</a> <em class="jxr_comment">     * Sets the context of all elements following elementid to context, until it encounters</em>
-<a class="jxr_linenumber" name="L507" href="#L507">507</a> <em class="jxr_comment">     * a context different to the original context at elementid.</em>
-<a class="jxr_linenumber" name="L508" href="#L508">508</a> <em class="jxr_comment">     */</em>
-<a class="jxr_linenumber" name="L509" href="#L509">509</a>     <strong class="jxr_keyword">void</strong> setSymbolTableAtIndex(<strong class="jxr_keyword">int</strong> elementid, <a name="SymbolTable" href="../../../../../software/amazon/ion/SymbolTable.html#SymbolTable">SymbolTable</a> symbols)
-<a class="jxr_linenumber" name="L510" href="#L510">510</a>     {
-<a class="jxr_linenumber" name="L511" href="#L511">511</a>         assert(elementid &lt; get_child_count());
-<a class="jxr_linenumber" name="L512" href="#L512">512</a>         <a name="TopLevelContext" href="../../../../../software/amazon/ion/impl/lite/TopLevelContext.html#TopLevelContext">TopLevelContext</a> context = TopLevelContext.wrap(symbols, <strong class="jxr_keyword">this</strong>);
-<a class="jxr_linenumber" name="L513" href="#L513">513</a>         <a name="TopLevelContext" href="<a name="TopLevelContext" href="../../../../../software/amazon/ion/impl/lite/TopLevelContext.html#TopLevelContext">TopLevelContext</a>software/amazon/ion/impl/lite/TopLevelContext.html#TopLevelContext">TopLevelContext</a> startContext = (<a name="TopLevelContext" href="../../../../../software/amazon/ion/impl/lite/TopLevelContext.html#TopLevelContext">TopLevelContext</a>) _children[elementid].getContext();
-<a class="jxr_linenumber" name="L514" href="#L514">514</a> 
-<a class="jxr_linenumber" name="L515" href="#L515">515</a>         <strong class="jxr_keyword">while</strong> (elementid &lt; get_child_count() &amp;&amp; _children[elementid].getContext() == startContext){
-<a class="jxr_linenumber" name="L516" href="#L516">516</a>             _children[elementid++].setContext(context);
-<a class="jxr_linenumber" name="L517" href="#L517">517</a>         }
-<a class="jxr_linenumber" name="L518" href="#L518">518</a>     }
-<a class="jxr_linenumber" name="L519" href="#L519">519</a> 
-<a class="jxr_linenumber" name="L520" href="#L520">520</a>     <em class="jxr_comment">//////////////////////////////////////////////////////////////////////////////</em>
-<a class="jxr_linenumber" name="L521" href="#L521">521</a>     <em class="jxr_comment">//////////////////////////////////////////////////////////////////////////////</em>
-<a class="jxr_linenumber" name="L522" href="#L522">522</a> 
-<a class="jxr_linenumber" name="L523" href="#L523">523</a>     <em class="jxr_comment">//  these are the local helper methods</em>
-<a class="jxr_linenumber" name="L524" href="#L524">524</a> 
-<a class="jxr_linenumber" name="L525" href="#L525">525</a>     <em class="jxr_comment">//////////////////////////////////////////////////////////////////////////////</em>
-<a class="jxr_linenumber" name="L526" href="#L526">526</a>     <em class="jxr_comment">//////////////////////////////////////////////////////////////////////////////</em>
-<a class="jxr_linenumber" name="L527" href="#L527">527</a> 
-<a class="jxr_linenumber" name="L528" href="#L528">528</a>     <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">synchronized</strong> <a name="IonSymbolLite" href="../../../../../software/amazon/ion/impl/lite/IonSymbolLite.html#IonSymbolLite">IonSymbolLite</a> get_ivm()
-<a class="jxr_linenumber" name="L529" href="#L529">529</a>     {
-<a class="jxr_linenumber" name="L530" href="#L530">530</a>         <strong class="jxr_keyword">if</strong> (_ivm == <strong class="jxr_keyword">null</strong>) {
-<a class="jxr_linenumber" name="L531" href="#L531">531</a>             _ivm = getSystem().newSymbol(ION_1_0);
-<a class="jxr_linenumber" name="L532" href="#L532">532</a>         }
-<a class="jxr_linenumber" name="L533" href="#L533">533</a>         <strong class="jxr_keyword">return</strong> _ivm;
-<a class="jxr_linenumber" name="L534" href="#L534">534</a>     }
-<a class="jxr_linenumber" name="L535" href="#L535">535</a> 
-<a class="jxr_linenumber" name="L536" href="#L536">536</a>     <em class="jxr_javadoccomment">/**</em>
-<a class="jxr_linenumber" name="L537" href="#L537">537</a> <em class="jxr_javadoccomment">     * Encapsulates an iterator and implements a custom remove method</em>
-<a class="jxr_linenumber" name="L538" href="#L538">538</a> <em class="jxr_javadoccomment">     *</em>
-<a class="jxr_linenumber" name="L539" href="#L539">539</a> <em class="jxr_javadoccomment">     *  this is tied to the _child array of the IonSequenceImpl</em>
-<a class="jxr_linenumber" name="L540" href="#L540">540</a> <em class="jxr_javadoccomment">     *  through the _children and _child_count members which this</em>
-<a class="jxr_linenumber" name="L541" href="#L541">541</a> <em class="jxr_javadoccomment">     *  iterator directly uses.</em>
-<a class="jxr_linenumber" name="L542" href="#L542">542</a> <em class="jxr_javadoccomment">     *</em>
-<a class="jxr_linenumber" name="L543" href="#L543">543</a> <em class="jxr_javadoccomment">     *  This is a specialization for returning a system view of the</em>
-<a class="jxr_linenumber" name="L544" href="#L544">544</a> <em class="jxr_javadoccomment">     *  current datagram.  It does this by synthesizing system values</em>
-<a class="jxr_linenumber" name="L545" href="#L545">545</a> <em class="jxr_javadoccomment">     *  (Ion Version Markers &amp; local symbol tables) as symbol tables</em>
-<a class="jxr_linenumber" name="L546" href="#L546">546</a> <em class="jxr_javadoccomment">     *  change between user values.</em>
-<a class="jxr_linenumber" name="L547" href="#L547">547</a> <em class="jxr_javadoccomment">     *</em>
-<a class="jxr_linenumber" name="L548" href="#L548">548</a> <em class="jxr_javadoccomment">     *  It accumulates a count of the system values it encounters</em>
-<a class="jxr_linenumber" name="L549" href="#L549">549</a> <em class="jxr_javadoccomment">     *  the need to inject them in the iteration stream.</em>
-<a class="jxr_linenumber" name="L550" href="#L550">550</a> <em class="jxr_javadoccomment">     *</em>
-<a class="jxr_linenumber" name="L551" href="#L551">551</a> <em class="jxr_javadoccomment">     *  It may need more than 1 system value between user values</em>
-<a class="jxr_linenumber" name="L552" href="#L552">552</a> <em class="jxr_javadoccomment">     *  if the system is reset or the local symbol table itself</em>
-<a class="jxr_linenumber" name="L553" href="#L553">553</a> <em class="jxr_javadoccomment">     *  has local symbols (this is rare but in principal could</em>
-<a class="jxr_linenumber" name="L554" href="#L554">554</a> <em class="jxr_javadoccomment">     *  be an arbitrarily long sequence).</em>
-<a class="jxr_linenumber" name="L555" href="#L555">555</a> <em class="jxr_javadoccomment">     *</em>
-<a class="jxr_linenumber" name="L556" href="#L556">556</a> <em class="jxr_javadoccomment">     *  The current position is between the value to be returned</em>
-<a class="jxr_linenumber" name="L557" href="#L557">557</a> <em class="jxr_javadoccomment">     *  by next and the value that would be returned by previous.</em>
-<a class="jxr_linenumber" name="L558" href="#L558">558</a> <em class="jxr_javadoccomment">     *  This is calculated in next_index_helper() (or previous_).</em>
-<a class="jxr_linenumber" name="L559" href="#L559">559</a> <em class="jxr_javadoccomment">     *  It is represented by a "struct" with a position in the</em>
-<a class="jxr_linenumber" name="L560" href="#L560">560</a> <em class="jxr_javadoccomment">     *  child array, an optional position in the local stack</em>
-<a class="jxr_linenumber" name="L561" href="#L561">561</a> <em class="jxr_javadoccomment">     *  of system values, and a flag indicating which list should</em>
-<a class="jxr_linenumber" name="L562" href="#L562">562</a> <em class="jxr_javadoccomment">     *  be used to fetch the actual value.</em>
-<a class="jxr_linenumber" name="L563" href="#L563">563</a> <em class="jxr_javadoccomment">     *</em>
-<a class="jxr_linenumber" name="L564" href="#L564">564</a> <em class="jxr_javadoccomment">     *  The local synthetic system values are held in the array</em>
-<a class="jxr_linenumber" name="L565" href="#L565">565</a> <em class="jxr_javadoccomment">     *  __local_system_value.  These are the values that should</em>
-<a class="jxr_linenumber" name="L566" href="#L566">566</a> <em class="jxr_javadoccomment">     *  preceed the value at _child[__user_content_pos].</em>
-<a class="jxr_linenumber" name="L567" href="#L567">567</a> <em class="jxr_javadoccomment">     *</em>
-<a class="jxr_linenumber" name="L568" href="#L568">568</a> <em class="jxr_javadoccomment">     *  TODO with the updated next and previous logic, particularly</em>
-<a class="jxr_linenumber" name="L569" href="#L569">569</a> <em class="jxr_javadoccomment">     *  the force_position_sync logic and lastMoveWasPrevious flag</em>
-<a class="jxr_linenumber" name="L570" href="#L570">570</a> <em class="jxr_javadoccomment">     *  we could implement add and set correctly.</em>
-<a class="jxr_linenumber" name="L571" href="#L571">571</a> <em class="jxr_javadoccomment">     *</em>
-<a class="jxr_linenumber" name="L572" href="#L572">572</a> <em class="jxr_javadoccomment">     *  NOTE this closely resembles the iterator defined in IonSequenceLite,</em>
-<a class="jxr_linenumber" name="L573" href="#L573">573</a> <em class="jxr_javadoccomment">     *  so changes here are likely to be needed in IonSequenceLite as well.</em>
-<a class="jxr_linenumber" name="L574" href="#L574">574</a> <em class="jxr_javadoccomment">     */</em>
-<a class="jxr_linenumber" name="L575" href="#L575">575</a>     <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">class</strong> SystemContentIterator
-<a class="jxr_linenumber" name="L576" href="#L576">576</a>         <strong class="jxr_keyword">implements</strong> ListIterator&lt;IonValue&gt;
-<a class="jxr_linenumber" name="L577" href="#L577">577</a>     {
-<a class="jxr_linenumber" name="L578" href="#L578">578</a>         <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">boolean</strong>                __readOnly;
-<a class="jxr_linenumber" name="L579" href="#L579">579</a>         <strong class="jxr_keyword">private</strong>       <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a>           __current;
-<a class="jxr_linenumber" name="L580" href="#L580">580</a>         <strong class="jxr_keyword">private</strong>       SystemIteratorPosition __pos;
-<a class="jxr_linenumber" name="L581" href="#L581">581</a> 
-<a class="jxr_linenumber" name="L582" href="#L582">582</a>         <strong class="jxr_keyword">private</strong>       SystemIteratorPosition __temp_pos;
-<a class="jxr_linenumber" name="L583" href="#L583">583</a> 
-<a class="jxr_linenumber" name="L584" href="#L584">584</a>         <strong class="jxr_keyword">public</strong> SystemContentIterator(<strong class="jxr_keyword">boolean</strong> readOnly)
-<a class="jxr_linenumber" name="L585" href="#L585">585</a>         {
-<a class="jxr_linenumber" name="L586" href="#L586">586</a>             <strong class="jxr_keyword">if</strong> (_isLocked() &amp;&amp; !readOnly) {
-<a class="jxr_linenumber" name="L587" href="#L587">587</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> IllegalStateException(<span class="jxr_string">"you can't open an updatable iterator on a read only value"</span>);
-<a class="jxr_linenumber" name="L588" href="#L588">588</a>             }
-<a class="jxr_linenumber" name="L589" href="#L589">589</a>             __readOnly = readOnly;
+<a class="jxr_linenumber" name="L495" href="#L495">495</a>         <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">new</strong> SystemContentIterator(isReadOnly());
+<a class="jxr_linenumber" name="L496" href="#L496">496</a>     }
+<a class="jxr_linenumber" name="L497" href="#L497">497</a> 
+<a class="jxr_linenumber" name="L498" href="#L498">498</a>     <em class="jxr_comment">// TODO: optimize this, if there's a real use case</em>
+<a class="jxr_linenumber" name="L499" href="#L499">499</a>     <em class="jxr_comment">//       deprecate this is there isn't (which I suspect is actually the case)</em>
+<a class="jxr_linenumber" name="L500" href="#L500">500</a>     <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">int</strong> systemSize()
+<a class="jxr_linenumber" name="L501" href="#L501">501</a>     {
+<a class="jxr_linenumber" name="L502" href="#L502">502</a>         <strong class="jxr_keyword">int</strong> count = 0;
+<a class="jxr_linenumber" name="L503" href="#L503">503</a>         ListIterator&lt;IonValue&gt; iterator = systemIterator();
+<a class="jxr_linenumber" name="L504" href="#L504">504</a>         <strong class="jxr_keyword">while</strong> (iterator.hasNext()) {
+<a class="jxr_linenumber" name="L505" href="#L505">505</a>             @SuppressWarnings(<span class="jxr_string">"unused"</span>)
+<a class="jxr_linenumber" name="L506" href="#L506">506</a>             <a name="IonValue" href="../../../../../software/amazon/ion/IonValue.html#IonValue">IonValue</a> value = iterator.next();
+<a class="jxr_linenumber" name="L507" href="#L507">507</a>             count++;
+<a class="jxr_linenumber" name="L508" href="#L508">508</a>         }
+<a class="jxr_linenumber" name="L509" href="#L509">509</a>         <strong class="jxr_keyword">return</strong> count;
+<a class="jxr_linenumber" name="L510" href="#L510">510</a>     }
+<a class="jxr_linenumber" name="L511" href="#L511">511</a> 
+<a class="jxr_linenumber" name="L512" href="#L512">512</a>     <em class="jxr_comment">/*</em>
+<a class="jxr_linenumber" name="L513" href="#L513">513</a> <em class="jxr_comment">     * Sets the context of all elements following elementid to context, until it encounters</em>
+<a class="jxr_linenumber" name="L514" href="#L514">514</a> <em class="jxr_comment">     * a context different to the original context at elementid.</em>
+<a class="jxr_linenumber" name="L515" href="#L515">515</a> <em class="jxr_comment">     */</em>
+<a class="jxr_linenumber" name="L516" href="#L516">516</a>     <strong class="jxr_keyword">void</strong> setSymbolTableAtIndex(<strong class="jxr_keyword">int</strong> elementid, <a name="SymbolTable" href="../../../../../software/amazon/ion/SymbolTable.html#SymbolTable">SymbolTable</a> symbols)
+<a class="jxr_linenumber" name="L517" href="#L517">517</a>     {
+<a class="jxr_linenumber" name="L518" href="#L518">518</a>         assert(elementid &lt; get_child_count());
+<a class="jxr_linenumber" name="L519" href="#L519">519</a>         <a name="TopLevelContext" href="../../../../../software/amazon/ion/impl/lite/TopLevelContext.html#TopLevelContext">TopLevelContext</a> context = TopLevelContext.wrap(symbols, <strong class="jxr_keyword">this</strong>);
+<a class="jxr_linenumber" name="L520" href="#L520">520</a>         <a name="TopLevelContext" href="<a name="TopLevelContext" href="../../../../../software/amazon/ion/impl/lite/TopLevelContext.html#TopLevelContext">TopLevelContext</a>software/amazon/ion/impl/lite/TopLevelContext.html#TopLevelContext">TopLevelContext</a> startContext = (<a name="TopLevelContext" href="../../../../../software/amazon/ion/impl/lite/TopLevelContext.html#TopLevelContext">TopLevelContext</a>) _children[elementid].getContext();
+<a class="jxr_linenumber" name="L521" href="#L521">521</a> 
+<a class="jxr_linenumber" name="L522" href="#L522">522</a>         <strong class="jxr_keyword">while</strong> (elementid &lt; get_child_count() &amp;&amp; _children[elementid].getContext() == startContext){
+<a class="jxr_linenumber" name="L523" href="#L523">523</a>             _children[elementid++].setContext(context);
+<a class="jxr_linenumber" name="L524" href="#L524">524</a>         }
+<a class="jxr_linenumber" name="L525" href="#L525">525</a>     }
+<a class="jxr_linenumber" name="L526" href="#L526">526</a> 
+<a class="jxr_linenumber" name="L527" href="#L527">527</a>     <em class="jxr_comment">//////////////////////////////////////////////////////////////////////////////</em>
+<a class="jxr_linenumber" name="L528" href="#L528">528</a>     <em class="jxr_comment">//////////////////////////////////////////////////////////////////////////////</em>
+<a class="jxr_linenumber" name="L529" href="#L529">529</a> 
+<a class="jxr_linenumber" name="L530" href="#L530">530</a>     <em class="jxr_comment">//  these are the local helper methods</em>
+<a class="jxr_linenumber" name="L531" href="#L531">531</a> 
+<a class="jxr_linenumber" name="L532" href="#L532">532</a>     <em class="jxr_comment">//////////////////////////////////////////////////////////////////////////////</em>
+<a class="jxr_linenumber" name="L533" href="#L533">533</a>     <em class="jxr_comment">//////////////////////////////////////////////////////////////////////////////</em>
+<a class="jxr_linenumber" name="L534" href="#L534">534</a> 
+<a class="jxr_linenumber" name="L535" href="#L535">535</a>     <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">synchronized</strong> <a name="IonSymbolLite" href="../../../../../software/amazon/ion/impl/lite/IonSymbolLite.html#IonSymbolLite">IonSymbolLite</a> get_ivm()
+<a class="jxr_linenumber" name="L536" href="#L536">536</a>     {
+<a class="jxr_linenumber" name="L537" href="#L537">537</a>         <strong class="jxr_keyword">if</strong> (_ivm == <strong class="jxr_keyword">null</strong>) {
+<a class="jxr_linenumber" name="L538" href="#L538">538</a>             _ivm = getSystem().newSymbol(ION_1_0);
+<a class="jxr_linenumber" name="L539" href="#L539">539</a>         }
+<a class="jxr_linenumber" name="L540" href="#L540">540</a>         <strong class="jxr_keyword">return</strong> _ivm;
+<a class="jxr_linenumber" name="L541" href="#L541">541</a>     }
+<a class="jxr_linenumber" name="L542" href="#L542">542</a> 
+<a class="jxr_linenumber" name="L543" href="#L543">543</a>     <em class="jxr_javadoccomment">/**</em>
+<a class="jxr_linenumber" name="L544" href="#L544">544</a> <em class="jxr_javadoccomment">     * Encapsulates an iterator and implements a custom remove method</em>
+<a class="jxr_linenumber" name="L545" href="#L545">545</a> <em class="jxr_javadoccomment">     *</em>
+<a class="jxr_linenumber" name="L546" href="#L546">546</a> <em class="jxr_javadoccomment">     *  this is tied to the _child array of the IonSequenceImpl</em>
+<a class="jxr_linenumber" name="L547" href="#L547">547</a> <em class="jxr_javadoccomment">     *  through the _children and _child_count members which this</em>
+<a class="jxr_linenumber" name="L548" href="#L548">548</a> <em class="jxr_javadoccomment">     *  iterator directly uses.</em>
+<a class="jxr_linenumber" name="L549" href="#L549">549</a> <em class="jxr_javadoccomment">     *</em>
+<a class="jxr_linenumber" name="L550" href="#L550">550</a> <em class="jxr_javadoccomment">     *  This is a specialization for returning a system view of the</em>
+<a class="jxr_linenumber" name="L551" href="#L551">551</a> <em class="jxr_javadoccomment">     *  current datagram.  It does this by synthesizing system values</em>
+<a class="jxr_linenumber" name="L552" href="#L552">552</a> <em class="jxr_javadoccomment">     *  (Ion Version Markers &amp; local symbol tables) as symbol tables</em>
+<a class="jxr_linenumber" name="L553" href="#L553">553</a> <em class="jxr_javadoccomment">     *  change between user values.</em>
+<a class="jxr_linenumber" name="L554" href="#L554">554</a> <em class="jxr_javadoccomment">     *</em>
+<a class="jxr_linenumber" name="L555" href="#L555">555</a> <em class="jxr_javadoccomment">     *  It accumulates a count of the system values it encounters</em>
+<a class="jxr_linenumber" name="L556" href="#L556">556</a> <em class="jxr_javadoccomment">     *  the need to inject them in the iteration stream.</em>
+<a class="jxr_linenumber" name="L557" href="#L557">557</a> <em class="jxr_javadoccomment">     *</em>
+<a class="jxr_linenumber" name="L558" href="#L558">558</a> <em class="jxr_javadoccomment">     *  It may need more than 1 system value between user values</em>
+<a class="jxr_linenumber" name="L559" href="#L559">559</a> <em class="jxr_javadoccomment">     *  if the system is reset or the local symbol table itself</em>
+<a class="jxr_linenumber" name="L560" href="#L560">560</a> <em class="jxr_javadoccomment">     *  has local symbols (this is rare but in principal could</em>
+<a class="jxr_linenumber" name="L561" href="#L561">561</a> <em class="jxr_javadoccomment">     *  be an arbitrarily long sequence).</em>
+<a class="jxr_linenumber" name="L562" href="#L562">562</a> <em class="jxr_javadoccomment">     *</em>
+<a class="jxr_linenumber" name="L563" href="#L563">563</a> <em class="jxr_javadoccomment">     *  The current position is between the value to be returned</em>
+<a class="jxr_linenumber" name="L564" href="#L564">564</a> <em class="jxr_javadoccomment">     *  by next and the value that would be returned by previous.</em>
+<a class="jxr_linenumber" name="L565" href="#L565">565</a> <em class="jxr_javadoccomment">     *  This is calculated in next_index_helper() (or previous_).</em>
+<a class="jxr_linenumber" name="L566" href="#L566">566</a> <em class="jxr_javadoccomment">     *  It is represented by a "struct" with a position in the</em>
+<a class="jxr_linenumber" name="L567" href="#L567">567</a> <em class="jxr_javadoccomment">     *  child array, an optional position in the local stack</em>
+<a class="jxr_linenumber" name="L568" href="#L568">568</a> <em class="jxr_javadoccomment">     *  of system values, and a flag indicating which list should</em>
+<a class="jxr_linenumber" name="L569" href="#L569">569</a> <em class="jxr_javadoccomment">     *  be used to fetch the actual value.</em>
+<a class="jxr_linenumber" name="L570" href="#L570">570</a> <em class="jxr_javadoccomment">     *</em>
+<a class="jxr_linenumber" name="L571" href="#L571">571</a> <em class="jxr_javadoccomment">     *  The local synthetic system values are held in the array</em>
+<a class="jxr_linenumber" name="L572" href="#L572">572</a> <em class="jxr_javadoccomment">     *  __local_system_value.  These are the values that should</em>
+<a class="jxr_linenumber" name="L573" href="#L573">573</a> <em class="jxr_javadoccomment">     *  preceed the value at _child[__user_content_pos].</em>
+<a class="jxr_linenumber" name="L574" href="#L574">574</a> <em class="jxr_javadoccomment">     *</em>
+<a class="jxr_linenumber" name="L575" href="#L575">575</a> <em class="jxr_javadoccomment">     *  TODO with the updated next and previous logic, particularly</em>
+<a class="jxr_linenumber" name="L576" href="#L576">576</a> <em class="jxr_javadoccomment">     *  the force_position_sync logic and lastMoveWasPrevious flag</em>
+<a class="jxr_linenumber" name="L577" href="#L577">577</a> <em class="jxr_javadoccomment">     *  we could implement add and set correctly.</em>
+<a class="jxr_linenumber" name="L578" href="#L578">578</a> <em class="jxr_javadoccomment">     *</em>
+<a class="jxr_linenumber" name="L579" href="#L579">579</a> <em class="jxr_javadoccomment">     *  NOTE this closely resembles the iterator defined in IonSequenceLite,</em>
+<a class="jxr_linenumber" name="L580" href="#L580">580</a> <em class="jxr_javadoccomment">     *  so changes here are likely to be needed in IonSequenceLite as well.</em>
+<a class="jxr_linenumber" name="L581" href="#L581">581</a> <em class="jxr_javadoccomment">     */</em>
+<a class="jxr_linenumber" name="L582" href="#L582">582</a>     <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">class</strong> SystemContentIterator
+<a class="jxr_linenumber" name="L583" href="#L583">583</a>         <strong class="jxr_keyword">implements</strong> ListIterator&lt;IonValue&gt;
+<a class="jxr_linenumber" name="L584" href="#L584">584</a>     {
+<a class="jxr_linenumber" name="L585" href="#L585">585</a>         <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">boolean</strong>                __readOnly;
+<a class="jxr_linenumber" name="L586" href="#L586">586</a>         <strong class="jxr_keyword">private</strong>       <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a>           __current;
+<a class="jxr_linenumber" name="L587" href="#L587">587</a>         <strong class="jxr_keyword">private</strong>       SystemIteratorPosition __pos;
+<a class="jxr_linenumber" name="L588" href="#L588">588</a> 
+<a class="jxr_linenumber" name="L589" href="#L589">589</a>         <strong class="jxr_keyword">private</strong>       SystemIteratorPosition __temp_pos;
 <a class="jxr_linenumber" name="L590" href="#L590">590</a> 
-<a class="jxr_linenumber" name="L591" href="#L591">591</a>             __temp_pos = <strong class="jxr_keyword">new</strong> SystemIteratorPosition(<strong class="jxr_keyword">this</strong>); <em class="jxr_comment">// we flip back and forth between two positions to avoid allocating these on every value (or more)</em>
-<a class="jxr_linenumber" name="L592" href="#L592">592</a>             __pos = <strong class="jxr_keyword">new</strong> SystemIteratorPosition(<strong class="jxr_keyword">this</strong>);
-<a class="jxr_linenumber" name="L593" href="#L593">593</a>             __pos.load_initial_position();
-<a class="jxr_linenumber" name="L594" href="#L594">594</a>         }
-<a class="jxr_linenumber" name="L595" href="#L595">595</a> 
-<a class="jxr_linenumber" name="L596" href="#L596">596</a>         <strong class="jxr_keyword">private</strong> <a name="IonSystem" href="../../../../../software/amazon/ion/IonSystem.html#IonSystem">IonSystem</a> getSystem()
-<a class="jxr_linenumber" name="L597" href="#L597">597</a>         {
-<a class="jxr_linenumber" name="L598" href="#L598">598</a>             <strong class="jxr_keyword">return</strong> IonDatagramLite.<strong class="jxr_keyword">this</strong>.getSystem();
-<a class="jxr_linenumber" name="L599" href="#L599">599</a>         }
-<a class="jxr_linenumber" name="L600" href="#L600">600</a> 
-<a class="jxr_linenumber" name="L601" href="#L601">601</a>         <strong class="jxr_keyword">protected</strong> <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> set_position(SystemIteratorPosition newPos)
-<a class="jxr_linenumber" name="L602" href="#L602">602</a>         {
-<a class="jxr_linenumber" name="L603" href="#L603">603</a>             <em class="jxr_comment">// swap our active position with our temp position</em>
-<a class="jxr_linenumber" name="L604" href="#L604">604</a>             __temp_pos = __pos;
-<a class="jxr_linenumber" name="L605" href="#L605">605</a>             __pos = newPos;
-<a class="jxr_linenumber" name="L606" href="#L606">606</a> 
-<a class="jxr_linenumber" name="L607" href="#L607">607</a>             <em class="jxr_comment">// load out current value from the position, and return it</em>
-<a class="jxr_linenumber" name="L608" href="#L608">608</a>             __current = __pos.load_position();
-<a class="jxr_linenumber" name="L609" href="#L609">609</a>             <strong class="jxr_keyword">return</strong> __current;
-<a class="jxr_linenumber" name="L610" href="#L610">610</a>         }
-<a class="jxr_linenumber" name="L611" href="#L611">611</a> 
-<a class="jxr_linenumber" name="L612" href="#L612">612</a>         <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">void</strong> force_position_sync()
-<a class="jxr_linenumber" name="L613" href="#L613">613</a>         {
-<a class="jxr_linenumber" name="L614" href="#L614">614</a>             <strong class="jxr_keyword">int</strong> user_index = __pos.__user_index;
-<a class="jxr_linenumber" name="L615" href="#L615">615</a>             <strong class="jxr_keyword">if</strong> (user_index &lt; 0 || user_index &gt;= _child_count) {
-<a class="jxr_linenumber" name="L616" href="#L616">616</a>                 <strong class="jxr_keyword">return</strong>;
-<a class="jxr_linenumber" name="L617" href="#L617">617</a>             }
-<a class="jxr_linenumber" name="L618" href="#L618">618</a>             <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> user_value = __pos.__current_user_value;
-<a class="jxr_linenumber" name="L619" href="#L619">619</a>             <strong class="jxr_keyword">if</strong> (user_value == <strong class="jxr_keyword">null</strong> || user_value == _children[user_index]) {
-<a class="jxr_linenumber" name="L620" href="#L620">620</a>                 <strong class="jxr_keyword">return</strong>;
-<a class="jxr_linenumber" name="L621" href="#L621">621</a>             }
-<a class="jxr_linenumber" name="L622" href="#L622">622</a>             <strong class="jxr_keyword">if</strong> (__readOnly) {
-<a class="jxr_linenumber" name="L623" href="#L623">623</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> <a name="IonException" href="../../../../../software/amazon/ion/IonException.html#IonException">IonException</a>(<span class="jxr_string">"read only sequence was changed"</span>);
+<a class="jxr_linenumber" name="L591" href="#L591">591</a>         <strong class="jxr_keyword">public</strong> SystemContentIterator(<strong class="jxr_keyword">boolean</strong> readOnly)
+<a class="jxr_linenumber" name="L592" href="#L592">592</a>         {
+<a class="jxr_linenumber" name="L593" href="#L593">593</a>             <strong class="jxr_keyword">if</strong> (_isLocked() &amp;&amp; !readOnly) {
+<a class="jxr_linenumber" name="L594" href="#L594">594</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> IllegalStateException(<span class="jxr_string">"you can't open an updatable iterator on a read only value"</span>);
+<a class="jxr_linenumber" name="L595" href="#L595">595</a>             }
+<a class="jxr_linenumber" name="L596" href="#L596">596</a>             __readOnly = readOnly;
+<a class="jxr_linenumber" name="L597" href="#L597">597</a> 
+<a class="jxr_linenumber" name="L598" href="#L598">598</a>             __temp_pos = <strong class="jxr_keyword">new</strong> SystemIteratorPosition(<strong class="jxr_keyword">this</strong>); <em class="jxr_comment">// we flip back and forth between two positions to avoid allocating these on every value (or more)</em>
+<a class="jxr_linenumber" name="L599" href="#L599">599</a>             __pos = <strong class="jxr_keyword">new</strong> SystemIteratorPosition(<strong class="jxr_keyword">this</strong>);
+<a class="jxr_linenumber" name="L600" href="#L600">600</a>             __pos.load_initial_position();
+<a class="jxr_linenumber" name="L601" href="#L601">601</a>         }
+<a class="jxr_linenumber" name="L602" href="#L602">602</a> 
+<a class="jxr_linenumber" name="L603" href="#L603">603</a>         <strong class="jxr_keyword">private</strong> <a name="IonSystem" href="../../../../../software/amazon/ion/IonSystem.html#IonSystem">IonSystem</a> getSystem()
+<a class="jxr_linenumber" name="L604" href="#L604">604</a>         {
+<a class="jxr_linenumber" name="L605" href="#L605">605</a>             <strong class="jxr_keyword">return</strong> IonDatagramLite.<strong class="jxr_keyword">this</strong>.getSystem();
+<a class="jxr_linenumber" name="L606" href="#L606">606</a>         }
+<a class="jxr_linenumber" name="L607" href="#L607">607</a> 
+<a class="jxr_linenumber" name="L608" href="#L608">608</a>         <strong class="jxr_keyword">protected</strong> <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> set_position(SystemIteratorPosition newPos)
+<a class="jxr_linenumber" name="L609" href="#L609">609</a>         {
+<a class="jxr_linenumber" name="L610" href="#L610">610</a>             <em class="jxr_comment">// swap our active position with our temp position</em>
+<a class="jxr_linenumber" name="L611" href="#L611">611</a>             __temp_pos = __pos;
+<a class="jxr_linenumber" name="L612" href="#L612">612</a>             __pos = newPos;
+<a class="jxr_linenumber" name="L613" href="#L613">613</a> 
+<a class="jxr_linenumber" name="L614" href="#L614">614</a>             <em class="jxr_comment">// load out current value from the position, and return it</em>
+<a class="jxr_linenumber" name="L615" href="#L615">615</a>             __current = __pos.load_position();
+<a class="jxr_linenumber" name="L616" href="#L616">616</a>             <strong class="jxr_keyword">return</strong> __current;
+<a class="jxr_linenumber" name="L617" href="#L617">617</a>         }
+<a class="jxr_linenumber" name="L618" href="#L618">618</a> 
+<a class="jxr_linenumber" name="L619" href="#L619">619</a>         <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">void</strong> force_position_sync()
+<a class="jxr_linenumber" name="L620" href="#L620">620</a>         {
+<a class="jxr_linenumber" name="L621" href="#L621">621</a>             <strong class="jxr_keyword">int</strong> user_index = __pos.__user_index;
+<a class="jxr_linenumber" name="L622" href="#L622">622</a>             <strong class="jxr_keyword">if</strong> (user_index &lt; 0 || user_index &gt;= _child_count) {
+<a class="jxr_linenumber" name="L623" href="#L623">623</a>                 <strong class="jxr_keyword">return</strong>;
 <a class="jxr_linenumber" name="L624" href="#L624">624</a>             }
-<a class="jxr_linenumber" name="L625" href="#L625">625</a>             __pos.force_position_sync_helper();
-<a class="jxr_linenumber" name="L626" href="#L626">626</a>         }
-<a class="jxr_linenumber" name="L627" href="#L627">627</a> 
-<a class="jxr_linenumber" name="L628" href="#L628">628</a>         <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">void</strong> add(<a name="IonValue" href="../../../../../software/amazon/ion/IonValue.html#IonValue">IonValue</a> element)
-<a class="jxr_linenumber" name="L629" href="#L629">629</a>         {
-<a class="jxr_linenumber" name="L630" href="#L630">630</a>             <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> UnsupportedOperationException();
-<a class="jxr_linenumber" name="L631" href="#L631">631</a>         }
-<a class="jxr_linenumber" name="L632" href="#L632">632</a> 
-<a class="jxr_linenumber" name="L633" href="#L633">633</a>         <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">boolean</strong> hasNext()
-<a class="jxr_linenumber" name="L634" href="#L634">634</a>         {
-<a class="jxr_linenumber" name="L635" href="#L635">635</a>             <strong class="jxr_keyword">return</strong> __pos.has_next();
-<a class="jxr_linenumber" name="L636" href="#L636">636</a>         }
-<a class="jxr_linenumber" name="L637" href="#L637">637</a> 
-<a class="jxr_linenumber" name="L638" href="#L638">638</a>         <strong class="jxr_keyword">public</strong> <a name="IonValue" href="../../../../../software/amazon/ion/IonValue.html#IonValue">IonValue</a> next()
-<a class="jxr_linenumber" name="L639" href="#L639">639</a>         {
-<a class="jxr_linenumber" name="L640" href="#L640">640</a>             SystemIteratorPosition pos = next_index_helper();
-<a class="jxr_linenumber" name="L641" href="#L641">641</a>             <strong class="jxr_keyword">if</strong> (pos == <strong class="jxr_keyword">null</strong>) {
-<a class="jxr_linenumber" name="L642" href="#L642">642</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> NoSuchElementException();
-<a class="jxr_linenumber" name="L643" href="#L643">643</a>             }
-<a class="jxr_linenumber" name="L644" href="#L644">644</a>             <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> current_value = set_position(pos);
-<a class="jxr_linenumber" name="L645" href="#L645">645</a>             assert(current_value == <strong class="jxr_keyword">this</strong>.__current);
-<a class="jxr_linenumber" name="L646" href="#L646">646</a>             <strong class="jxr_keyword">return</strong> current_value;
-<a class="jxr_linenumber" name="L647" href="#L647">647</a>         }
-<a class="jxr_linenumber" name="L648" href="#L648">648</a> 
-<a class="jxr_linenumber" name="L649" href="#L649">649</a>         <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">int</strong> nextIndex()
-<a class="jxr_linenumber" name="L650" href="#L650">650</a>         {
-<a class="jxr_linenumber" name="L651" href="#L651">651</a>             SystemIteratorPosition pos = next_index_helper();
-<a class="jxr_linenumber" name="L652" href="#L652">652</a>             <strong class="jxr_keyword">if</strong> (pos == <strong class="jxr_keyword">null</strong>) {
-<a class="jxr_linenumber" name="L653" href="#L653">653</a>                 <em class="jxr_comment">// we can do this because we hold the __pos</em>
-<a class="jxr_linenumber" name="L654" href="#L654">654</a>                 <em class="jxr_comment">// even when we run off the end, it will be</em>
-<a class="jxr_linenumber" name="L655" href="#L655">655</a>                 <em class="jxr_comment">// positioned at the value that wasn't there</em>
-<a class="jxr_linenumber" name="L656" href="#L656">656</a>                 <strong class="jxr_keyword">return</strong> __pos.get_external_pos() + 1;
-<a class="jxr_linenumber" name="L657" href="#L657">657</a>             }
-<a class="jxr_linenumber" name="L658" href="#L658">658</a>             <strong class="jxr_keyword">int</strong> idx = pos.get_external_pos();
-<a class="jxr_linenumber" name="L659" href="#L659">659</a>             <strong class="jxr_keyword">return</strong> idx;
-<a class="jxr_linenumber" name="L660" href="#L660">660</a>         }
-<a class="jxr_linenumber" name="L661" href="#L661">661</a> 
-<a class="jxr_linenumber" name="L662" href="#L662">662</a>         <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> SystemIteratorPosition next_index_helper()
-<a class="jxr_linenumber" name="L663" href="#L663">663</a>         {
-<a class="jxr_linenumber" name="L664" href="#L664">664</a>             SystemIteratorPosition next = <strong class="jxr_keyword">null</strong>;
-<a class="jxr_linenumber" name="L665" href="#L665">665</a>             force_position_sync();
-<a class="jxr_linenumber" name="L666" href="#L666">666</a> 
-<a class="jxr_linenumber" name="L667" href="#L667">667</a>             <strong class="jxr_keyword">if</strong> (__pos.has_next() == false) {
-<a class="jxr_linenumber" name="L668" href="#L668">668</a>                 <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">null</strong>;
-<a class="jxr_linenumber" name="L669" href="#L669">669</a>             }
-<a class="jxr_linenumber" name="L670" href="#L670">670</a> 
-<a class="jxr_linenumber" name="L671" href="#L671">671</a>             <em class="jxr_comment">// at this point we will have a next so prep out position now</em>
-<a class="jxr_linenumber" name="L672" href="#L672">672</a>             next = __temp_pos;
-<a class="jxr_linenumber" name="L673" href="#L673">673</a>             assert(next != <strong class="jxr_keyword">null</strong> &amp;&amp; next != __pos);
-<a class="jxr_linenumber" name="L674" href="#L674">674</a>             next.copyFrom(__pos);
-<a class="jxr_linenumber" name="L675" href="#L675">675</a> 
-<a class="jxr_linenumber" name="L676" href="#L676">676</a>             <em class="jxr_comment">// see if there's a system value waiting for use</em>
-<a class="jxr_linenumber" name="L677" href="#L677">677</a>             next.__local_index++;
-<a class="jxr_linenumber" name="L678" href="#L678">678</a>             <strong class="jxr_keyword">if</strong> (next.__local_index &lt; next.__local_value_count) {
-<a class="jxr_linenumber" name="L679" href="#L679">679</a>                 <strong class="jxr_keyword">return</strong> next;
-<a class="jxr_linenumber" name="L680" href="#L680">680</a>             }
-<a class="jxr_linenumber" name="L681" href="#L681">681</a> 
-<a class="jxr_linenumber" name="L682" href="#L682">682</a>             <em class="jxr_comment">// if there's not system value there must be another user value</em>
-<a class="jxr_linenumber" name="L683" href="#L683">683</a>             <em class="jxr_comment">// so we shouldn't get here since has_next() should have failed</em>
-<a class="jxr_linenumber" name="L684" href="#L684">684</a>             assert(next.__user_index &lt;= get_child_count());
-<a class="jxr_linenumber" name="L685" href="#L685">685</a> 
-<a class="jxr_linenumber" name="L686" href="#L686">686</a>             <em class="jxr_comment">// if we were on a system value then we're just stepping onto the</em>
-<a class="jxr_linenumber" name="L687" href="#L687">687</a>             <em class="jxr_comment">// since has_next() already declared we do have a waiting value</em>
-<a class="jxr_linenumber" name="L688" href="#L688">688</a>             next.__user_index++;
-<a class="jxr_linenumber" name="L689" href="#L689">689</a>             next.load_updated_position();
-<a class="jxr_linenumber" name="L690" href="#L690">690</a>             <em class="jxr_comment">// we step onto the first local value</em>
-<a class="jxr_linenumber" name="L691" href="#L691">691</a>             next.__local_index = 0;
-<a class="jxr_linenumber" name="L692" href="#L692">692</a>             <strong class="jxr_keyword">return</strong> next;
-<a class="jxr_linenumber" name="L693" href="#L693">693</a>         }
-<a class="jxr_linenumber" name="L694" href="#L694">694</a> 
-<a class="jxr_linenumber" name="L695" href="#L695">695</a>         <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">boolean</strong> hasPrevious()
-<a class="jxr_linenumber" name="L696" href="#L696">696</a>         {
-<a class="jxr_linenumber" name="L697" href="#L697">697</a>             <strong class="jxr_keyword">return</strong> __pos.has_prev();
-<a class="jxr_linenumber" name="L698" href="#L698">698</a>         }
-<a class="jxr_linenumber" name="L699" href="#L699">699</a> 
-<a class="jxr_linenumber" name="L700" href="#L700">700</a>         <strong class="jxr_keyword">public</strong> <a name="IonValue" href="../../../../../software/amazon/ion/IonValue.html#IonValue">IonValue</a> previous()
-<a class="jxr_linenumber" name="L701" href="#L701">701</a>         {
-<a class="jxr_linenumber" name="L702" href="#L702">702</a>             SystemIteratorPosition pos = previous_index_helper();
-<a class="jxr_linenumber" name="L703" href="#L703">703</a>             <strong class="jxr_keyword">if</strong> (pos == <strong class="jxr_keyword">null</strong>) {
-<a class="jxr_linenumber" name="L704" href="#L704">704</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> NoSuchElementException();
-<a class="jxr_linenumber" name="L705" href="#L705">705</a>             }
-<a class="jxr_linenumber" name="L706" href="#L706">706</a>             <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> current_value = set_position(pos);
-<a class="jxr_linenumber" name="L707" href="#L707">707</a>             assert(current_value == <strong class="jxr_keyword">this</strong>.__current);
-<a class="jxr_linenumber" name="L708" href="#L708">708</a>             <strong class="jxr_keyword">return</strong> current_value;
-<a class="jxr_linenumber" name="L709" href="#L709">709</a>         }
-<a class="jxr_linenumber" name="L710" href="#L710">710</a> 
-<a class="jxr_linenumber" name="L711" href="#L711">711</a>         <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">int</strong> previousIndex()
-<a class="jxr_linenumber" name="L712" href="#L712">712</a>         {
-<a class="jxr_linenumber" name="L713" href="#L713">713</a>             SystemIteratorPosition pos = previous_index_helper();
-<a class="jxr_linenumber" name="L714" href="#L714">714</a>             <strong class="jxr_keyword">if</strong> (pos == <strong class="jxr_keyword">null</strong>) {
-<a class="jxr_linenumber" name="L715" href="#L715">715</a>                 <strong class="jxr_keyword">return</strong> -1;
-<a class="jxr_linenumber" name="L716" href="#L716">716</a>             }
-<a class="jxr_linenumber" name="L717" href="#L717">717</a>             <strong class="jxr_keyword">int</strong> idx = pos.get_external_pos();
-<a class="jxr_linenumber" name="L718" href="#L718">718</a>             <strong class="jxr_keyword">return</strong> idx;
-<a class="jxr_linenumber" name="L719" href="#L719">719</a>         }
-<a class="jxr_linenumber" name="L720" href="#L720">720</a> 
-<a class="jxr_linenumber" name="L721" href="#L721">721</a>         <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> SystemIteratorPosition previous_index_helper()
-<a class="jxr_linenumber" name="L722" href="#L722">722</a>         {
-<a class="jxr_linenumber" name="L723" href="#L723">723</a>             SystemIteratorPosition prev = <strong class="jxr_keyword">null</strong>;
-<a class="jxr_linenumber" name="L724" href="#L724">724</a> 
-<a class="jxr_linenumber" name="L725" href="#L725">725</a>             force_position_sync();
-<a class="jxr_linenumber" name="L726" href="#L726">726</a>             <strong class="jxr_keyword">if</strong> (__pos.has_prev() == false) {
-<a class="jxr_linenumber" name="L727" href="#L727">727</a>                 <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">null</strong>;
-<a class="jxr_linenumber" name="L728" href="#L728">728</a>             }
-<a class="jxr_linenumber" name="L729" href="#L729">729</a> 
-<a class="jxr_linenumber" name="L730" href="#L730">730</a>             <em class="jxr_comment">// at this point we will have a prev so prep out position now</em>
-<a class="jxr_linenumber" name="L731" href="#L731">731</a>             prev = __temp_pos;
-<a class="jxr_linenumber" name="L732" href="#L732">732</a>             assert(prev != <strong class="jxr_keyword">null</strong> &amp;&amp; prev != __pos);
-<a class="jxr_linenumber" name="L733" href="#L733">733</a>             prev.copyFrom(__pos);
-<a class="jxr_linenumber" name="L734" href="#L734">734</a> 
-<a class="jxr_linenumber" name="L735" href="#L735">735</a>             prev.__local_index--;
-<a class="jxr_linenumber" name="L736" href="#L736">736</a>             <strong class="jxr_keyword">if</strong> (prev.__local_index &gt;= 0) {
-<a class="jxr_linenumber" name="L737" href="#L737">737</a>                 <strong class="jxr_keyword">return</strong> prev;
-<a class="jxr_linenumber" name="L738" href="#L738">738</a>             }
-<a class="jxr_linenumber" name="L739" href="#L739">739</a> 
-<a class="jxr_linenumber" name="L740" href="#L740">740</a>             <em class="jxr_comment">// if there's not system value there must be another user value</em>
-<a class="jxr_linenumber" name="L741" href="#L741">741</a>             <em class="jxr_comment">// we would have bailed with has_prev returned false above otherwise</em>
-<a class="jxr_linenumber" name="L742" href="#L742">742</a>             assert(prev.__user_index &gt; 0);
-<a class="jxr_linenumber" name="L743" href="#L743">743</a> 
-<a class="jxr_linenumber" name="L744" href="#L744">744</a>             <em class="jxr_comment">// if this is the 2nd prev then we really have to back up</em>
-<a class="jxr_linenumber" name="L745" href="#L745">745</a>             prev.__index_adjustment -= prev.__local_value_count;
-<a class="jxr_linenumber" name="L746" href="#L746">746</a>             prev.__user_index--;
-<a class="jxr_linenumber" name="L747" href="#L747">747</a>             prev.load_updated_position();
-<a class="jxr_linenumber" name="L748" href="#L748">748</a> 
-<a class="jxr_linenumber" name="L749" href="#L749">749</a>             <em class="jxr_comment">// going backwards we "start" at the end of our local list</em>
-<a class="jxr_linenumber" name="L750" href="#L750">750</a>             prev.__local_index = prev.__local_value_count - 1;
-<a class="jxr_linenumber" name="L751" href="#L751">751</a> 
-<a class="jxr_linenumber" name="L752" href="#L752">752</a>             <strong class="jxr_keyword">return</strong> prev;
-<a class="jxr_linenumber" name="L753" href="#L753">753</a>         }
-<a class="jxr_linenumber" name="L754" href="#L754">754</a> 
-<a class="jxr_linenumber" name="L755" href="#L755">755</a>         <em class="jxr_javadoccomment">/**</em>
-<a class="jxr_linenumber" name="L756" href="#L756">756</a> <em class="jxr_javadoccomment">         * removes the current member from the containing</em>
-<a class="jxr_linenumber" name="L757" href="#L757">757</a> <em class="jxr_javadoccomment">         * datagram if it is a user value.</em>
-<a class="jxr_linenumber" name="L758" href="#L758">758</a> <em class="jxr_javadoccomment">         *</em>
-<a class="jxr_linenumber" name="L759" href="#L759">759</a> <em class="jxr_javadoccomment">         * If there is no current value it throws NoSuchElementException</em>
-<a class="jxr_linenumber" name="L760" href="#L760">760</a> <em class="jxr_javadoccomment">         * If the current value is not a user value in the datagram</em>
-<a class="jxr_linenumber" name="L761" href="#L761">761</a> <em class="jxr_javadoccomment">         * this throws UnsupportedOperationException.</em>
-<a class="jxr_linenumber" name="L762" href="#L762">762</a> <em class="jxr_javadoccomment">         * And if the iterator is a read only iterator this also</em>
-<a class="jxr_linenumber" name="L763" href="#L763">763</a> <em class="jxr_javadoccomment">         * throws UnsupportedOperationException.</em>
-<a class="jxr_linenumber" name="L764" href="#L764">764</a> <em class="jxr_javadoccomment">         */</em>
-<a class="jxr_linenumber" name="L765" href="#L765">765</a>         <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">void</strong> remove()
-<a class="jxr_linenumber" name="L766" href="#L766">766</a>         {
-<a class="jxr_linenumber" name="L767" href="#L767">767</a>             <strong class="jxr_keyword">if</strong> (__readOnly) {
-<a class="jxr_linenumber" name="L768" href="#L768">768</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> UnsupportedOperationException();
-<a class="jxr_linenumber" name="L769" href="#L769">769</a>             }
-<a class="jxr_linenumber" name="L770" href="#L770">770</a>             force_position_sync();
-<a class="jxr_linenumber" name="L771" href="#L771">771</a> 
-<a class="jxr_linenumber" name="L772" href="#L772">772</a>             <strong class="jxr_keyword">if</strong> (__current == <strong class="jxr_keyword">null</strong> || __pos == <strong class="jxr_keyword">null</strong>) {
-<a class="jxr_linenumber" name="L773" href="#L773">773</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> NoSuchElementException();
-<a class="jxr_linenumber" name="L774" href="#L774">774</a>             }
-<a class="jxr_linenumber" name="L775" href="#L775">775</a>             <strong class="jxr_keyword">if</strong> (__pos.on_system_value()) {
-<a class="jxr_linenumber" name="L776" href="#L776">776</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> UnsupportedOperationException();
-<a class="jxr_linenumber" name="L777" href="#L777">777</a>             }
+<a class="jxr_linenumber" name="L625" href="#L625">625</a>             <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> user_value = __pos.__current_user_value;
+<a class="jxr_linenumber" name="L626" href="#L626">626</a>             <strong class="jxr_keyword">if</strong> (user_value == <strong class="jxr_keyword">null</strong> || user_value == _children[user_index]) {
+<a class="jxr_linenumber" name="L627" href="#L627">627</a>                 <strong class="jxr_keyword">return</strong>;
+<a class="jxr_linenumber" name="L628" href="#L628">628</a>             }
+<a class="jxr_linenumber" name="L629" href="#L629">629</a>             <strong class="jxr_keyword">if</strong> (__readOnly) {
+<a class="jxr_linenumber" name="L630" href="#L630">630</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> <a name="IonException" href="../../../../../software/amazon/ion/IonException.html#IonException">IonException</a>(<span class="jxr_string">"read only sequence was changed"</span>);
+<a class="jxr_linenumber" name="L631" href="#L631">631</a>             }
+<a class="jxr_linenumber" name="L632" href="#L632">632</a>             __pos.force_position_sync_helper();
+<a class="jxr_linenumber" name="L633" href="#L633">633</a>         }
+<a class="jxr_linenumber" name="L634" href="#L634">634</a> 
+<a class="jxr_linenumber" name="L635" href="#L635">635</a>         <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">void</strong> add(<a name="IonValue" href="../../../../../software/amazon/ion/IonValue.html#IonValue">IonValue</a> element)
+<a class="jxr_linenumber" name="L636" href="#L636">636</a>         {
+<a class="jxr_linenumber" name="L637" href="#L637">637</a>             <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> UnsupportedOperationException();
+<a class="jxr_linenumber" name="L638" href="#L638">638</a>         }
+<a class="jxr_linenumber" name="L639" href="#L639">639</a> 
+<a class="jxr_linenumber" name="L640" href="#L640">640</a>         <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">boolean</strong> hasNext()
+<a class="jxr_linenumber" name="L641" href="#L641">641</a>         {
+<a class="jxr_linenumber" name="L642" href="#L642">642</a>             <strong class="jxr_keyword">return</strong> __pos.has_next();
+<a class="jxr_linenumber" name="L643" href="#L643">643</a>         }
+<a class="jxr_linenumber" name="L644" href="#L644">644</a> 
+<a class="jxr_linenumber" name="L645" href="#L645">645</a>         <strong class="jxr_keyword">public</strong> <a name="IonValue" href="../../../../../software/amazon/ion/IonValue.html#IonValue">IonValue</a> next()
+<a class="jxr_linenumber" name="L646" href="#L646">646</a>         {
+<a class="jxr_linenumber" name="L647" href="#L647">647</a>             SystemIteratorPosition pos = next_index_helper();
+<a class="jxr_linenumber" name="L648" href="#L648">648</a>             <strong class="jxr_keyword">if</strong> (pos == <strong class="jxr_keyword">null</strong>) {
+<a class="jxr_linenumber" name="L649" href="#L649">649</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> NoSuchElementException();
+<a class="jxr_linenumber" name="L650" href="#L650">650</a>             }
+<a class="jxr_linenumber" name="L651" href="#L651">651</a>             <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> current_value = set_position(pos);
+<a class="jxr_linenumber" name="L652" href="#L652">652</a>             assert(current_value == <strong class="jxr_keyword">this</strong>.__current);
+<a class="jxr_linenumber" name="L653" href="#L653">653</a>             <strong class="jxr_keyword">return</strong> current_value;
+<a class="jxr_linenumber" name="L654" href="#L654">654</a>         }
+<a class="jxr_linenumber" name="L655" href="#L655">655</a> 
+<a class="jxr_linenumber" name="L656" href="#L656">656</a>         <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">int</strong> nextIndex()
+<a class="jxr_linenumber" name="L657" href="#L657">657</a>         {
+<a class="jxr_linenumber" name="L658" href="#L658">658</a>             SystemIteratorPosition pos = next_index_helper();
+<a class="jxr_linenumber" name="L659" href="#L659">659</a>             <strong class="jxr_keyword">if</strong> (pos == <strong class="jxr_keyword">null</strong>) {
+<a class="jxr_linenumber" name="L660" href="#L660">660</a>                 <em class="jxr_comment">// we can do this because we hold the __pos</em>
+<a class="jxr_linenumber" name="L661" href="#L661">661</a>                 <em class="jxr_comment">// even when we run off the end, it will be</em>
+<a class="jxr_linenumber" name="L662" href="#L662">662</a>                 <em class="jxr_comment">// positioned at the value that wasn't there</em>
+<a class="jxr_linenumber" name="L663" href="#L663">663</a>                 <strong class="jxr_keyword">return</strong> __pos.get_external_pos() + 1;
+<a class="jxr_linenumber" name="L664" href="#L664">664</a>             }
+<a class="jxr_linenumber" name="L665" href="#L665">665</a>             <strong class="jxr_keyword">int</strong> idx = pos.get_external_pos();
+<a class="jxr_linenumber" name="L666" href="#L666">666</a>             <strong class="jxr_keyword">return</strong> idx;
+<a class="jxr_linenumber" name="L667" href="#L667">667</a>         }
+<a class="jxr_linenumber" name="L668" href="#L668">668</a> 
+<a class="jxr_linenumber" name="L669" href="#L669">669</a>         <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> SystemIteratorPosition next_index_helper()
+<a class="jxr_linenumber" name="L670" href="#L670">670</a>         {
+<a class="jxr_linenumber" name="L671" href="#L671">671</a>             SystemIteratorPosition next = <strong class="jxr_keyword">null</strong>;
+<a class="jxr_linenumber" name="L672" href="#L672">672</a>             force_position_sync();
+<a class="jxr_linenumber" name="L673" href="#L673">673</a> 
+<a class="jxr_linenumber" name="L674" href="#L674">674</a>             <strong class="jxr_keyword">if</strong> (__pos.has_next() == false) {
+<a class="jxr_linenumber" name="L675" href="#L675">675</a>                 <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">null</strong>;
+<a class="jxr_linenumber" name="L676" href="#L676">676</a>             }
+<a class="jxr_linenumber" name="L677" href="#L677">677</a> 
+<a class="jxr_linenumber" name="L678" href="#L678">678</a>             <em class="jxr_comment">// at this point we will have a next so prep out position now</em>
+<a class="jxr_linenumber" name="L679" href="#L679">679</a>             next = __temp_pos;
+<a class="jxr_linenumber" name="L680" href="#L680">680</a>             assert(next != <strong class="jxr_keyword">null</strong> &amp;&amp; next != __pos);
+<a class="jxr_linenumber" name="L681" href="#L681">681</a>             next.copyFrom(__pos);
+<a class="jxr_linenumber" name="L682" href="#L682">682</a> 
+<a class="jxr_linenumber" name="L683" href="#L683">683</a>             <em class="jxr_comment">// see if there's a system value waiting for use</em>
+<a class="jxr_linenumber" name="L684" href="#L684">684</a>             next.__local_index++;
+<a class="jxr_linenumber" name="L685" href="#L685">685</a>             <strong class="jxr_keyword">if</strong> (next.__local_index &lt; next.__local_value_count) {
+<a class="jxr_linenumber" name="L686" href="#L686">686</a>                 <strong class="jxr_keyword">return</strong> next;
+<a class="jxr_linenumber" name="L687" href="#L687">687</a>             }
+<a class="jxr_linenumber" name="L688" href="#L688">688</a> 
+<a class="jxr_linenumber" name="L689" href="#L689">689</a>             <em class="jxr_comment">// if there's not system value there must be another user value</em>
+<a class="jxr_linenumber" name="L690" href="#L690">690</a>             <em class="jxr_comment">// so we shouldn't get here since has_next() should have failed</em>
+<a class="jxr_linenumber" name="L691" href="#L691">691</a>             assert(next.__user_index &lt;= get_child_count());
+<a class="jxr_linenumber" name="L692" href="#L692">692</a> 
+<a class="jxr_linenumber" name="L693" href="#L693">693</a>             <em class="jxr_comment">// if we were on a system value then we're just stepping onto the</em>
+<a class="jxr_linenumber" name="L694" href="#L694">694</a>             <em class="jxr_comment">// since has_next() already declared we do have a waiting value</em>
+<a class="jxr_linenumber" name="L695" href="#L695">695</a>             next.__user_index++;
+<a class="jxr_linenumber" name="L696" href="#L696">696</a>             next.load_updated_position();
+<a class="jxr_linenumber" name="L697" href="#L697">697</a>             <em class="jxr_comment">// we step onto the first local value</em>
+<a class="jxr_linenumber" name="L698" href="#L698">698</a>             next.__local_index = 0;
+<a class="jxr_linenumber" name="L699" href="#L699">699</a>             <strong class="jxr_keyword">return</strong> next;
+<a class="jxr_linenumber" name="L700" href="#L700">700</a>         }
+<a class="jxr_linenumber" name="L701" href="#L701">701</a> 
+<a class="jxr_linenumber" name="L702" href="#L702">702</a>         <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">boolean</strong> hasPrevious()
+<a class="jxr_linenumber" name="L703" href="#L703">703</a>         {
+<a class="jxr_linenumber" name="L704" href="#L704">704</a>             <strong class="jxr_keyword">return</strong> __pos.has_prev();
+<a class="jxr_linenumber" name="L705" href="#L705">705</a>         }
+<a class="jxr_linenumber" name="L706" href="#L706">706</a> 
+<a class="jxr_linenumber" name="L707" href="#L707">707</a>         <strong class="jxr_keyword">public</strong> <a name="IonValue" href="../../../../../software/amazon/ion/IonValue.html#IonValue">IonValue</a> previous()
+<a class="jxr_linenumber" name="L708" href="#L708">708</a>         {
+<a class="jxr_linenumber" name="L709" href="#L709">709</a>             SystemIteratorPosition pos = previous_index_helper();
+<a class="jxr_linenumber" name="L710" href="#L710">710</a>             <strong class="jxr_keyword">if</strong> (pos == <strong class="jxr_keyword">null</strong>) {
+<a class="jxr_linenumber" name="L711" href="#L711">711</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> NoSuchElementException();
+<a class="jxr_linenumber" name="L712" href="#L712">712</a>             }
+<a class="jxr_linenumber" name="L713" href="#L713">713</a>             <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> current_value = set_position(pos);
+<a class="jxr_linenumber" name="L714" href="#L714">714</a>             assert(current_value == <strong class="jxr_keyword">this</strong>.__current);
+<a class="jxr_linenumber" name="L715" href="#L715">715</a>             <strong class="jxr_keyword">return</strong> current_value;
+<a class="jxr_linenumber" name="L716" href="#L716">716</a>         }
+<a class="jxr_linenumber" name="L717" href="#L717">717</a> 
+<a class="jxr_linenumber" name="L718" href="#L718">718</a>         <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">int</strong> previousIndex()
+<a class="jxr_linenumber" name="L719" href="#L719">719</a>         {
+<a class="jxr_linenumber" name="L720" href="#L720">720</a>             SystemIteratorPosition pos = previous_index_helper();
+<a class="jxr_linenumber" name="L721" href="#L721">721</a>             <strong class="jxr_keyword">if</strong> (pos == <strong class="jxr_keyword">null</strong>) {
+<a class="jxr_linenumber" name="L722" href="#L722">722</a>                 <strong class="jxr_keyword">return</strong> -1;
+<a class="jxr_linenumber" name="L723" href="#L723">723</a>             }
+<a class="jxr_linenumber" name="L724" href="#L724">724</a>             <strong class="jxr_keyword">int</strong> idx = pos.get_external_pos();
+<a class="jxr_linenumber" name="L725" href="#L725">725</a>             <strong class="jxr_keyword">return</strong> idx;
+<a class="jxr_linenumber" name="L726" href="#L726">726</a>         }
+<a class="jxr_linenumber" name="L727" href="#L727">727</a> 
+<a class="jxr_linenumber" name="L728" href="#L728">728</a>         <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> SystemIteratorPosition previous_index_helper()
+<a class="jxr_linenumber" name="L729" href="#L729">729</a>         {
+<a class="jxr_linenumber" name="L730" href="#L730">730</a>             SystemIteratorPosition prev = <strong class="jxr_keyword">null</strong>;
+<a class="jxr_linenumber" name="L731" href="#L731">731</a> 
+<a class="jxr_linenumber" name="L732" href="#L732">732</a>             force_position_sync();
+<a class="jxr_linenumber" name="L733" href="#L733">733</a>             <strong class="jxr_keyword">if</strong> (__pos.has_prev() == false) {
+<a class="jxr_linenumber" name="L734" href="#L734">734</a>                 <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">null</strong>;
+<a class="jxr_linenumber" name="L735" href="#L735">735</a>             }
+<a class="jxr_linenumber" name="L736" href="#L736">736</a> 
+<a class="jxr_linenumber" name="L737" href="#L737">737</a>             <em class="jxr_comment">// at this point we will have a prev so prep out position now</em>
+<a class="jxr_linenumber" name="L738" href="#L738">738</a>             prev = __temp_pos;
+<a class="jxr_linenumber" name="L739" href="#L739">739</a>             assert(prev != <strong class="jxr_keyword">null</strong> &amp;&amp; prev != __pos);
+<a class="jxr_linenumber" name="L740" href="#L740">740</a>             prev.copyFrom(__pos);
+<a class="jxr_linenumber" name="L741" href="#L741">741</a> 
+<a class="jxr_linenumber" name="L742" href="#L742">742</a>             prev.__local_index--;
+<a class="jxr_linenumber" name="L743" href="#L743">743</a>             <strong class="jxr_keyword">if</strong> (prev.__local_index &gt;= 0) {
+<a class="jxr_linenumber" name="L744" href="#L744">744</a>                 <strong class="jxr_keyword">return</strong> prev;
+<a class="jxr_linenumber" name="L745" href="#L745">745</a>             }
+<a class="jxr_linenumber" name="L746" href="#L746">746</a> 
+<a class="jxr_linenumber" name="L747" href="#L747">747</a>             <em class="jxr_comment">// if there's not system value there must be another user value</em>
+<a class="jxr_linenumber" name="L748" href="#L748">748</a>             <em class="jxr_comment">// we would have bailed with has_prev returned false above otherwise</em>
+<a class="jxr_linenumber" name="L749" href="#L749">749</a>             assert(prev.__user_index &gt; 0);
+<a class="jxr_linenumber" name="L750" href="#L750">750</a> 
+<a class="jxr_linenumber" name="L751" href="#L751">751</a>             <em class="jxr_comment">// if this is the 2nd prev then we really have to back up</em>
+<a class="jxr_linenumber" name="L752" href="#L752">752</a>             prev.__index_adjustment -= prev.__local_value_count;
+<a class="jxr_linenumber" name="L753" href="#L753">753</a>             prev.__user_index--;
+<a class="jxr_linenumber" name="L754" href="#L754">754</a>             prev.load_updated_position();
+<a class="jxr_linenumber" name="L755" href="#L755">755</a> 
+<a class="jxr_linenumber" name="L756" href="#L756">756</a>             <em class="jxr_comment">// going backwards we "start" at the end of our local list</em>
+<a class="jxr_linenumber" name="L757" href="#L757">757</a>             prev.__local_index = prev.__local_value_count - 1;
+<a class="jxr_linenumber" name="L758" href="#L758">758</a> 
+<a class="jxr_linenumber" name="L759" href="#L759">759</a>             <strong class="jxr_keyword">return</strong> prev;
+<a class="jxr_linenumber" name="L760" href="#L760">760</a>         }
+<a class="jxr_linenumber" name="L761" href="#L761">761</a> 
+<a class="jxr_linenumber" name="L762" href="#L762">762</a>         <em class="jxr_javadoccomment">/**</em>
+<a class="jxr_linenumber" name="L763" href="#L763">763</a> <em class="jxr_javadoccomment">         * removes the current member from the containing</em>
+<a class="jxr_linenumber" name="L764" href="#L764">764</a> <em class="jxr_javadoccomment">         * datagram if it is a user value.</em>
+<a class="jxr_linenumber" name="L765" href="#L765">765</a> <em class="jxr_javadoccomment">         *</em>
+<a class="jxr_linenumber" name="L766" href="#L766">766</a> <em class="jxr_javadoccomment">         * If there is no current value it throws NoSuchElementException</em>
+<a class="jxr_linenumber" name="L767" href="#L767">767</a> <em class="jxr_javadoccomment">         * If the current value is not a user value in the datagram</em>
+<a class="jxr_linenumber" name="L768" href="#L768">768</a> <em class="jxr_javadoccomment">         * this throws UnsupportedOperationException.</em>
+<a class="jxr_linenumber" name="L769" href="#L769">769</a> <em class="jxr_javadoccomment">         * And if the iterator is a read only iterator this also</em>
+<a class="jxr_linenumber" name="L770" href="#L770">770</a> <em class="jxr_javadoccomment">         * throws UnsupportedOperationException.</em>
+<a class="jxr_linenumber" name="L771" href="#L771">771</a> <em class="jxr_javadoccomment">         */</em>
+<a class="jxr_linenumber" name="L772" href="#L772">772</a>         <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">void</strong> remove()
+<a class="jxr_linenumber" name="L773" href="#L773">773</a>         {
+<a class="jxr_linenumber" name="L774" href="#L774">774</a>             <strong class="jxr_keyword">if</strong> (__readOnly) {
+<a class="jxr_linenumber" name="L775" href="#L775">775</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> UnsupportedOperationException();
+<a class="jxr_linenumber" name="L776" href="#L776">776</a>             }
+<a class="jxr_linenumber" name="L777" href="#L777">777</a>             force_position_sync();
 <a class="jxr_linenumber" name="L778" href="#L778">778</a> 
-<a class="jxr_linenumber" name="L779" href="#L779">779</a>             <strong class="jxr_keyword">int</strong> idx = __pos.__user_index;
-<a class="jxr_linenumber" name="L780" href="#L780">780</a>             assert(idx &gt;= 0);
-<a class="jxr_linenumber" name="L781" href="#L781">781</a> 
-<a class="jxr_linenumber" name="L782" href="#L782">782</a>             <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> concrete = __current;
-<a class="jxr_linenumber" name="L783" href="#L783">783</a>             <strong class="jxr_keyword">int</strong> concrete_idx = concrete._elementid();
-<a class="jxr_linenumber" name="L784" href="#L784">784</a>             assert(concrete_idx == idx);
+<a class="jxr_linenumber" name="L779" href="#L779">779</a>             <strong class="jxr_keyword">if</strong> (__current == <strong class="jxr_keyword">null</strong> || __pos == <strong class="jxr_keyword">null</strong>) {
+<a class="jxr_linenumber" name="L780" href="#L780">780</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> NoSuchElementException();
+<a class="jxr_linenumber" name="L781" href="#L781">781</a>             }
+<a class="jxr_linenumber" name="L782" href="#L782">782</a>             <strong class="jxr_keyword">if</strong> (__pos.on_system_value()) {
+<a class="jxr_linenumber" name="L783" href="#L783">783</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> UnsupportedOperationException();
+<a class="jxr_linenumber" name="L784" href="#L784">784</a>             }
 <a class="jxr_linenumber" name="L785" href="#L785">785</a> 
-<a class="jxr_linenumber" name="L786" href="#L786">786</a>             <em class="jxr_comment">// here we remove the member from the container's list of elements</em>
-<a class="jxr_linenumber" name="L787" href="#L787">787</a>             remove_child(idx);
-<a class="jxr_linenumber" name="L788" href="#L788">788</a>             patch_elements_helper(concrete_idx);
-<a class="jxr_linenumber" name="L789" href="#L789">789</a> 
-<a class="jxr_linenumber" name="L790" href="#L790">790</a>             <em class="jxr_comment">// when we remove the current value we remove</em>
-<a class="jxr_linenumber" name="L791" href="#L791">791</a>             <em class="jxr_comment">// its associated system values and this</em>
-<a class="jxr_linenumber" name="L792" href="#L792">792</a>             <em class="jxr_comment">// may change the index adjustment</em>
-<a class="jxr_linenumber" name="L793" href="#L793">793</a>             __pos.__index_adjustment -= __pos.__local_value_count;
-<a class="jxr_linenumber" name="L794" href="#L794">794</a>             <strong class="jxr_keyword">if</strong> (__pos.__user_index &lt; get_child_count() - 1)
-<a class="jxr_linenumber" name="L795" href="#L795">795</a>             {
-<a class="jxr_linenumber" name="L796" href="#L796">796</a>                 __pos.load_updated_position();
-<a class="jxr_linenumber" name="L797" href="#L797">797</a>                 __pos.__local_index = -1;
-<a class="jxr_linenumber" name="L798" href="#L798">798</a>             }
-<a class="jxr_linenumber" name="L799" href="#L799">799</a>             __current = <strong class="jxr_keyword">null</strong>;
-<a class="jxr_linenumber" name="L800" href="#L800">800</a>         }
-<a class="jxr_linenumber" name="L801" href="#L801">801</a> 
-<a class="jxr_linenumber" name="L802" href="#L802">802</a>         <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">void</strong> set(<a name="IonValue" href="../../../../../software/amazon/ion/IonValue.html#IonValue">IonValue</a> element)
-<a class="jxr_linenumber" name="L803" href="#L803">803</a>         {
-<a class="jxr_linenumber" name="L804" href="#L804">804</a>             <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> UnsupportedOperationException();
-<a class="jxr_linenumber" name="L805" href="#L805">805</a>         }
-<a class="jxr_linenumber" name="L806" href="#L806">806</a>         <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">int</strong> get_datagram_child_count()
-<a class="jxr_linenumber" name="L807" href="#L807">807</a>         {
-<a class="jxr_linenumber" name="L808" href="#L808">808</a>             <strong class="jxr_keyword">return</strong> get_child_count();
-<a class="jxr_linenumber" name="L809" href="#L809">809</a>         }
-<a class="jxr_linenumber" name="L810" href="#L810">810</a>         <strong class="jxr_keyword">protected</strong> <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> get_datagram_child(<strong class="jxr_keyword">int</strong> idx)
-<a class="jxr_linenumber" name="L811" href="#L811">811</a>         {
-<a class="jxr_linenumber" name="L812" href="#L812">812</a>             <strong class="jxr_keyword">return</strong> get_child(idx);
-<a class="jxr_linenumber" name="L813" href="#L813">813</a>         }
-<a class="jxr_linenumber" name="L814" href="#L814">814</a>         <strong class="jxr_keyword">protected</strong> <a name="IonSystem" href="../../../../../software/amazon/ion/IonSystem.html#IonSystem">IonSystem</a> get_datagram_system()
-<a class="jxr_linenumber" name="L815" href="#L815">815</a>         {
-<a class="jxr_linenumber" name="L816" href="#L816">816</a>             <strong class="jxr_keyword">return</strong> _system;
-<a class="jxr_linenumber" name="L817" href="#L817">817</a>         }
-<a class="jxr_linenumber" name="L818" href="#L818">818</a>         <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">boolean</strong> datagram_contains(<a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> value)
-<a class="jxr_linenumber" name="L819" href="#L819">819</a>         {
-<a class="jxr_linenumber" name="L820" href="#L820">820</a>             <strong class="jxr_keyword">return</strong> contains(value);
-<a class="jxr_linenumber" name="L821" href="#L821">821</a>         }
-<a class="jxr_linenumber" name="L822" href="#L822">822</a>         <strong class="jxr_keyword">protected</strong> <a name="IonSymbolLite" href="../../../../../software/amazon/ion/impl/lite/IonSymbolLite.html#IonSymbolLite">IonSymbolLite</a> get_datagram_ivm()
-<a class="jxr_linenumber" name="L823" href="#L823">823</a>         {
-<a class="jxr_linenumber" name="L824" href="#L824">824</a>             <strong class="jxr_keyword">return</strong> get_ivm();
-<a class="jxr_linenumber" name="L825" href="#L825">825</a>         }
-<a class="jxr_linenumber" name="L826" href="#L826">826</a>     }
-<a class="jxr_linenumber" name="L827" href="#L827">827</a>     <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">class</strong> SystemIteratorPosition
-<a class="jxr_linenumber" name="L828" href="#L828">828</a>     {
-<a class="jxr_linenumber" name="L829" href="#L829">829</a>         <em class="jxr_javadoccomment">/**</em>
-<a class="jxr_linenumber" name="L830" href="#L830">830</a> <em class="jxr_javadoccomment">         * this position points to the user value that</em>
-<a class="jxr_linenumber" name="L831" href="#L831">831</a> <em class="jxr_javadoccomment">         * we might have just passed calling next</em>
-<a class="jxr_linenumber" name="L832" href="#L832">832</a> <em class="jxr_javadoccomment">         *</em>
-<a class="jxr_linenumber" name="L833" href="#L833">833</a> <em class="jxr_javadoccomment">         * that is this position is between the last</em>
-<a class="jxr_linenumber" name="L834" href="#L834">834</a> <em class="jxr_javadoccomment">         * value returned by next and the next value</em>
-<a class="jxr_linenumber" name="L835" href="#L835">835</a> <em class="jxr_javadoccomment">         * that will be returned.</em>
-<a class="jxr_linenumber" name="L836" href="#L836">836</a> <em class="jxr_javadoccomment">         *</em>
-<a class="jxr_linenumber" name="L837" href="#L837">837</a> <em class="jxr_javadoccomment">         * As we change the user index we load the</em>
-<a class="jxr_linenumber" name="L838" href="#L838">838</a> <em class="jxr_javadoccomment">         * current user value and synthesize any needed</em>
-<a class="jxr_linenumber" name="L839" href="#L839">839</a> <em class="jxr_javadoccomment">         * local system values</em>
-<a class="jxr_linenumber" name="L840" href="#L840">840</a> <em class="jxr_javadoccomment">         *</em>
-<a class="jxr_linenumber" name="L841" href="#L841">841</a> <em class="jxr_javadoccomment">         * we also push the user value onto the same</em>
-<a class="jxr_linenumber" name="L842" href="#L842">842</a> <em class="jxr_javadoccomment">         * local stack.  that way out local index can</em>
-<a class="jxr_linenumber" name="L843" href="#L843">843</a> <em class="jxr_javadoccomment">         * run off either end of the local "list"</em>
-<a class="jxr_linenumber" name="L844" href="#L844">844</a> <em class="jxr_javadoccomment">         * and only when we go yet another past either</em>
-<a class="jxr_linenumber" name="L845" href="#L845">845</a> <em class="jxr_javadoccomment">         * end do we need to reload the value to</em>
-<a class="jxr_linenumber" name="L846" href="#L846">846</a> <em class="jxr_javadoccomment">         * one side of the other, and which side of</em>
-<a class="jxr_linenumber" name="L847" href="#L847">847</a> <em class="jxr_javadoccomment">         * our local list we ran off of will tell</em>
-<a class="jxr_linenumber" name="L848" href="#L848">848</a> <em class="jxr_javadoccomment">         * us that.</em>
-<a class="jxr_linenumber" name="L849" href="#L849">849</a> <em class="jxr_javadoccomment">         */</em>
-<a class="jxr_linenumber" name="L850" href="#L850">850</a>         <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">final</strong> SystemContentIterator __iterator;
-<a class="jxr_linenumber" name="L851" href="#L851">851</a>         <strong class="jxr_keyword">protected</strong>       <strong class="jxr_keyword">int</strong>                   __index_adjustment;      <em class="jxr_comment">// delta between the user_content_pos and the external_pos</em>
-<a class="jxr_linenumber" name="L852" href="#L852">852</a> 
-<a class="jxr_linenumber" name="L853" href="#L853">853</a>         <strong class="jxr_keyword">protected</strong>       <strong class="jxr_keyword">int</strong>                   __local_index;           <em class="jxr_comment">// index of the next value in the system array (__local_system_value), if __on_system_value</em>
-<a class="jxr_linenumber" name="L854" href="#L854">854</a>         <strong class="jxr_keyword">protected</strong>       <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonVal<a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a>IonValueLite">IonValueLite</a>[]        __local_values = <strong class="jxr_keyword">new</strong> <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a>[3]; <em class="jxr_comment">// more than the value, a symbol table, and a version marker would be MOST unusual</em>
-<a class="jxr_linenumber" name="L855" href="#L855">855</a>         <strong class="jxr_keyword">protected</strong>       <strong class="jxr_keyword">int</strong>                   __local_value_count;
-<a class="jxr_linenumber" name="L856" href="#L856">856</a> 
-<a class="jxr_linenumber" name="L857" href="#L857">857</a>         <strong class="jxr_keyword">protected</strong>       <strong class="jxr_keyword">int</strong>                   __user_index;            <em class="jxr_comment">// index of next value in the user content array (_children)</em>
-<a class="jxr_linenumber" name="L858" href="#L858">858</a>         <strong class="jxr_keyword">protected</strong>       <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a>          __current_user_value;    <em class="jxr_comment">// value from the child array at the time the user_index was moved forward == get_child(next_user_index -1)</em>
-<a class="jxr_linenumber" name="L859" href="#L859">859</a>         <strong class="jxr_keyword">protected</strong>       <a name="SymbolTable" href="../../../../../software/amazon/ion/SymbolTable.html#SymbolTable">SymbolTable</a>           __current_symbols;
-<a class="jxr_linenumber" name="L860" href="#L860">860</a>         <strong class="jxr_keyword">protected</strong>       <strong class="jxr_keyword">int</strong>                   __current_symbols_index;
-<a class="jxr_linenumber" name="L861" href="#L861">861</a> 
-<a class="jxr_linenumber" name="L862" href="#L862">862</a>         SystemIteratorPosition(SystemContentIterator iterator)
-<a class="jxr_linenumber" name="L863" href="#L863">863</a>         {
-<a class="jxr_linenumber" name="L864" href="#L864">864</a>             __iterator = iterator;
-<a class="jxr_linenumber" name="L865" href="#L865">865</a>         }
-<a class="jxr_linenumber" name="L866" href="#L866">866</a> 
-<a class="jxr_linenumber" name="L867" href="#L867">867</a>         <strong class="jxr_keyword">void</strong> load_initial_position()
-<a class="jxr_linenumber" name="L868" href="#L868">868</a>         {
-<a class="jxr_linenumber" name="L869" href="#L869">869</a>             __user_index = 0;
-<a class="jxr_linenumber" name="L870" href="#L870">870</a>             __local_index = -1; <em class="jxr_comment">// we're before the first value</em>
-<a class="jxr_linenumber" name="L871" href="#L871">871</a>             __current_symbols_index = -1;
-<a class="jxr_linenumber" name="L872" href="#L872">872</a>             load_updated_position();
-<a class="jxr_linenumber" name="L873" href="#L873">873</a>         }
-<a class="jxr_linenumber" name="L874" href="#L874">874</a> 
-<a class="jxr_linenumber" name="L875" href="#L875">875</a>         <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">int</strong> get_external_pos()
-<a class="jxr_linenumber" name="L876" href="#L876">876</a>         {
-<a class="jxr_linenumber" name="L877" href="#L877">877</a>             <strong class="jxr_keyword">int</strong> user_index;
-<a class="jxr_linenumber" name="L878" href="#L878">878</a>             user_index  = __user_index;
-<a class="jxr_linenumber" name="L879" href="#L879">879</a>             user_index += __index_adjustment;
-<a class="jxr_linenumber" name="L880" href="#L880">880</a>             user_index -= __local_value_count;
-<a class="jxr_linenumber" name="L881" href="#L881">881</a>             user_index += __local_index;
-<a class="jxr_linenumber" name="L882" href="#L882">882</a>             <strong class="jxr_keyword">return</strong> user_index;
-<a class="jxr_linenumber" name="L883" href="#L883">883</a>         }
-<a class="jxr_linenumber" name="L884" href="#L884">884</a> 
-<a class="jxr_linenumber" name="L885" href="#L885">885</a>         <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">boolean</strong> on_system_value()
-<a class="jxr_linenumber" name="L886" href="#L886">886</a>         {
-<a class="jxr_linenumber" name="L887" href="#L887">887</a>             <strong class="jxr_keyword">return</strong> (__current_user_value != __local_values[0]);
-<a class="jxr_linenumber" name="L888" href="#L888">888</a>         }
-<a class="jxr_linenumber" name="L889" href="#L889">889</a>         <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">boolean</strong> has_next()
-<a class="jxr_linenumber" name="L890" href="#L890">890</a>         {
-<a class="jxr_linenumber" name="L891" href="#L891">891</a>             <strong class="jxr_keyword">if</strong> (__local_index + 1 &lt; __local_value_count) {
-<a class="jxr_linenumber" name="L892" href="#L892">892</a>                 <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">true</strong>;
-<a class="jxr_linenumber" name="L893" href="#L893">893</a>             }
-<a class="jxr_linenumber" name="L894" href="#L894">894</a>             <strong class="jxr_keyword">if</strong> (__user_index + 1 &lt; __iterator.get_datagram_child_count()) {
-<a class="jxr_linenumber" name="L895" href="#L895">895</a>                 <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">true</strong>;
-<a class="jxr_linenumber" name="L896" href="#L896">896</a>             }
-<a class="jxr_linenumber" name="L897" href="#L897">897</a>             <strong class="jxr_keyword">return</strong> false;
-<a class="jxr_linenumber" name="L898" href="#L898">898</a>         }
-<a class="jxr_linenumber" name="L899" href="#L899">899</a>         <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">boolean</strong> has_prev()
-<a class="jxr_linenumber" name="L900" href="#L900">900</a>         {
-<a class="jxr_linenumber" name="L901" href="#L901">901</a>             <em class="jxr_comment">// if we're not at the beginning of the datagram list</em>
-<a class="jxr_linenumber" name="L902" href="#L902">902</a>             <em class="jxr_comment">// we always have another user value</em>
-<a class="jxr_linenumber" name="L903" href="#L903">903</a>             <strong class="jxr_keyword">if</strong> (__user_index &gt; 0) {
-<a class="jxr_linenumber" name="L904" href="#L904">904</a>                 <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">true</strong>;
-<a class="jxr_linenumber" name="L905" href="#L905">905</a>             }
-<a class="jxr_linenumber" name="L906" href="#L906">906</a>             <strong class="jxr_keyword">if</strong> (__local_index &gt; 0) {
-<a class="jxr_linenumber" name="L907" href="#L907">907</a>                 <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">true</strong>;
-<a class="jxr_linenumber" name="L908" href="#L908">908</a>             }
-<a class="jxr_linenumber" name="L909" href="#L909">909</a>             <em class="jxr_comment">// we're out of both user and system values</em>
-<a class="jxr_linenumber" name="L910" href="#L910">910</a>             <strong class="jxr_keyword">return</strong> false;
-<a class="jxr_linenumber" name="L911" href="#L911">911</a>         }
-<a class="jxr_linenumber" name="L912" href="#L912">912</a> 
-<a class="jxr_linenumber" name="L913" href="#L913">913</a>         <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">void</strong> copyFrom(SystemIteratorPosition source)
-<a class="jxr_linenumber" name="L914" href="#L914">914</a>         {
-<a class="jxr_linenumber" name="L915" href="#L915">915</a>             <strong class="jxr_keyword">this</strong>.__index_adjustment         = source.__index_adjustment;
-<a class="jxr_linenumber" name="L916" href="#L916">916</a>             <strong class="jxr_keyword">this</strong>.__user_index               = source.__user_index;
-<a class="jxr_linenumber" name="L917" href="#L917">917</a>             <strong class="jxr_keyword">this</strong>.__local_index              = source.__local_index;
-<a class="jxr_linenumber" name="L918" href="#L918">918</a>             <strong class="jxr_keyword">this</strong>.__current_user_value       = source.__current_user_value;
-<a class="jxr_linenumber" name="L919" href="#L919">919</a>             <strong class="jxr_keyword">this</strong>.__current_symbols          = source.__current_symbols;
-<a class="jxr_linenumber" name="L920" href="#L920">920</a>             <strong class="jxr_keyword">this</strong>.__current_symbols_index    = source.__current_symbols_index;
-<a class="jxr_linenumber" name="L921" href="#L921">921</a> 
-<a class="jxr_linenumber" name="L922" href="#L922">922</a>             <em class="jxr_comment">// for the local system values each position needs its own</em>
-<a class="jxr_linenumber" name="L923" href="#L923">923</a>             <em class="jxr_comment">// array, but the can share the value references</em>
-<a class="jxr_linenumber" name="L924" href="#L924">924</a>             <strong class="jxr_keyword">if</strong> (source.__local_value_count &gt; 0) {
-<a class="jxr_linenumber" name="L925" href="#L925">925</a>                 <strong class="jxr_keyword">if</strong> (<strong class="jxr_keyword">this</strong>.__local_values == <strong class="jxr_keyword">null</strong> || source.__local_value_count &gt;= <strong class="jxr_keyword">this</strong>.__local_values.length) {
-<a class="jxr_linenumber" name="L926" href="#L926">926</a>                     <strong class="jxr_keyword">this</strong>.__local_values = <strong class="jxr_keyword">new</strong> <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a>[source.__local_values.length];
-<a class="jxr_linenumber" name="L927" href="#L927">927</a>                 }
-<a class="jxr_linenumber" name="L928" href="#L928">928</a>                 System.arraycopy(source.__local_values, 0, <strong class="jxr_keyword">this</strong>.__local_values, 0, source.__local_value_count);
-<a class="jxr_linenumber" name="L929" href="#L929">929</a>             }
-<a class="jxr_linenumber" name="L930" href="#L930">930</a>             <strong class="jxr_keyword">this</strong>.__local_value_count = source.__local_value_count;
-<a class="jxr_linenumber" name="L931" href="#L931">931</a>         }
-<a class="jxr_linenumber" name="L932" href="#L932">932</a> 
-<a class="jxr_linenumber" name="L933" href="#L933">933</a>         <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">void</strong> load_updated_position()
-<a class="jxr_linenumber" name="L934" href="#L934">934</a>         {
-<a class="jxr_linenumber" name="L935" href="#L935">935</a>             <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> prev_value = __current_user_value;
-<a class="jxr_linenumber" name="L936" href="#L936">936</a>             <em class="jxr_comment">// we load our referenced user value (@ __user_index if</em>
-<a class="jxr_linenumber" name="L937" href="#L937">937</a>             <em class="jxr_comment">// it exists).</em>
-<a class="jxr_linenumber" name="L938" href="#L938">938</a>             <strong class="jxr_keyword">if</strong> (__user_index &lt; 0 || (__user_index &gt; 0 &amp;&amp; __user_index &gt;=  __iterator.get_datagram_child_count())) {
-<a class="jxr_linenumber" name="L939" href="#L939">939</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> <a name="IonException" href="../../../../../software/amazon/ion/IonException.html#IonException">IonException</a>(<span class="jxr_string">"attempt to position iterator past end of values"</span>);
-<a class="jxr_linenumber" name="L940" href="#L940">940</a>             }
-<a class="jxr_linenumber" name="L941" href="#L941">941</a>             <strong class="jxr_keyword">if</strong> (__user_index &lt; __iterator.get_datagram_child_count()) {
-<a class="jxr_linenumber" name="L942" href="#L942">942</a>                 __current_user_value = __iterator.get_datagram_child(__user_index);
-<a class="jxr_linenumber" name="L943" href="#L943">943</a>                 assert(__current_user_value != <strong class="jxr_keyword">null</strong>);
-<a class="jxr_linenumber" name="L944" href="#L944">944</a>             }
-<a class="jxr_linenumber" name="L945" href="#L945">945</a>             <strong class="jxr_keyword">else</strong> {
-<a class="jxr_linenumber" name="L946" href="#L946">946</a>                 <em class="jxr_comment">// when there are no user values and we're at index == 0</em>
-<a class="jxr_linenumber" name="L947" href="#L947">947</a>                 assert(__user_index == 0 &amp;&amp; __iterator.get_datagram_child_count() == 0);
-<a class="jxr_linenumber" name="L948" href="#L948">948</a>                 __current_user_value = <strong class="jxr_keyword">null</strong>;
-<a class="jxr_linenumber" name="L949" href="#L949">949</a>             }
-<a class="jxr_linenumber" name="L950" href="#L950">950</a> 
-<a class="jxr_linenumber" name="L951" href="#L951">951</a>             <strong class="jxr_keyword">int</strong> old_count = __local_value_count;
-<a class="jxr_linenumber" name="L952" href="#L952">952</a>             __local_value_count = 0;
-<a class="jxr_linenumber" name="L953" href="#L953">953</a>             <strong class="jxr_keyword">if</strong> (__current_user_value != <strong class="jxr_keyword">null</strong>) {
-<a class="jxr_linenumber" name="L954" href="#L954">954</a>                 push_system_value(__current_user_value);
-<a class="jxr_linenumber" name="L955" href="#L955">955</a>             }
-<a class="jxr_linenumber" name="L956" href="#L956">956</a>             load_current_symbol_table(prev_value);
+<a class="jxr_linenumber" name="L786" href="#L786">786</a>             <strong class="jxr_keyword">int</strong> idx = __pos.__user_index;
+<a class="jxr_linenumber" name="L787" href="#L787">787</a>             assert(idx &gt;= 0);
+<a class="jxr_linenumber" name="L788" href="#L788">788</a> 
+<a class="jxr_linenumber" name="L789" href="#L789">789</a>             <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> concrete = __current;
+<a class="jxr_linenumber" name="L790" href="#L790">790</a>             <strong class="jxr_keyword">int</strong> concrete_idx = concrete._elementid();
+<a class="jxr_linenumber" name="L791" href="#L791">791</a>             assert(concrete_idx == idx);
+<a class="jxr_linenumber" name="L792" href="#L792">792</a> 
+<a class="jxr_linenumber" name="L793" href="#L793">793</a>             <em class="jxr_comment">// here we remove the member from the container's list of elements</em>
+<a class="jxr_linenumber" name="L794" href="#L794">794</a>             remove_child(idx);
+<a class="jxr_linenumber" name="L795" href="#L795">795</a>             patch_elements_helper(concrete_idx);
+<a class="jxr_linenumber" name="L796" href="#L796">796</a> 
+<a class="jxr_linenumber" name="L797" href="#L797">797</a>             <em class="jxr_comment">// when we remove the current value we remove</em>
+<a class="jxr_linenumber" name="L798" href="#L798">798</a>             <em class="jxr_comment">// its associated system values and this</em>
+<a class="jxr_linenumber" name="L799" href="#L799">799</a>             <em class="jxr_comment">// may change the index adjustment</em>
+<a class="jxr_linenumber" name="L800" href="#L800">800</a>             __pos.__index_adjustment -= __pos.__local_value_count;
+<a class="jxr_linenumber" name="L801" href="#L801">801</a>             <strong class="jxr_keyword">if</strong> (__pos.__user_index &lt; get_child_count() - 1)
+<a class="jxr_linenumber" name="L802" href="#L802">802</a>             {
+<a class="jxr_linenumber" name="L803" href="#L803">803</a>                 __pos.load_updated_position();
+<a class="jxr_linenumber" name="L804" href="#L804">804</a>                 __pos.__local_index = -1;
+<a class="jxr_linenumber" name="L805" href="#L805">805</a>             }
+<a class="jxr_linenumber" name="L806" href="#L806">806</a>             __current = <strong class="jxr_keyword">null</strong>;
+<a class="jxr_linenumber" name="L807" href="#L807">807</a>         }
+<a class="jxr_linenumber" name="L808" href="#L808">808</a> 
+<a class="jxr_linenumber" name="L809" href="#L809">809</a>         <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">void</strong> set(<a name="IonValue" href="../../../../../software/amazon/ion/IonValue.html#IonValue">IonValue</a> element)
+<a class="jxr_linenumber" name="L810" href="#L810">810</a>         {
+<a class="jxr_linenumber" name="L811" href="#L811">811</a>             <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> UnsupportedOperationException();
+<a class="jxr_linenumber" name="L812" href="#L812">812</a>         }
+<a class="jxr_linenumber" name="L813" href="#L813">813</a>         <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">int</strong> get_datagram_child_count()
+<a class="jxr_linenumber" name="L814" href="#L814">814</a>         {
+<a class="jxr_linenumber" name="L815" href="#L815">815</a>             <strong class="jxr_keyword">return</strong> get_child_count();
+<a class="jxr_linenumber" name="L816" href="#L816">816</a>         }
+<a class="jxr_linenumber" name="L817" href="#L817">817</a>         <strong class="jxr_keyword">protected</strong> <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> get_datagram_child(<strong class="jxr_keyword">int</strong> idx)
+<a class="jxr_linenumber" name="L818" href="#L818">818</a>         {
+<a class="jxr_linenumber" name="L819" href="#L819">819</a>             <strong class="jxr_keyword">return</strong> get_child(idx);
+<a class="jxr_linenumber" name="L820" href="#L820">820</a>         }
+<a class="jxr_linenumber" name="L821" href="#L821">821</a>         <strong class="jxr_keyword">protected</strong> <a name="IonSystem" href="../../../../../software/amazon/ion/IonSystem.html#IonSystem">IonSystem</a> get_datagram_system()
+<a class="jxr_linenumber" name="L822" href="#L822">822</a>         {
+<a class="jxr_linenumber" name="L823" href="#L823">823</a>             <strong class="jxr_keyword">return</strong> _system;
+<a class="jxr_linenumber" name="L824" href="#L824">824</a>         }
+<a class="jxr_linenumber" name="L825" href="#L825">825</a>         <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">boolean</strong> datagram_contains(<a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> value)
+<a class="jxr_linenumber" name="L826" href="#L826">826</a>         {
+<a class="jxr_linenumber" name="L827" href="#L827">827</a>             <strong class="jxr_keyword">return</strong> contains(value);
+<a class="jxr_linenumber" name="L828" href="#L828">828</a>         }
+<a class="jxr_linenumber" name="L829" href="#L829">829</a>         <strong class="jxr_keyword">protected</strong> <a name="IonSymbolLite" href="../../../../../software/amazon/ion/impl/lite/IonSymbolLite.html#IonSymbolLite">IonSymbolLite</a> get_datagram_ivm()
+<a class="jxr_linenumber" name="L830" href="#L830">830</a>         {
+<a class="jxr_linenumber" name="L831" href="#L831">831</a>             <strong class="jxr_keyword">return</strong> get_ivm();
+<a class="jxr_linenumber" name="L832" href="#L832">832</a>         }
+<a class="jxr_linenumber" name="L833" href="#L833">833</a>     }
+<a class="jxr_linenumber" name="L834" href="#L834">834</a>     <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">class</strong> SystemIteratorPosition
+<a class="jxr_linenumber" name="L835" href="#L835">835</a>     {
+<a class="jxr_linenumber" name="L836" href="#L836">836</a>         <em class="jxr_javadoccomment">/**</em>
+<a class="jxr_linenumber" name="L837" href="#L837">837</a> <em class="jxr_javadoccomment">         * this position points to the user value that</em>
+<a class="jxr_linenumber" name="L838" href="#L838">838</a> <em class="jxr_javadoccomment">         * we might have just passed calling next</em>
+<a class="jxr_linenumber" name="L839" href="#L839">839</a> <em class="jxr_javadoccomment">         *</em>
+<a class="jxr_linenumber" name="L840" href="#L840">840</a> <em class="jxr_javadoccomment">         * that is this position is between the last</em>
+<a class="jxr_linenumber" name="L841" href="#L841">841</a> <em class="jxr_javadoccomment">         * value returned by next and the next value</em>
+<a class="jxr_linenumber" name="L842" href="#L842">842</a> <em class="jxr_javadoccomment">         * that will be returned.</em>
+<a class="jxr_linenumber" name="L843" href="#L843">843</a> <em class="jxr_javadoccomment">         *</em>
+<a class="jxr_linenumber" name="L844" href="#L844">844</a> <em class="jxr_javadoccomment">         * As we change the user index we load the</em>
+<a class="jxr_linenumber" name="L845" href="#L845">845</a> <em class="jxr_javadoccomment">         * current user value and synthesize any needed</em>
+<a class="jxr_linenumber" name="L846" href="#L846">846</a> <em class="jxr_javadoccomment">         * local system values</em>
+<a class="jxr_linenumber" name="L847" href="#L847">847</a> <em class="jxr_javadoccomment">         *</em>
+<a class="jxr_linenumber" name="L848" href="#L848">848</a> <em class="jxr_javadoccomment">         * we also push the user value onto the same</em>
+<a class="jxr_linenumber" name="L849" href="#L849">849</a> <em class="jxr_javadoccomment">         * local stack.  that way out local index can</em>
+<a class="jxr_linenumber" name="L850" href="#L850">850</a> <em class="jxr_javadoccomment">         * run off either end of the local "list"</em>
+<a class="jxr_linenumber" name="L851" href="#L851">851</a> <em class="jxr_javadoccomment">         * and only when we go yet another past either</em>
+<a class="jxr_linenumber" name="L852" href="#L852">852</a> <em class="jxr_javadoccomment">         * end do we need to reload the value to</em>
+<a class="jxr_linenumber" name="L853" href="#L853">853</a> <em class="jxr_javadoccomment">         * one side of the other, and which side of</em>
+<a class="jxr_linenumber" name="L854" href="#L854">854</a> <em class="jxr_javadoccomment">         * our local list we ran off of will tell</em>
+<a class="jxr_linenumber" name="L855" href="#L855">855</a> <em class="jxr_javadoccomment">         * us that.</em>
+<a class="jxr_linenumber" name="L856" href="#L856">856</a> <em class="jxr_javadoccomment">         */</em>
+<a class="jxr_linenumber" name="L857" href="#L857">857</a>         <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">final</strong> SystemContentIterator __iterator;
+<a class="jxr_linenumber" name="L858" href="#L858">858</a>         <strong class="jxr_keyword">protected</strong>       <strong class="jxr_keyword">int</strong>                   __index_adjustment;      <em class="jxr_comment">// delta between the user_content_pos and the external_pos</em>
+<a class="jxr_linenumber" name="L859" href="#L859">859</a> 
+<a class="jxr_linenumber" name="L860" href="#L860">860</a>         <strong class="jxr_keyword">protected</strong>       <strong class="jxr_keyword">int</strong>                   __local_index;           <em class="jxr_comment">// index of the next value in the system array (__local_system_value), if __on_system_value</em>
+<a class="jxr_linenumber" name="L861" href="#L861">861</a>         <strong class="jxr_keyword">protected</strong>       <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonVal<a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a>IonValueLite">IonValueLite</a>[]        __local_values = <strong class="jxr_keyword">new</strong> <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a>[3]; <em class="jxr_comment">// more than the value, a symbol table, and a version marker would be MOST unusual</em>
+<a class="jxr_linenumber" name="L862" href="#L862">862</a>         <strong class="jxr_keyword">protected</strong>       <strong class="jxr_keyword">int</strong>                   __local_value_count;
+<a class="jxr_linenumber" name="L863" href="#L863">863</a> 
+<a class="jxr_linenumber" name="L864" href="#L864">864</a>         <strong class="jxr_keyword">protected</strong>       <strong class="jxr_keyword">int</strong>                   __user_index;            <em class="jxr_comment">// index of next value in the user content array (_children)</em>
+<a class="jxr_linenumber" name="L865" href="#L865">865</a>         <strong class="jxr_keyword">protected</strong>       <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a>          __current_user_value;    <em class="jxr_comment">// value from the child array at the time the user_index was moved forward == get_child(next_user_index -1)</em>
+<a class="jxr_linenumber" name="L866" href="#L866">866</a>         <strong class="jxr_keyword">protected</strong>       <a name="SymbolTable" href="../../../../../software/amazon/ion/SymbolTable.html#SymbolTable">SymbolTable</a>           __current_symbols;
+<a class="jxr_linenumber" name="L867" href="#L867">867</a>         <strong class="jxr_keyword">protected</strong>       <strong class="jxr_keyword">int</strong>                   __current_symbols_index;
+<a class="jxr_linenumber" name="L868" href="#L868">868</a> 
+<a class="jxr_linenumber" name="L869" href="#L869">869</a>         SystemIteratorPosition(SystemContentIterator iterator)
+<a class="jxr_linenumber" name="L870" href="#L870">870</a>         {
+<a class="jxr_linenumber" name="L871" href="#L871">871</a>             __iterator = iterator;
+<a class="jxr_linenumber" name="L872" href="#L872">872</a>         }
+<a class="jxr_linenumber" name="L873" href="#L873">873</a> 
+<a class="jxr_linenumber" name="L874" href="#L874">874</a>         <strong class="jxr_keyword">void</strong> load_initial_position()
+<a class="jxr_linenumber" name="L875" href="#L875">875</a>         {
+<a class="jxr_linenumber" name="L876" href="#L876">876</a>             __user_index = 0;
+<a class="jxr_linenumber" name="L877" href="#L877">877</a>             __local_index = -1; <em class="jxr_comment">// we're before the first value</em>
+<a class="jxr_linenumber" name="L878" href="#L878">878</a>             __current_symbols_index = -1;
+<a class="jxr_linenumber" name="L879" href="#L879">879</a>             load_updated_position();
+<a class="jxr_linenumber" name="L880" href="#L880">880</a>         }
+<a class="jxr_linenumber" name="L881" href="#L881">881</a> 
+<a class="jxr_linenumber" name="L882" href="#L882">882</a>         <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">int</strong> get_external_pos()
+<a class="jxr_linenumber" name="L883" href="#L883">883</a>         {
+<a class="jxr_linenumber" name="L884" href="#L884">884</a>             <strong class="jxr_keyword">int</strong> user_index;
+<a class="jxr_linenumber" name="L885" href="#L885">885</a>             user_index  = __user_index;
+<a class="jxr_linenumber" name="L886" href="#L886">886</a>             user_index += __index_adjustment;
+<a class="jxr_linenumber" name="L887" href="#L887">887</a>             user_index -= __local_value_count;
+<a class="jxr_linenumber" name="L888" href="#L888">888</a>             user_index += __local_index;
+<a class="jxr_linenumber" name="L889" href="#L889">889</a>             <strong class="jxr_keyword">return</strong> user_index;
+<a class="jxr_linenumber" name="L890" href="#L890">890</a>         }
+<a class="jxr_linenumber" name="L891" href="#L891">891</a> 
+<a class="jxr_linenumber" name="L892" href="#L892">892</a>         <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">boolean</strong> on_system_value()
+<a class="jxr_linenumber" name="L893" href="#L893">893</a>         {
+<a class="jxr_linenumber" name="L894" href="#L894">894</a>             <strong class="jxr_keyword">return</strong> (__current_user_value != __local_values[0]);
+<a class="jxr_linenumber" name="L895" href="#L895">895</a>         }
+<a class="jxr_linenumber" name="L896" href="#L896">896</a>         <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">boolean</strong> has_next()
+<a class="jxr_linenumber" name="L897" href="#L897">897</a>         {
+<a class="jxr_linenumber" name="L898" href="#L898">898</a>             <strong class="jxr_keyword">if</strong> (__local_index + 1 &lt; __local_value_count) {
+<a class="jxr_linenumber" name="L899" href="#L899">899</a>                 <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">true</strong>;
+<a class="jxr_linenumber" name="L900" href="#L900">900</a>             }
+<a class="jxr_linenumber" name="L901" href="#L901">901</a>             <strong class="jxr_keyword">if</strong> (__user_index + 1 &lt; __iterator.get_datagram_child_count()) {
+<a class="jxr_linenumber" name="L902" href="#L902">902</a>                 <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">true</strong>;
+<a class="jxr_linenumber" name="L903" href="#L903">903</a>             }
+<a class="jxr_linenumber" name="L904" href="#L904">904</a>             <strong class="jxr_keyword">return</strong> false;
+<a class="jxr_linenumber" name="L905" href="#L905">905</a>         }
+<a class="jxr_linenumber" name="L906" href="#L906">906</a>         <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">boolean</strong> has_prev()
+<a class="jxr_linenumber" name="L907" href="#L907">907</a>         {
+<a class="jxr_linenumber" name="L908" href="#L908">908</a>             <em class="jxr_comment">// if we're not at the beginning of the datagram list</em>
+<a class="jxr_linenumber" name="L909" href="#L909">909</a>             <em class="jxr_comment">// we always have another user value</em>
+<a class="jxr_linenumber" name="L910" href="#L910">910</a>             <strong class="jxr_keyword">if</strong> (__user_index &gt; 0) {
+<a class="jxr_linenumber" name="L911" href="#L911">911</a>                 <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">true</strong>;
+<a class="jxr_linenumber" name="L912" href="#L912">912</a>             }
+<a class="jxr_linenumber" name="L913" href="#L913">913</a>             <strong class="jxr_keyword">if</strong> (__local_index &gt; 0) {
+<a class="jxr_linenumber" name="L914" href="#L914">914</a>                 <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">true</strong>;
+<a class="jxr_linenumber" name="L915" href="#L915">915</a>             }
+<a class="jxr_linenumber" name="L916" href="#L916">916</a>             <em class="jxr_comment">// we're out of both user and system values</em>
+<a class="jxr_linenumber" name="L917" href="#L917">917</a>             <strong class="jxr_keyword">return</strong> false;
+<a class="jxr_linenumber" name="L918" href="#L918">918</a>         }
+<a class="jxr_linenumber" name="L919" href="#L919">919</a> 
+<a class="jxr_linenumber" name="L920" href="#L920">920</a>         <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">void</strong> copyFrom(SystemIteratorPosition source)
+<a class="jxr_linenumber" name="L921" href="#L921">921</a>         {
+<a class="jxr_linenumber" name="L922" href="#L922">922</a>             <strong class="jxr_keyword">this</strong>.__index_adjustment         = source.__index_adjustment;
+<a class="jxr_linenumber" name="L923" href="#L923">923</a>             <strong class="jxr_keyword">this</strong>.__user_index               = source.__user_index;
+<a class="jxr_linenumber" name="L924" href="#L924">924</a>             <strong class="jxr_keyword">this</strong>.__local_index              = source.__local_index;
+<a class="jxr_linenumber" name="L925" href="#L925">925</a>             <strong class="jxr_keyword">this</strong>.__current_user_value       = source.__current_user_value;
+<a class="jxr_linenumber" name="L926" href="#L926">926</a>             <strong class="jxr_keyword">this</strong>.__current_symbols          = source.__current_symbols;
+<a class="jxr_linenumber" name="L927" href="#L927">927</a>             <strong class="jxr_keyword">this</strong>.__current_symbols_index    = source.__current_symbols_index;
+<a class="jxr_linenumber" name="L928" href="#L928">928</a> 
+<a class="jxr_linenumber" name="L929" href="#L929">929</a>             <em class="jxr_comment">// for the local system values each position needs its own</em>
+<a class="jxr_linenumber" name="L930" href="#L930">930</a>             <em class="jxr_comment">// array, but the can share the value references</em>
+<a class="jxr_linenumber" name="L931" href="#L931">931</a>             <strong class="jxr_keyword">if</strong> (source.__local_value_count &gt; 0) {
+<a class="jxr_linenumber" name="L932" href="#L932">932</a>                 <strong class="jxr_keyword">if</strong> (<strong class="jxr_keyword">this</strong>.__local_values == <strong class="jxr_keyword">null</strong> || source.__local_value_count &gt;= <strong class="jxr_keyword">this</strong>.__local_values.length) {
+<a class="jxr_linenumber" name="L933" href="#L933">933</a>                     <strong class="jxr_keyword">this</strong>.__local_values = <strong class="jxr_keyword">new</strong> <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a>[source.__local_values.length];
+<a class="jxr_linenumber" name="L934" href="#L934">934</a>                 }
+<a class="jxr_linenumber" name="L935" href="#L935">935</a>                 System.arraycopy(source.__local_values, 0, <strong class="jxr_keyword">this</strong>.__local_values, 0, source.__local_value_count);
+<a class="jxr_linenumber" name="L936" href="#L936">936</a>             }
+<a class="jxr_linenumber" name="L937" href="#L937">937</a>             <strong class="jxr_keyword">this</strong>.__local_value_count = source.__local_value_count;
+<a class="jxr_linenumber" name="L938" href="#L938">938</a>         }
+<a class="jxr_linenumber" name="L939" href="#L939">939</a> 
+<a class="jxr_linenumber" name="L940" href="#L940">940</a>         <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">void</strong> load_updated_position()
+<a class="jxr_linenumber" name="L941" href="#L941">941</a>         {
+<a class="jxr_linenumber" name="L942" href="#L942">942</a>             <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> prev_value = __current_user_value;
+<a class="jxr_linenumber" name="L943" href="#L943">943</a>             <em class="jxr_comment">// we load our referenced user value (@ __user_index if</em>
+<a class="jxr_linenumber" name="L944" href="#L944">944</a>             <em class="jxr_comment">// it exists).</em>
+<a class="jxr_linenumber" name="L945" href="#L945">945</a>             <strong class="jxr_keyword">if</strong> (__user_index &lt; 0 || (__user_index &gt; 0 &amp;&amp; __user_index &gt;=  __iterator.get_datagram_child_count())) {
+<a class="jxr_linenumber" name="L946" href="#L946">946</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> <a name="IonException" href="../../../../../software/amazon/ion/IonException.html#IonException">IonException</a>(<span class="jxr_string">"attempt to position iterator past end of values"</span>);
+<a class="jxr_linenumber" name="L947" href="#L947">947</a>             }
+<a class="jxr_linenumber" name="L948" href="#L948">948</a>             <strong class="jxr_keyword">if</strong> (__user_index &lt; __iterator.get_datagram_child_count()) {
+<a class="jxr_linenumber" name="L949" href="#L949">949</a>                 __current_user_value = __iterator.get_datagram_child(__user_index);
+<a class="jxr_linenumber" name="L950" href="#L950">950</a>                 assert(__current_user_value != <strong class="jxr_keyword">null</strong>);
+<a class="jxr_linenumber" name="L951" href="#L951">951</a>             }
+<a class="jxr_linenumber" name="L952" href="#L952">952</a>             <strong class="jxr_keyword">else</strong> {
+<a class="jxr_linenumber" name="L953" href="#L953">953</a>                 <em class="jxr_comment">// when there are no user values and we're at index == 0</em>
+<a class="jxr_linenumber" name="L954" href="#L954">954</a>                 assert(__user_index == 0 &amp;&amp; __iterator.get_datagram_child_count() == 0);
+<a class="jxr_linenumber" name="L955" href="#L955">955</a>                 __current_user_value = <strong class="jxr_keyword">null</strong>;
+<a class="jxr_linenumber" name="L956" href="#L956">956</a>             }
 <a class="jxr_linenumber" name="L957" href="#L957">957</a> 
-<a class="jxr_linenumber" name="L958" href="#L958">958</a>             <strong class="jxr_keyword">for</strong> (<strong class="jxr_keyword">int</strong> ii=__local_value_count; ii&lt;old_count; ii++) {
-<a class="jxr_linenumber" name="L959" href="#L959">959</a>                 __local_values[ii] = <strong class="jxr_keyword">null</strong>;
-<a class="jxr_linenumber" name="L960" href="#L960">960</a>             }
-<a class="jxr_linenumber" name="L961" href="#L961">961</a>             __index_adjustment += __local_value_count - 1;
-<a class="jxr_linenumber" name="L962" href="#L962">962</a> 
-<a class="jxr_linenumber" name="L963" href="#L963">963</a>             <strong class="jxr_keyword">return</strong>;
-<a class="jxr_linenumber" name="L964" href="#L964">964</a>         }
-<a class="jxr_linenumber" name="L965" href="#L965">965</a> 
-<a class="jxr_linenumber" name="L966" href="#L966">966</a>         <strong class="jxr_keyword">void</strong> load_current_symbol_table(<a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> prev_user_value)
-<a class="jxr_linenumber" name="L967" href="#L967">967</a>         {
-<a class="jxr_linenumber" name="L968" href="#L968">968</a>             <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> curr_value  = __current_user_value;
-<a class="jxr_linenumber" name="L969" href="#L969">969</a>             <strong class="jxr_keyword">int</strong>          curr_index  = __user_index;
-<a class="jxr_linenumber" name="L970" href="#L970">970</a> 
-<a class="jxr_linenumber" name="L971" href="#L971">971</a>             <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> prev_value  = prev_user_value;
-<a class="jxr_linenumber" name="L972" href="#L972">972</a>             <a name="SymbolTable" href="../../../../../software/amazon/ion/SymbolTable.html#SymbolTable">SymbolTable</a>  prev_symtab = __current_symbols;
-<a class="jxr_linenumber" name="L973" href="#L973">973</a>             <strong class="jxr_keyword">int</strong>          prev_index  = __current_symbols_index;
-<a class="jxr_linenumber" name="L974" href="#L974">974</a> 
-<a class="jxr_linenumber" name="L975" href="#L975">975</a>             <em class="jxr_comment">// set our new position symbol table</em>
-<a class="jxr_linenumber" name="L976" href="#L976">976</a>             __current_symbols  = <strong class="jxr_keyword">null</strong>;
-<a class="jxr_linenumber" name="L977" href="#L977">977</a>             __current_symbols_index = curr_index;
-<a class="jxr_linenumber" name="L978" href="#L978">978</a>             <a name="SymbolTable" href="../../../../../software/amazon/ion/SymbolTable.html#SymbolTable">SymbolTable</a>  curr_symtab = <strong class="jxr_keyword">null</strong>;
-<a class="jxr_linenumber" name="L979" href="#L979">979</a>            <strong class="jxr_keyword">if</strong> (curr_value != <strong class="jxr_keyword">null</strong>) {
-<a class="jxr_linenumber" name="L980" href="#L980">980</a>                 curr_symtab = curr_value.getAssignedSymbolTable();
-<a class="jxr_linenumber" name="L981" href="#L981">981</a>                 __current_symbols = curr_symtab;
-<a class="jxr_linenumber" name="L982" href="#L982">982</a>             }
-<a class="jxr_linenumber" name="L983" href="#L983">983</a> 
-<a class="jxr_linenumber" name="L984" href="#L984">984</a>             <em class="jxr_comment">// if we need to we reset the previous values here</em>
-<a class="jxr_linenumber" name="L985" href="#L985">985</a>             <em class="jxr_comment">// this happens when the caller is scanning backwards</em>
-<a class="jxr_linenumber" name="L986" href="#L986">986</a>             <strong class="jxr_keyword">if</strong> (curr_index - 1 != prev_index) {
-<a class="jxr_linenumber" name="L987" href="#L987">987</a>                 prev_index = curr_index - 1;
-<a class="jxr_linenumber" name="L988" href="#L988">988</a>                 prev_symtab = <strong class="jxr_keyword">null</strong>;
-<a class="jxr_linenumber" name="L989" href="#L989">989</a>                 <strong class="jxr_keyword">if</strong> (prev_index &gt;= 0 &amp;&amp; prev_index &lt; __iterator.get_datagram_child_count()) {
-<a class="jxr_linenumber" name="L990" href="#L990">990</a>                     prev_value  = __iterator.get_datagram_child(prev_index);
-<a class="jxr_linenumber" name="L991" href="#L991">991</a>                     prev_symtab = prev_value.getAssignedSymbolTable();
-<a class="jxr_linenumber" name="L992" href="#L992">992</a>                 }
-<a class="jxr_linenumber" name="L993" href="#L993">993</a>             }
-<a class="jxr_linenumber" name="L994" href="#L994">994</a> 
-<a class="jxr_linenumber" name="L995" href="#L995">995</a>             <em class="jxr_comment">// Now if there was a change push the local symbol</em>
-<a class="jxr_linenumber" name="L996" href="#L996">996</a>             <em class="jxr_comment">// tables onto our system value stack</em>
-<a class="jxr_linenumber" name="L997" href="#L997">997</a> 
-<a class="jxr_linenumber" name="L998" href="#L998">998</a>             <em class="jxr_comment">// note that our chain of preceding symbol tables</em>
-<a class="jxr_linenumber" name="L999" href="#L999">999</a>             <em class="jxr_comment">// might match our list of previous structs in the</em>
-<a class="jxr_linenumber" name="L1000" href="#L1000">1000</a>             <em class="jxr_comment">// user list.  Until there's a difference we don't</em>
-<a class="jxr_linenumber" name="L1001" href="#L1001">1001</a>             <em class="jxr_comment">// push the symbol tables (because they've already</em>
-<a class="jxr_linenumber" name="L1002" href="#L1002">1002</a>             <em class="jxr_comment">// been processed as real values).</em>
-<a class="jxr_linenumber" name="L1003" href="#L1003">1003</a>             <strong class="jxr_keyword">if</strong> (curr_symtab != prev_symtab) {
-<a class="jxr_linenumber" name="L1004" href="#L1004">1004</a>                 <a name="SymbolTable" href="../../../../../software/amazon/ion/SymbolTable.html#SymbolTable">SymbolTable</a> <strong class="jxr_keyword">new</strong>_symbol_table = curr_symtab;
-<a class="jxr_linenumber" name="L1005" href="#L1005">1005</a>                 <strong class="jxr_keyword">while</strong> (<strong class="jxr_keyword">new</strong>_symbol_table != <strong class="jxr_keyword">null</strong>)
-<a class="jxr_linenumber" name="L1006" href="#L1006">1006</a>                 {
-<a class="jxr_linenumber" name="L1007" href="#L1007">1007</a>                     <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">boolean</strong> <strong class="jxr_keyword">new</strong>_symbol_table_is_system = <strong class="jxr_keyword">new</strong>_symbol_table.isSystemTable();
-<a class="jxr_linenumber" name="L1008" href="#L1008">1008</a>                     <a name="IonValue" href="../../../../../software/amazon/ion/IonValue.html#IonValue">IonValue</a> rep;
-<a class="jxr_linenumber" name="L1009" href="#L1009">1009</a>                     <strong class="jxr_keyword">if</strong> (<strong class="jxr_keyword">new</strong>_symbol_table_is_system) {
-<a class="jxr_linenumber" name="L1010" href="#L1010">1010</a>                         rep = __iterator.get_datagram_ivm();
-<a class="jxr_linenumber" name="L1011" href="#L1011">1011</a>                     }
-<a class="jxr_linenumber" name="L1012" href="#L1012">1012</a>                     <strong class="jxr_keyword">else</strong> {
-<a class="jxr_linenumber" name="L1013" href="#L1013">1013</a>                         rep = PrivateUtils.symtabTree(<strong class="jxr_keyword">new</strong>_symbol_table);
-<a class="jxr_linenumber" name="L1014" href="#L1014">1014</a>                     }
-<a class="jxr_linenumber" name="L1015" href="#L1015">1015</a>                     assert(rep != <strong class="jxr_keyword">null</strong> &amp;&amp; __iterator.get_datagram_system() == rep.getSystem());
-<a class="jxr_linenumber" name="L1016" href="#L1016">1016</a> 
-<a class="jxr_linenumber" name="L1017" href="#L1017">1017</a>                     <strong class="jxr_keyword">if</strong> (rep == prev_value || (is_ivm(curr_value) &amp;&amp; <strong class="jxr_keyword">new</strong>_symbol_table_is_system)) {
-<a class="jxr_linenumber" name="L1018" href="#L1018">1018</a>                         <strong class="jxr_keyword">int</strong> prev_idx = (prev_value == <strong class="jxr_keyword">null</strong>) ? -1 : (prev_value._elementid() - 1);
-<a class="jxr_linenumber" name="L1019" href="#L1019">1019</a>                         <strong class="jxr_keyword">if</strong> (prev_idx &gt;= 0) {
-<a class="jxr_linenumber" name="L1020" href="#L1020">1020</a>                             prev_value = __iterator.get_datagram_child(prev_idx);
-<a class="jxr_linenumber" name="L1021" href="#L1021">1021</a>                         }
-<a class="jxr_linenumber" name="L1022" href="#L1022">1022</a>                         <strong class="jxr_keyword">else</strong> {
-<a class="jxr_linenumber" name="L1023" href="#L1023">1023</a>                             prev_value = <strong class="jxr_keyword">null</strong>;
-<a class="jxr_linenumber" name="L1024" href="#L1024">1024</a>                         }
-<a class="jxr_linenumber" name="L1025" href="#L1025">1025</a>                     }
-<a class="jxr_linenumber" name="L1026" href="#L1026">1026</a>                     <strong class="jxr_keyword">else</strong> {
-<a class="jxr_linenumber" name="L1027" href="#L1027">1027</a>                         push_system_value((<a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a>)rep);
-<a class="jxr_linenumber" name="L1028" href="#L1028">1028</a>                         prev_value = <strong class="jxr_keyword">null</strong>; <em class="jxr_comment">// end of the matches</em>
-<a class="jxr_linenumber" name="L1029" href="#L1029">1029</a>                     }
-<a class="jxr_linenumber" name="L1030" href="#L1030">1030</a>                     <strong class="jxr_keyword">new</strong>_symbol_table = rep.getSymbolTable();
-<a class="jxr_linenumber" name="L1031" href="#L1031">1031</a>                     <strong class="jxr_keyword">if</strong> (<strong class="jxr_keyword">new</strong>_symbol_table == <strong class="jxr_keyword">null</strong> || <strong class="jxr_keyword">new</strong>_symbol_table.isSystemTable()) {
-<a class="jxr_linenumber" name="L1032" href="#L1032">1032</a>                         <strong class="jxr_keyword">break</strong>;
-<a class="jxr_linenumber" name="L1033" href="#L1033">1033</a>                     }
-<a class="jxr_linenumber" name="L1034" href="#L1034">1034</a>                 }
-<a class="jxr_linenumber" name="L1035" href="#L1035">1035</a>             }
-<a class="jxr_linenumber" name="L1036" href="#L1036">1036</a>             <em class="jxr_comment">// and at the front we need to put in the ion version marker</em>
-<a class="jxr_linenumber" name="L1037" href="#L1037">1037</a>             <strong class="jxr_keyword">if</strong> (curr_index == 0 &amp;&amp; !is_ivm(curr_value)) {
-<a class="jxr_linenumber" name="L1038" href="#L1038">1038</a>                 <em class="jxr_comment">// TODO this is wrong, because we may have already pushed</em>
-<a class="jxr_linenumber" name="L1039" href="#L1039">1039</a>                 <em class="jxr_comment">// a rep above. This is just making up an additional symtab</em>
-<a class="jxr_linenumber" name="L1040" href="#L1040">1040</a>                 <em class="jxr_comment">// where one was not placed by the user.</em>
-<a class="jxr_linenumber" name="L1041" href="#L1041">1041</a>                 <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> ivm = __iterator.get_datagram_ivm();
-<a class="jxr_linenumber" name="L1042" href="#L1042">1042</a>                 push_system_value(ivm);
-<a class="jxr_linenumber" name="L1043" href="#L1043">1043</a>             }
-<a class="jxr_linenumber" name="L1044" href="#L1044">1044</a>         }
-<a class="jxr_linenumber" name="L1045" href="#L1045">1045</a> 
-<a class="jxr_linenumber" name="L1046" href="#L1046">1046</a>         <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">boolean</strong> is_ivm(<a name="IonValue" href="../../../../../software/amazon/ion/IonValue.html#IonValue">IonValue</a> value)
-<a class="jxr_linenumber" name="L1047" href="#L1047">1047</a>         {
-<a class="jxr_linenumber" name="L1048" href="#L1048">1048</a>             <strong class="jxr_keyword">if</strong> (value instanceof <a name="IonSymbol" href="../../../../../software/amazon/ion/IonSymbol.html#IonSymbol">IonSymbol</a>
-<a class="jxr_linenumber" name="L1049" href="#L1049">1049</a>                 &amp;&amp; value.getTypeAnnotationSymbols().length == 0) {
-<a class="jxr_linenumber" name="L1050" href="#L1050">1050</a>                 <em class="jxr_comment">// $ion_1_0 is read as an IVM only if it is not annotated</em>
-<a class="jxr_linenumber" name="L1051" href="#L1051">1051</a>                 <a name="IonSymbo<a name="IonSymbol" href="../../../../../software/amazon/ion/IonSymbol.html#IonSymbol">IonSymbol</a>../../../../../software/amazon/ion/IonSymbol.html#IonSymbol">IonSymbol</a> sym = (<a name="IonSymbol" href="../../../../../software/amazon/ion/IonSymbol.html#IonSymbol">IonSymbol</a>)value;
-<a class="jxr_linenumber" name="L1052" href="#L1052">1052</a>                 <a name="SymbolToken" href="../../../../../software/amazon/ion/SymbolToken.html#SymbolToken">SymbolToken</a> tok = sym.symbolValue();
-<a class="jxr_linenumber" name="L1053" href="#L1053">1053</a>                 <strong class="jxr_keyword">if</strong> (tok != <strong class="jxr_keyword">null</strong> &amp;&amp; ION_1_0.equals(tok.getText()))
-<a class="jxr_linenumber" name="L1054" href="#L1054">1054</a>                 {
-<a class="jxr_linenumber" name="L1055" href="#L1055">1055</a>                     <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">true</strong>;
-<a class="jxr_linenumber" name="L1056" href="#L1056">1056</a>                 }
-<a class="jxr_linenumber" name="L1057" href="#L1057">1057</a>             }
-<a class="jxr_linenumber" name="L1058" href="#L1058">1058</a>             <strong class="jxr_keyword">return</strong> false;
-<a class="jxr_linenumber" name="L1059" href="#L1059">1059</a>         }
-<a class="jxr_linenumber" name="L1060" href="#L1060">1060</a> 
-<a class="jxr_linenumber" name="L1061" href="#L1061">1061</a>         <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">void</strong> push_system_value(<a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> value)
-<a class="jxr_linenumber" name="L1062" href="#L1062">1062</a>         {
-<a class="jxr_linenumber" name="L1063" href="#L1063">1063</a>             <strong class="jxr_keyword">if</strong> (__local_value_count &gt;= __local_values.length) {
-<a class="jxr_linenumber" name="L1064" href="#L1064">1064</a>                 <strong class="jxr_keyword">int</strong> <strong class="jxr_keyword">new</strong>_size = (__local_values == <strong class="jxr_keyword">null</strong>) ? 2 : (__local_values.length * 2);
-<a class="jxr_linenumber" name="L1065" href="#L1065">1065</a>                 assert( <strong class="jxr_keyword">new</strong>_size &gt; __local_value_count); <em class="jxr_comment">// we should only need to add 1 value at a time</em>
-<a class="jxr_linenumber" name="L1066" href="#L1066">1066</a>                 <a name="IonValueLite" href="../../../../../software/amazon/ion<a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a>onValueLite.html#IonValueLite">IonValueLite</a>[] temp = <strong class="jxr_keyword">new</strong> <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a>[<strong class="jxr_keyword">new</strong>_size];
-<a class="jxr_linenumber" name="L1067" href="#L1067">1067</a>                 <strong class="jxr_keyword">if</strong> (__local_value_count &gt; 0) {
-<a class="jxr_linenumber" name="L1068" href="#L1068">1068</a>                     System.arraycopy(__local_values, 0, temp, 0, __local_value_count);
-<a class="jxr_linenumber" name="L1069" href="#L1069">1069</a>                 }
-<a class="jxr_linenumber" name="L1070" href="#L1070">1070</a>                 __local_values = temp;
-<a class="jxr_linenumber" name="L1071" href="#L1071">1071</a>             }
-<a class="jxr_linenumber" name="L1072" href="#L1072">1072</a>             __local_values[__local_value_count++] = value;
-<a class="jxr_linenumber" name="L1073" href="#L1073">1073</a>         }
-<a class="jxr_linenumber" name="L1074" href="#L1074">1074</a> 
-<a class="jxr_linenumber" name="L1075" href="#L1075">1075</a>         <strong class="jxr_keyword">protected</strong> <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> load_position()
-<a class="jxr_linenumber" name="L1076" href="#L1076">1076</a>         {
-<a class="jxr_linenumber" name="L1077" href="#L1077">1077</a>             <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> current = <strong class="jxr_keyword">null</strong>;
-<a class="jxr_linenumber" name="L1078" href="#L1078">1078</a> 
-<a class="jxr_linenumber" name="L1079" href="#L1079">1079</a>             assert(__local_index &lt; __local_value_count);
-<a class="jxr_linenumber" name="L1080" href="#L1080">1080</a> 
-<a class="jxr_linenumber" name="L1081" href="#L1081">1081</a>             current = __local_values[__local_value_count - __local_index - 1];
-<a class="jxr_linenumber" name="L1082" href="#L1082">1082</a> 
-<a class="jxr_linenumber" name="L1083" href="#L1083">1083</a>             <strong class="jxr_keyword">return</strong> current;
-<a class="jxr_linenumber" name="L1084" href="#L1084">1084</a>         }
+<a class="jxr_linenumber" name="L958" href="#L958">958</a>             <strong class="jxr_keyword">int</strong> old_count = __local_value_count;
+<a class="jxr_linenumber" name="L959" href="#L959">959</a>             __local_value_count = 0;
+<a class="jxr_linenumber" name="L960" href="#L960">960</a>             <strong class="jxr_keyword">if</strong> (__current_user_value != <strong class="jxr_keyword">null</strong>) {
+<a class="jxr_linenumber" name="L961" href="#L961">961</a>                 push_system_value(__current_user_value);
+<a class="jxr_linenumber" name="L962" href="#L962">962</a>             }
+<a class="jxr_linenumber" name="L963" href="#L963">963</a>             load_current_symbol_table(prev_value);
+<a class="jxr_linenumber" name="L964" href="#L964">964</a> 
+<a class="jxr_linenumber" name="L965" href="#L965">965</a>             <strong class="jxr_keyword">for</strong> (<strong class="jxr_keyword">int</strong> ii=__local_value_count; ii&lt;old_count; ii++) {
+<a class="jxr_linenumber" name="L966" href="#L966">966</a>                 __local_values[ii] = <strong class="jxr_keyword">null</strong>;
+<a class="jxr_linenumber" name="L967" href="#L967">967</a>             }
+<a class="jxr_linenumber" name="L968" href="#L968">968</a>             __index_adjustment += __local_value_count - 1;
+<a class="jxr_linenumber" name="L969" href="#L969">969</a> 
+<a class="jxr_linenumber" name="L970" href="#L970">970</a>             <strong class="jxr_keyword">return</strong>;
+<a class="jxr_linenumber" name="L971" href="#L971">971</a>         }
+<a class="jxr_linenumber" name="L972" href="#L972">972</a> 
+<a class="jxr_linenumber" name="L973" href="#L973">973</a>         <strong class="jxr_keyword">void</strong> load_current_symbol_table(<a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> prev_user_value)
+<a class="jxr_linenumber" name="L974" href="#L974">974</a>         {
+<a class="jxr_linenumber" name="L975" href="#L975">975</a>             <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> curr_value  = __current_user_value;
+<a class="jxr_linenumber" name="L976" href="#L976">976</a>             <strong class="jxr_keyword">int</strong>          curr_index  = __user_index;
+<a class="jxr_linenumber" name="L977" href="#L977">977</a> 
+<a class="jxr_linenumber" name="L978" href="#L978">978</a>             <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> prev_value  = prev_user_value;
+<a class="jxr_linenumber" name="L979" href="#L979">979</a>             <a name="SymbolTable" href="../../../../../software/amazon/ion/SymbolTable.html#SymbolTable">SymbolTable</a>  prev_symtab = __current_symbols;
+<a class="jxr_linenumber" name="L980" href="#L980">980</a>             <strong class="jxr_keyword">int</strong>          prev_index  = __current_symbols_index;
+<a class="jxr_linenumber" name="L981" href="#L981">981</a> 
+<a class="jxr_linenumber" name="L982" href="#L982">982</a>             <em class="jxr_comment">// set our new position symbol table</em>
+<a class="jxr_linenumber" name="L983" href="#L983">983</a>             __current_symbols  = <strong class="jxr_keyword">null</strong>;
+<a class="jxr_linenumber" name="L984" href="#L984">984</a>             __current_symbols_index = curr_index;
+<a class="jxr_linenumber" name="L985" href="#L985">985</a>             <a name="SymbolTable" href="../../../../../software/amazon/ion/SymbolTable.html#SymbolTable">SymbolTable</a>  curr_symtab = <strong class="jxr_keyword">null</strong>;
+<a class="jxr_linenumber" name="L986" href="#L986">986</a>            <strong class="jxr_keyword">if</strong> (curr_value != <strong class="jxr_keyword">null</strong>) {
+<a class="jxr_linenumber" name="L987" href="#L987">987</a>                 curr_symtab = curr_value.getAssignedSymbolTable();
+<a class="jxr_linenumber" name="L988" href="#L988">988</a>                 __current_symbols = curr_symtab;
+<a class="jxr_linenumber" name="L989" href="#L989">989</a>             }
+<a class="jxr_linenumber" name="L990" href="#L990">990</a> 
+<a class="jxr_linenumber" name="L991" href="#L991">991</a>             <em class="jxr_comment">// if we need to we reset the previous values here</em>
+<a class="jxr_linenumber" name="L992" href="#L992">992</a>             <em class="jxr_comment">// this happens when the caller is scanning backwards</em>
+<a class="jxr_linenumber" name="L993" href="#L993">993</a>             <strong class="jxr_keyword">if</strong> (curr_index - 1 != prev_index) {
+<a class="jxr_linenumber" name="L994" href="#L994">994</a>                 prev_index = curr_index - 1;
+<a class="jxr_linenumber" name="L995" href="#L995">995</a>                 prev_symtab = <strong class="jxr_keyword">null</strong>;
+<a class="jxr_linenumber" name="L996" href="#L996">996</a>                 <strong class="jxr_keyword">if</strong> (prev_index &gt;= 0 &amp;&amp; prev_index &lt; __iterator.get_datagram_child_count()) {
+<a class="jxr_linenumber" name="L997" href="#L997">997</a>                     prev_value  = __iterator.get_datagram_child(prev_index);
+<a class="jxr_linenumber" name="L998" href="#L998">998</a>                     prev_symtab = prev_value.getAssignedSymbolTable();
+<a class="jxr_linenumber" name="L999" href="#L999">999</a>                 }
+<a class="jxr_linenumber" name="L1000" href="#L1000">1000</a>             }
+<a class="jxr_linenumber" name="L1001" href="#L1001">1001</a> 
+<a class="jxr_linenumber" name="L1002" href="#L1002">1002</a>             <em class="jxr_comment">// Now if there was a change push the local symbol</em>
+<a class="jxr_linenumber" name="L1003" href="#L1003">1003</a>             <em class="jxr_comment">// tables onto our system value stack</em>
+<a class="jxr_linenumber" name="L1004" href="#L1004">1004</a> 
+<a class="jxr_linenumber" name="L1005" href="#L1005">1005</a>             <em class="jxr_comment">// note that our chain of preceding symbol tables</em>
+<a class="jxr_linenumber" name="L1006" href="#L1006">1006</a>             <em class="jxr_comment">// might match our list of previous structs in the</em>
+<a class="jxr_linenumber" name="L1007" href="#L1007">1007</a>             <em class="jxr_comment">// user list.  Until there's a difference we don't</em>
+<a class="jxr_linenumber" name="L1008" href="#L1008">1008</a>             <em class="jxr_comment">// push the symbol tables (because they've already</em>
+<a class="jxr_linenumber" name="L1009" href="#L1009">1009</a>             <em class="jxr_comment">// been processed as real values).</em>
+<a class="jxr_linenumber" name="L1010" href="#L1010">1010</a>             <strong class="jxr_keyword">if</strong> (curr_symtab != prev_symtab) {
+<a class="jxr_linenumber" name="L1011" href="#L1011">1011</a>                 <a name="SymbolTable" href="../../../../../software/amazon/ion/SymbolTable.html#SymbolTable">SymbolTable</a> <strong class="jxr_keyword">new</strong>_symbol_table = curr_symtab;
+<a class="jxr_linenumber" name="L1012" href="#L1012">1012</a>                 <strong class="jxr_keyword">while</strong> (<strong class="jxr_keyword">new</strong>_symbol_table != <strong class="jxr_keyword">null</strong>)
+<a class="jxr_linenumber" name="L1013" href="#L1013">1013</a>                 {
+<a class="jxr_linenumber" name="L1014" href="#L1014">1014</a>                     <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">boolean</strong> <strong class="jxr_keyword">new</strong>_symbol_table_is_system = <strong class="jxr_keyword">new</strong>_symbol_table.isSystemTable();
+<a class="jxr_linenumber" name="L1015" href="#L1015">1015</a>                     <a name="IonValue" href="../../../../../software/amazon/ion/IonValue.html#IonValue">IonValue</a> rep;
+<a class="jxr_linenumber" name="L1016" href="#L1016">1016</a>                     <strong class="jxr_keyword">if</strong> (<strong class="jxr_keyword">new</strong>_symbol_table_is_system) {
+<a class="jxr_linenumber" name="L1017" href="#L1017">1017</a>                         rep = __iterator.get_datagram_ivm();
+<a class="jxr_linenumber" name="L1018" href="#L1018">1018</a>                     }
+<a class="jxr_linenumber" name="L1019" href="#L1019">1019</a>                     <strong class="jxr_keyword">else</strong> {
+<a class="jxr_linenumber" name="L1020" href="#L1020">1020</a>                         rep = PrivateUtils.symtabTree(<strong class="jxr_keyword">new</strong>_symbol_table);
+<a class="jxr_linenumber" name="L1021" href="#L1021">1021</a>                     }
+<a class="jxr_linenumber" name="L1022" href="#L1022">1022</a>                     assert(rep != <strong class="jxr_keyword">null</strong> &amp;&amp; __iterator.get_datagram_system() == rep.getSystem());
+<a class="jxr_linenumber" name="L1023" href="#L1023">1023</a> 
+<a class="jxr_linenumber" name="L1024" href="#L1024">1024</a>                     <strong class="jxr_keyword">if</strong> (rep == prev_value || (is_ivm(curr_value) &amp;&amp; <strong class="jxr_keyword">new</strong>_symbol_table_is_system)) {
+<a class="jxr_linenumber" name="L1025" href="#L1025">1025</a>                         <strong class="jxr_keyword">int</strong> prev_idx = (prev_value == <strong class="jxr_keyword">null</strong>) ? -1 : (prev_value._elementid() - 1);
+<a class="jxr_linenumber" name="L1026" href="#L1026">1026</a>                         <strong class="jxr_keyword">if</strong> (prev_idx &gt;= 0) {
+<a class="jxr_linenumber" name="L1027" href="#L1027">1027</a>                             prev_value = __iterator.get_datagram_child(prev_idx);
+<a class="jxr_linenumber" name="L1028" href="#L1028">1028</a>                         }
+<a class="jxr_linenumber" name="L1029" href="#L1029">1029</a>                         <strong class="jxr_keyword">else</strong> {
+<a class="jxr_linenumber" name="L1030" href="#L1030">1030</a>                             prev_value = <strong class="jxr_keyword">null</strong>;
+<a class="jxr_linenumber" name="L1031" href="#L1031">1031</a>                         }
+<a class="jxr_linenumber" name="L1032" href="#L1032">1032</a>                     }
+<a class="jxr_linenumber" name="L1033" href="#L1033">1033</a>                     <strong class="jxr_keyword">else</strong> {
+<a class="jxr_linenumber" name="L1034" href="#L1034">1034</a>                         push_system_value((<a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a>)rep);
+<a class="jxr_linenumber" name="L1035" href="#L1035">1035</a>                         prev_value = <strong class="jxr_keyword">null</strong>; <em class="jxr_comment">// end of the matches</em>
+<a class="jxr_linenumber" name="L1036" href="#L1036">1036</a>                     }
+<a class="jxr_linenumber" name="L1037" href="#L1037">1037</a>                     <strong class="jxr_keyword">new</strong>_symbol_table = rep.getSymbolTable();
+<a class="jxr_linenumber" name="L1038" href="#L1038">1038</a>                     <strong class="jxr_keyword">if</strong> (<strong class="jxr_keyword">new</strong>_symbol_table == <strong class="jxr_keyword">null</strong> || <strong class="jxr_keyword">new</strong>_symbol_table.isSystemTable()) {
+<a class="jxr_linenumber" name="L1039" href="#L1039">1039</a>                         <strong class="jxr_keyword">break</strong>;
+<a class="jxr_linenumber" name="L1040" href="#L1040">1040</a>                     }
+<a class="jxr_linenumber" name="L1041" href="#L1041">1041</a>                 }
+<a class="jxr_linenumber" name="L1042" href="#L1042">1042</a>             }
+<a class="jxr_linenumber" name="L1043" href="#L1043">1043</a>             <em class="jxr_comment">// and at the front we need to put in the ion version marker</em>
+<a class="jxr_linenumber" name="L1044" href="#L1044">1044</a>             <strong class="jxr_keyword">if</strong> (curr_index == 0 &amp;&amp; !is_ivm(curr_value)) {
+<a class="jxr_linenumber" name="L1045" href="#L1045">1045</a>                 <em class="jxr_comment">// TODO this is wrong, because we may have already pushed</em>
+<a class="jxr_linenumber" name="L1046" href="#L1046">1046</a>                 <em class="jxr_comment">// a rep above. This is just making up an additional symtab</em>
+<a class="jxr_linenumber" name="L1047" href="#L1047">1047</a>                 <em class="jxr_comment">// where one was not placed by the user.</em>
+<a class="jxr_linenumber" name="L1048" href="#L1048">1048</a>                 <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> ivm = __iterator.get_datagram_ivm();
+<a class="jxr_linenumber" name="L1049" href="#L1049">1049</a>                 push_system_value(ivm);
+<a class="jxr_linenumber" name="L1050" href="#L1050">1050</a>             }
+<a class="jxr_linenumber" name="L1051" href="#L1051">1051</a>         }
+<a class="jxr_linenumber" name="L1052" href="#L1052">1052</a> 
+<a class="jxr_linenumber" name="L1053" href="#L1053">1053</a>         <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">boolean</strong> is_ivm(<a name="IonValue" href="../../../../../software/amazon/ion/IonValue.html#IonValue">IonValue</a> value)
+<a class="jxr_linenumber" name="L1054" href="#L1054">1054</a>         {
+<a class="jxr_linenumber" name="L1055" href="#L1055">1055</a>             <strong class="jxr_keyword">if</strong> (value instanceof <a name="IonSymbol" href="../../../../../software/amazon/ion/IonSymbol.html#IonSymbol">IonSymbol</a>
+<a class="jxr_linenumber" name="L1056" href="#L1056">1056</a>                 &amp;&amp; value.getTypeAnnotationSymbols().length == 0) {
+<a class="jxr_linenumber" name="L1057" href="#L1057">1057</a>                 <em class="jxr_comment">// $ion_1_0 is read as an IVM only if it is not annotated</em>
+<a class="jxr_linenumber" name="L1058" href="#L1058">1058</a>                 <a name="IonSymbo<a name="IonSymbol" href="../../../../../software/amazon/ion/IonSymbol.html#IonSymbol">IonSymbol</a>../../../../../software/amazon/ion/IonSymbol.html#IonSymbol">IonSymbol</a> sym = (<a name="IonSymbol" href="../../../../../software/amazon/ion/IonSymbol.html#IonSymbol">IonSymbol</a>)value;
+<a class="jxr_linenumber" name="L1059" href="#L1059">1059</a>                 <a name="SymbolToken" href="../../../../../software/amazon/ion/SymbolToken.html#SymbolToken">SymbolToken</a> tok = sym.symbolValue();
+<a class="jxr_linenumber" name="L1060" href="#L1060">1060</a>                 <strong class="jxr_keyword">if</strong> (tok != <strong class="jxr_keyword">null</strong> &amp;&amp; ION_1_0.equals(tok.getText()))
+<a class="jxr_linenumber" name="L1061" href="#L1061">1061</a>                 {
+<a class="jxr_linenumber" name="L1062" href="#L1062">1062</a>                     <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">true</strong>;
+<a class="jxr_linenumber" name="L1063" href="#L1063">1063</a>                 }
+<a class="jxr_linenumber" name="L1064" href="#L1064">1064</a>             }
+<a class="jxr_linenumber" name="L1065" href="#L1065">1065</a>             <strong class="jxr_keyword">return</strong> false;
+<a class="jxr_linenumber" name="L1066" href="#L1066">1066</a>         }
+<a class="jxr_linenumber" name="L1067" href="#L1067">1067</a> 
+<a class="jxr_linenumber" name="L1068" href="#L1068">1068</a>         <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">void</strong> push_system_value(<a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> value)
+<a class="jxr_linenumber" name="L1069" href="#L1069">1069</a>         {
+<a class="jxr_linenumber" name="L1070" href="#L1070">1070</a>             <strong class="jxr_keyword">if</strong> (__local_value_count &gt;= __local_values.length) {
+<a class="jxr_linenumber" name="L1071" href="#L1071">1071</a>                 <strong class="jxr_keyword">int</strong> <strong class="jxr_keyword">new</strong>_size = (__local_values == <strong class="jxr_keyword">null</strong>) ? 2 : (__local_values.length * 2);
+<a class="jxr_linenumber" name="L1072" href="#L1072">1072</a>                 assert( <strong class="jxr_keyword">new</strong>_size &gt; __local_value_count); <em class="jxr_comment">// we should only need to add 1 value at a time</em>
+<a class="jxr_linenumber" name="L1073" href="#L1073">1073</a>                 <a name="IonValueLite" href="../../../../../software/amazon/ion<a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a>onValueLite.html#IonValueLite">IonValueLite</a>[] temp = <strong class="jxr_keyword">new</strong> <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a>[<strong class="jxr_keyword">new</strong>_size];
+<a class="jxr_linenumber" name="L1074" href="#L1074">1074</a>                 <strong class="jxr_keyword">if</strong> (__local_value_count &gt; 0) {
+<a class="jxr_linenumber" name="L1075" href="#L1075">1075</a>                     System.arraycopy(__local_values, 0, temp, 0, __local_value_count);
+<a class="jxr_linenumber" name="L1076" href="#L1076">1076</a>                 }
+<a class="jxr_linenumber" name="L1077" href="#L1077">1077</a>                 __local_values = temp;
+<a class="jxr_linenumber" name="L1078" href="#L1078">1078</a>             }
+<a class="jxr_linenumber" name="L1079" href="#L1079">1079</a>             __local_values[__local_value_count++] = value;
+<a class="jxr_linenumber" name="L1080" href="#L1080">1080</a>         }
+<a class="jxr_linenumber" name="L1081" href="#L1081">1081</a> 
+<a class="jxr_linenumber" name="L1082" href="#L1082">1082</a>         <strong class="jxr_keyword">protected</strong> <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> load_position()
+<a class="jxr_linenumber" name="L1083" href="#L1083">1083</a>         {
+<a class="jxr_linenumber" name="L1084" href="#L1084">1084</a>             <a name="IonValueLite" href="../../../../../software/amazon/ion/impl/lite/IonValueLite.html#IonValueLite">IonValueLite</a> current = <strong class="jxr_keyword">null</strong>;
 <a class="jxr_linenumber" name="L1085" href="#L1085">1085</a> 
-<a class="jxr_linenumber" name="L1086" href="#L1086">1086</a>         <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">void</strong> force_position_sync_helper()
-<a class="jxr_linenumber" name="L1087" href="#L1087">1087</a>         {
-<a class="jxr_linenumber" name="L1088" href="#L1088">1088</a>             <strong class="jxr_keyword">if</strong> (!__iterator.datagram_contains(__current_user_value)) {
-<a class="jxr_linenumber" name="L1089" href="#L1089">1089</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> <a name="IonException" href="../../../../../software/amazon/ion/IonException.html#IonException">IonException</a>(<span class="jxr_string">"current user value removed outside this iterator - position lost"</span>);
-<a class="jxr_linenumber" name="L1090" href="#L1090">1090</a>             }
-<a class="jxr_linenumber" name="L1091" href="#L1091">1091</a>             <strong class="jxr_keyword">int</strong> old_index = __user_index;
-<a class="jxr_linenumber" name="L1092" href="#L1092">1092</a>             <strong class="jxr_keyword">int</strong> <strong class="jxr_keyword">new</strong>_index = __current_user_value._elementid();
-<a class="jxr_linenumber" name="L1093" href="#L1093">1093</a> 
-<a class="jxr_linenumber" name="L1094" href="#L1094">1094</a>             <strong class="jxr_keyword">if</strong> (old_index != <strong class="jxr_keyword">new</strong>_index) {
-<a class="jxr_linenumber" name="L1095" href="#L1095">1095</a>                 <em class="jxr_comment">// if our current value moved we have to recompute</em>
-<a class="jxr_linenumber" name="L1096" href="#L1096">1096</a>                 <em class="jxr_comment">// the adjustment from scratch since we don't really</em>
-<a class="jxr_linenumber" name="L1097" href="#L1097">1097</a>                 <em class="jxr_comment">// have any idea why this moved in either direction.</em>
-<a class="jxr_linenumber" name="L1098" href="#L1098">1098</a>                 <strong class="jxr_keyword">int</strong> adjustment = 0;
-<a class="jxr_linenumber" name="L1099" href="#L1099">1099</a>                 <a name="SymbolTable" href="../../../../../software/amazon/ion/SymbolTable.html#SymbolTable">SymbolTable</a> curr, prev = <strong class="jxr_keyword">null</strong>;
-<a class="jxr_linenumber" name="L1100" href="#L1100">1100</a>                 <strong class="jxr_keyword">for</strong> (<strong class="jxr_keyword">int</strong> ii=0; ii&lt;<strong class="jxr_keyword">new</strong>_index; ii--) {
-<a class="jxr_linenumber" name="L1101" href="#L1101">1101</a>                     curr = __iterator.get_datagram_child(ii).getSymbolTable();
-<a class="jxr_linenumber" name="L1102" href="#L1102">1102</a>                     <strong class="jxr_keyword">if</strong> (curr != prev) {
-<a class="jxr_linenumber" name="L1103" href="#L1103">1103</a>                         <a name="IonSystem" href="../../../../../software/amazon/ion/IonSystem.html#IonSystem">IonSystem</a> sys = __iterator.getSystem();
-<a class="jxr_linenumber" name="L1104" href="#L1104">1104</a>                         adjustment += count_system_values(sys, prev, curr);
-<a class="jxr_linenumber" name="L1105" href="#L1105">1105</a>                     }
-<a class="jxr_linenumber" name="L1106" href="#L1106">1106</a>                     prev = curr;
-<a class="jxr_linenumber" name="L1107" href="#L1107">1107</a>                 }
-<a class="jxr_linenumber" name="L1108" href="#L1108">1108</a>                 __index_adjustment = adjustment + __local_value_count;
-<a class="jxr_linenumber" name="L1109" href="#L1109">1109</a>                 __user_index = <strong class="jxr_keyword">new</strong>_index;
-<a class="jxr_linenumber" name="L1110" href="#L1110">1110</a>             }
-<a class="jxr_linenumber" name="L1111" href="#L1111">1111</a>         }
-<a class="jxr_linenumber" name="L1112" href="#L1112">1112</a> 
-<a class="jxr_linenumber" name="L1113" href="#L1113">1113</a>         <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">int</strong> count_system_values(<a name="IonSystem" href="../../../../../software/amazon/ion/IonSystem.html#IonSystem">IonSystem</a> sys,
-<a class="jxr_linenumber" name="L1114" href="#L1114">1114</a>                                                <a name="SymbolTable" href="../../../../../software/amazon/ion/SymbolTable.html#SymbolTable">SymbolTable</a> prev,
-<a class="jxr_linenumber" name="L1115" href="#L1115">1115</a>                                                <a name="SymbolTable" href="../../../../../software/amazon/ion/SymbolTable.html#SymbolTable">SymbolTable</a> curr)
-<a class="jxr_linenumber" name="L1116" href="#L1116">1116</a>         {
-<a class="jxr_linenumber" name="L1117" href="#L1117">1117</a>             <strong class="jxr_keyword">int</strong> count = 0;
-<a class="jxr_linenumber" name="L1118" href="#L1118">1118</a>             <strong class="jxr_keyword">while</strong> (curr.isLocalTable()) {
-<a class="jxr_linenumber" name="L1119" href="#L1119">1119</a>                 count++;
-<a class="jxr_linenumber" name="L1120" href="#L1120">1120</a>                 curr = PrivateUtils.symtabTree(curr).getSymbolTable();
-<a class="jxr_linenumber" name="L1121" href="#L1121">1121</a>             }
-<a class="jxr_linenumber" name="L1122" href="#L1122">1122</a>             <em class="jxr_comment">// we should terminate when the symbol tables symbol table is the system symbol table</em>
-<a class="jxr_linenumber" name="L1123" href="#L1123">1123</a>             assert(curr != <strong class="jxr_keyword">null</strong>);
-<a class="jxr_linenumber" name="L1124" href="#L1124">1124</a>             <strong class="jxr_keyword">if</strong> (prev == <strong class="jxr_keyword">null</strong> || prev.getIonVersionId().equals(curr.getIonVersionId())) {
-<a class="jxr_linenumber" name="L1125" href="#L1125">1125</a>                 count++;
-<a class="jxr_linenumber" name="L1126" href="#L1126">1126</a>             }
-<a class="jxr_linenumber" name="L1127" href="#L1127">1127</a>             <strong class="jxr_keyword">return</strong> count;
-<a class="jxr_linenumber" name="L1128" href="#L1128">1128</a>         }
-<a class="jxr_linenumber" name="L1129" href="#L1129">1129</a>     }
-<a class="jxr_linenumber" name="L1130" href="#L1130">1130</a> }
+<a class="jxr_linenumber" name="L1086" href="#L1086">1086</a>             assert(__local_index &lt; __local_value_count);
+<a class="jxr_linenumber" name="L1087" href="#L1087">1087</a> 
+<a class="jxr_linenumber" name="L1088" href="#L1088">1088</a>             current = __local_values[__local_value_count - __local_index - 1];
+<a class="jxr_linenumber" name="L1089" href="#L1089">1089</a> 
+<a class="jxr_linenumber" name="L1090" href="#L1090">1090</a>             <strong class="jxr_keyword">return</strong> current;
+<a class="jxr_linenumber" name="L1091" href="#L1091">1091</a>         }
+<a class="jxr_linenumber" name="L1092" href="#L1092">1092</a> 
+<a class="jxr_linenumber" name="L1093" href="#L1093">1093</a>         <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">void</strong> force_position_sync_helper()
+<a class="jxr_linenumber" name="L1094" href="#L1094">1094</a>         {
+<a class="jxr_linenumber" name="L1095" href="#L1095">1095</a>             <strong class="jxr_keyword">if</strong> (!__iterator.datagram_contains(__current_user_value)) {
+<a class="jxr_linenumber" name="L1096" href="#L1096">1096</a>                 <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> <a name="IonException" href="../../../../../software/amazon/ion/IonException.html#IonException">IonException</a>(<span class="jxr_string">"current user value removed outside this iterator - position lost"</span>);
+<a class="jxr_linenumber" name="L1097" href="#L1097">1097</a>             }
+<a class="jxr_linenumber" name="L1098" href="#L1098">1098</a>             <strong class="jxr_keyword">int</strong> old_index = __user_index;
+<a class="jxr_linenumber" name="L1099" href="#L1099">1099</a>             <strong class="jxr_keyword">int</strong> <strong class="jxr_keyword">new</strong>_index = __current_user_value._elementid();
+<a class="jxr_linenumber" name="L1100" href="#L1100">1100</a> 
+<a class="jxr_linenumber" name="L1101" href="#L1101">1101</a>             <strong class="jxr_keyword">if</strong> (old_index != <strong class="jxr_keyword">new</strong>_index) {
+<a class="jxr_linenumber" name="L1102" href="#L1102">1102</a>                 <em class="jxr_comment">// if our current value moved we have to recompute</em>
+<a class="jxr_linenumber" name="L1103" href="#L1103">1103</a>                 <em class="jxr_comment">// the adjustment from scratch since we don't really</em>
+<a class="jxr_linenumber" name="L1104" href="#L1104">1104</a>                 <em class="jxr_comment">// have any idea why this moved in either direction.</em>
+<a class="jxr_linenumber" name="L1105" href="#L1105">1105</a>                 <strong class="jxr_keyword">int</strong> adjustment = 0;
+<a class="jxr_linenumber" name="L1106" href="#L1106">1106</a>                 <a name="SymbolTable" href="../../../../../software/amazon/ion/SymbolTable.html#SymbolTable">SymbolTable</a> curr, prev = <strong class="jxr_keyword">null</strong>;
+<a class="jxr_linenumber" name="L1107" href="#L1107">1107</a>                 <strong class="jxr_keyword">for</strong> (<strong class="jxr_keyword">int</strong> ii=0; ii&lt;<strong class="jxr_keyword">new</strong>_index; ii--) {
+<a class="jxr_linenumber" name="L1108" href="#L1108">1108</a>                     curr = __iterator.get_datagram_child(ii).getSymbolTable();
+<a class="jxr_linenumber" name="L1109" href="#L1109">1109</a>                     <strong class="jxr_keyword">if</strong> (curr != prev) {
+<a class="jxr_linenumber" name="L1110" href="#L1110">1110</a>                         <a name="IonSystem" href="../../../../../software/amazon/ion/IonSystem.html#IonSystem">IonSystem</a> sys = __iterator.getSystem();
+<a class="jxr_linenumber" name="L1111" href="#L1111">1111</a>                         adjustment += count_system_values(sys, prev, curr);
+<a class="jxr_linenumber" name="L1112" href="#L1112">1112</a>                     }
+<a class="jxr_linenumber" name="L1113" href="#L1113">1113</a>                     prev = curr;
+<a class="jxr_linenumber" name="L1114" href="#L1114">1114</a>                 }
+<a class="jxr_linenumber" name="L1115" href="#L1115">1115</a>                 __index_adjustment = adjustment + __local_value_count;
+<a class="jxr_linenumber" name="L1116" href="#L1116">1116</a>                 __user_index = <strong class="jxr_keyword">new</strong>_index;
+<a class="jxr_linenumber" name="L1117" href="#L1117">1117</a>             }
+<a class="jxr_linenumber" name="L1118" href="#L1118">1118</a>         }
+<a class="jxr_linenumber" name="L1119" href="#L1119">1119</a> 
+<a class="jxr_linenumber" name="L1120" href="#L1120">1120</a>         <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">int</strong> count_system_values(<a name="IonSystem" href="../../../../../software/amazon/ion/IonSystem.html#IonSystem">IonSystem</a> sys,
+<a class="jxr_linenumber" name="L1121" href="#L1121">1121</a>                                                <a name="SymbolTable" href="../../../../../software/amazon/ion/SymbolTable.html#SymbolTable">SymbolTable</a> prev,
+<a class="jxr_linenumber" name="L1122" href="#L1122">1122</a>                                                <a name="SymbolTable" href="../../../../../software/amazon/ion/SymbolTable.html#SymbolTable">SymbolTable</a> curr)
+<a class="jxr_linenumber" name="L1123" href="#L1123">1123</a>         {
+<a class="jxr_linenumber" name="L1124" href="#L1124">1124</a>             <strong class="jxr_keyword">int</strong> count = 0;
+<a class="jxr_linenumber" name="L1125" href="#L1125">1125</a>             <strong class="jxr_keyword">while</strong> (curr.isLocalTable()) {
+<a class="jxr_linenumber" name="L1126" href="#L1126">1126</a>                 count++;
+<a class="jxr_linenumber" name="L1127" href="#L1127">1127</a>                 curr = PrivateUtils.symtabTree(curr).getSymbolTable();
+<a class="jxr_linenumber" name="L1128" href="#L1128">1128</a>             }
+<a class="jxr_linenumber" name="L1129" href="#L1129">1129</a>             <em class="jxr_comment">// we should terminate when the symbol tables symbol table is the system symbol table</em>
+<a class="jxr_linenumber" name="L1130" href="#L1130">1130</a>             assert(curr != <strong class="jxr_keyword">null</strong>);
+<a class="jxr_linenumber" name="L1131" href="#L1131">1131</a>             <strong class="jxr_keyword">if</strong> (prev == <strong class="jxr_keyword">null</strong> || prev.getIonVersionId().equals(curr.getIonVersionId())) {
+<a class="jxr_linenumber" name="L1132" href="#L1132">1132</a>                 count++;
+<a class="jxr_linenumber" name="L1133" href="#L1133">1133</a>             }
+<a class="jxr_linenumber" name="L1134" href="#L1134">1134</a>             <strong class="jxr_keyword">return</strong> count;
+<a class="jxr_linenumber" name="L1135" href="#L1135">1135</a>         }
+<a class="jxr_linenumber" name="L1136" href="#L1136">1136</a>     }
+<a class="jxr_linenumber" name="L1137" href="#L1137">1137</a> }
 </pre>
 <hr/>
 <div id="footer">Copyright &#169; 2018. All rights reserved.</div>

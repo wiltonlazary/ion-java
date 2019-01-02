@@ -779,6 +779,8 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
         {
             symbols.addTypeAnnotationSymbol(systemSymbol(ION_SYMBOL_TABLE_SID));
             symbols.stepIn(STRUCT);
+            symbols.setFieldNameSymbol(systemSymbol(IMPORTS_SID));
+            symbols.writeSymbolToken(systemSymbol(ION_SYMBOL_TABLE_SID));
             symbols.setFieldNameSymbol(systemSymbol(SYMBOLS_SID));
             symbols.stepIn(LIST);
             symbolState = SymbolState.LOCAL_SYMBOLS;

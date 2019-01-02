@@ -816,7 +816,6 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
                 startLocalSymbolTableIfNeeded(/*writeIVM*/ true);
                 token = symbol(text, imports.localSidStart + locals.size());
                 locals.put(text, token);
-
                 symbols.writeString(text);
             }
             return token;
@@ -1052,12 +1051,13 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
     {
         if (getDepth() != 0) throw new IllegalStateException("IonWriter.flush() can only be called at top-level.");
         // make sure that until the local symbol state changes we no-op the table closing routine
-        symbolState = SymbolState.LOCAL_SYMBOLS_FLUSHED;
-        forceSystemOutput = false;
         // push the data out
-        symbols.flush();
+        if(symbolState == SymbolState.LOCAL_SYMBOLS){
+            symbolState.closeTable(symbols);
+            symbols.flush();
+        }
         user.flush();
-
+        symbolState = SymbolState.LOCAL_SYMBOLS_FLUSHED;
     }
 
     private void unsafeFlush() throws IOException

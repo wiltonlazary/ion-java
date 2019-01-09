@@ -12,14 +12,14 @@ software.amazon.ion:ion-java,software.amazon.ion.system,IonSystemBuilder.Mutable
 software.amazon.ion:ion-java,software.amazon.ion.system,IonReaderBuilder,3,93,0,2,1,24,1,17,1,16
 software.amazon.ion:ion-java,software.amazon.ion.system,IonWriterBuilder.InitialIvmHandling,0,24,0,0,0,3,0,1,0,1
 software.amazon.ion:ion-java,software.amazon.ion.impl.lite,ReverseBinaryEncoder,294,2387,61,219,59,483,61,129,2,38
-software.amazon.ion:ion-java,software.amazon.ion.impl.lite,IonSystemLite,213,758,40,80,46,203,43,90,9,52
+software.amazon.ion:ion-java,software.amazon.ion.impl.lite,IonSystemLite,219,762,40,80,48,204,43,90,9,52
 software.amazon.ion:ion-java,software.amazon.ion.impl.lite,IonStructLite.new PrivateCurriedValueFactory() {...},0,17,0,0,0,3,0,2,0,2
 software.amazon.ion:ion-java,software.amazon.ion.impl.lite,IonStructLite.new PrivateCurriedValueFactory() {...},0,17,0,0,0,3,0,2,0,2
 software.amazon.ion:ion-java,software.amazon.ion.impl.lite,IonStructLite.new IonContainerLite.SequenceContentIterator() {...},14,61,6,10,2,16,6,5,0,3
 software.amazon.ion:ion-java,software.amazon.ion.impl.lite,IonStructLite,172,1004,39,135,32,274,30,99,3,39
 software.amazon.ion:ion-java,software.amazon.ion.impl.lite,IonBoolLite,4,105,1,7,2,32,2,14,1,11
 software.amazon.ion:ion-java,software.amazon.ion.impl.lite,IonValueLite,194,1071,59,175,36,294,62,125,8,62
-software.amazon.ion:ion-java,software.amazon.ion.impl.lite,IonLoaderLite,27,138,6,8,6,36,7,10,1,9
+software.amazon.ion:ion-java,software.amazon.ion.impl.lite,IonLoaderLite,33,155,7,11,8,43,8,11,1,9
 software.amazon.ion:ion-java,software.amazon.ion.impl.lite,IonSequenceLite.SubListView.new ListIterator() {...},4,87,0,4,1,15,1,11,1,9
 software.amazon.ion:ion-java,software.amazon.ion.impl.lite,IonSequenceLite.SubListView,15,472,7,45,4,115,7,48,0,29
 software.amazon.ion:ion-java,software.amazon.ion.impl.lite,IonFloatLite,10,146,3,13,3,40,4,21,1,16
@@ -36,7 +36,7 @@ software.amazon.ion:ion-java,software.amazon.ion.impl.lite,IonListLite,9,34,0,0,
 software.amazon.ion:ion-java,software.amazon.ion.impl.lite,IonValueLite.LazySymbolTableProvider,0,20,0,2,0,7,0,3,0,2
 software.amazon.ion:ion-java,software.amazon.ion.impl.lite,IonSequenceLite,122,491,34,70,24,124,25,52,3,22
 software.amazon.ion:ion-java,software.amazon.ion.impl.lite,PrivateLiteDomTrampoline,14,10,0,0,4,2,2,2,2,2
-software.amazon.ion:ion-java,software.amazon.ion.impl.lite,IonSystemLite.ReaderIterator,5,49,0,6,2,14,2,6,2,3
+software.amazon.ion:ion-java,software.amazon.ion.impl.lite,IonSystemLite.ReaderIterator,10,60,0,8,3,20,1,8,1,4
 software.amazon.ion:ion-java,software.amazon.ion.impl.lite,IonLobLite,5,135,4,12,0,37,3,15,0,10
 software.amazon.ion:ion-java,software.amazon.ion.impl.lite,ContainerlessContext,0,29,0,0,0,9,0,6,0,6
 software.amazon.ion:ion-java,software.amazon.ion.impl.lite,IonSequenceLite.new PrivateCurriedValueFactory() {...},24,0,0,0,4,0,2,0,2,0
@@ -181,7 +181,7 @@ software.amazon.ion:ion-java,software.amazon.ion.impl,PrivateIonTextWriterBuilde
 software.amazon.ion:ion-java,software.amazon.ion.impl,IonReaderBinaryUserX.SpanProviderFacet,0,10,0,0,0,2,0,2,0,2
 software.amazon.ion:ion-java,software.amazon.ion.impl,PrivateIonTextWriterBuilder.Mutable,0,18,0,0,0,6,0,5,0,5
 software.amazon.ion:ion-java,software.amazon.ion.impl,LocalSymbolTableAsStruct.Factory,6,83,3,3,0,16,3,5,0,5
-software.amazon.ion:ion-java,software.amazon.ion.impl,UnifiedInputStreamX.FromCharStream,6,23,0,0,3,8,1,1,1,1
+software.amazon.ion:ion-java,software.amazon.ion.impl,UnifiedInputStreamX.FromCharStream,0,29,0,0,0,11,0,2,0,2
 software.amazon.ion:ion-java,software.amazon.ion.impl,IonReaderTextUserX,48,410,13,64,5,97,13,44,0,18
 software.amazon.ion:ion-java,software.amazon.ion.impl,IonReaderTreeUserX,40,296,10,46,5,77,10,30,0,12
 software.amazon.ion:ion-java,software.amazon.ion.impl,IonWriterSystemText,166,930,38,126,34,300,37,98,3,38

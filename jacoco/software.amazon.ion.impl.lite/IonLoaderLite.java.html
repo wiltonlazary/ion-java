@@ -122,28 +122,46 @@ import software.amazon.ion.impl.PrivateLocalSymbolTableFactory;
 
     public IonDatagram load(byte[] ionData) throws IonException
     {
+<span class="fc" id="L125">        IonReader reader = null;</span>
         try {
-<span class="fc" id="L126">            IonReader reader = makeReader(_catalog, ionData, 0, ionData.length, _lstFactory);</span>
-<span class="fc" id="L127">            IonDatagramLite datagram = load_helper(reader);</span>
-<span class="fc" id="L128">            return datagram;</span>
+<span class="fc" id="L127">            reader = makeReader(_catalog, ionData, 0, ionData.length, _lstFactory);</span>
+<span class="fc" id="L128">            IonDatagramLite datagram = load_helper(reader);</span>
+<span class="fc" id="L129">            return datagram;</span>
         }
-<span class="nc" id="L130">        catch (IOException e) {</span>
-<span class="nc" id="L131">            throw new IonException(e);</span>
+<span class="nc" id="L131">        catch (IOException e) {</span>
+<span class="nc" id="L132">            throw new IonException(e);</span>
+        }
+        finally
+        {
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">            if (reader != null) {</span>
+                try {
+<span class="fc" id="L138">                    reader.close();</span>
+                }
+<span class="nc" id="L140">                catch (IOException e) {</span>
+<span class="nc" id="L141">                    throw new IonException(e);</span>
+<span class="fc" id="L142">                }</span>
+            }
         }
     }
 
     public IonDatagram load(InputStream ionData)
         throws IonException, IOException
     {
+<span class="fc" id="L150">        IonReader reader = null;</span>
         try {
-<span class="fc" id="L139">            IonReader reader = makeReader(_catalog, ionData, _lstFactory);</span>
-<span class="fc" id="L140">            IonDatagramLite datagram = load_helper(reader);</span>
-<span class="fc" id="L141">            return datagram;</span>
+<span class="fc" id="L152">            reader = makeReader(_catalog, ionData, _lstFactory);</span>
+<span class="fc" id="L153">            IonDatagramLite datagram = load_helper(reader);</span>
+<span class="fc" id="L154">            return datagram;</span>
         }
-<span class="fc" id="L143">        catch (IonException e) {</span>
-<span class="fc" id="L144">            IOException io = e.causeOfType(IOException.class);</span>
-<span class="fc bfc" id="L145" title="All 2 branches covered.">            if (io != null) throw io;</span>
-<span class="fc" id="L146">            throw e;</span>
+<span class="fc" id="L156">        catch (IonException e) {</span>
+<span class="fc" id="L157">            IOException io = e.causeOfType(IOException.class);</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">            if (io != null) throw io;</span>
+<span class="fc" id="L159">            throw e;</span>
+        }
+        finally {
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            if (reader != null) {</span>
+<span class="fc" id="L163">                reader.close();</span>
+            }
         }
     }
 

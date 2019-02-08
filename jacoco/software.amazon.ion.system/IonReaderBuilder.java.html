@@ -160,8 +160,7 @@ public class IonReaderBuilder
      * instance over the given block of Ion data, detecting whether it's text or
      * binary data.
      * &lt;p&gt;
-     * This method will auto-detect and uncompress GZIPped Ion data. &lt;strong&gt;WARNING:&lt;/strong&gt;
-     *      * this feature is deprecated and will be removed in subsequent releases.
+     * This method will auto-detect and uncompress GZIPped Ion data.
      *
      * @param ionData the source of the Ion data, which may be either Ion binary
      * data or UTF-8 Ion text. The reader retains a reference to the array, so
@@ -171,13 +170,10 @@ public class IonReaderBuilder
      * @return a new {@link IonReader} instance; not {@code null}.
      *
      * @see IonSystem#newReader(byte[])
-     *
-     * @deprecated auto-detecting of and decompression GZIPped Ion data will be
-     * removed in subsequent releases.
      */
     public IonReader build(byte[] ionData)
     {
-<span class="fc" id="L180">        return makeReader(validateCatalog(), ionData);</span>
+<span class="fc" id="L176">        return makeReader(validateCatalog(), ionData);</span>
     }
 
     /**
@@ -185,8 +181,7 @@ public class IonReaderBuilder
      * instance over the given block of Ion data, detecting whether it's text or
      * binary data.
      * &lt;p&gt;
-     * This method will auto-detect and uncompress GZIPped Ion data. &lt;strong&gt;WARNING:&lt;/strong&gt;
-     * this feature is deprecated and will be removed in subsequent releases.
+     * This method will auto-detect and uncompress GZIPped Ion data.
      *
      * @param ionData the source of the Ion data, which is used only within the
      * range of bytes starting at {@code offset} for {@code len} bytes.
@@ -198,13 +193,10 @@ public class IonReaderBuilder
      * exceed {@code ionData.length}.
      *
      * @see IonSystem#newReader(byte[], int, int)
-     *
-     * @deprecated auto-detecting of and decompression GZIPped Ion data will be
-     * removed in subsequent releases.
      */
     public IonReader build(byte[] ionData, int offset, int length)
     {
-<span class="fc" id="L207">        return makeReader(validateCatalog(), ionData, offset, length);</span>
+<span class="fc" id="L199">        return makeReader(validateCatalog(), ionData, offset, length);</span>
     }
 
     /**
@@ -212,8 +204,7 @@ public class IonReaderBuilder
      * instance over the given stream of Ion data, detecting whether it's text or
      * binary data.
      * &lt;p&gt;
-     * This method will auto-detect and uncompress GZIPped Ion data. &lt;strong&gt;WARNING:&lt;/strong&gt;
-     * this feature is deprecated and will be removed in subsequent releases.
+     * This method will auto-detect and uncompress GZIPped Ion data.
      * &lt;p&gt;
      * Because this library performs its own buffering, it's recommended that
      * users avoid adding additional buffering to the given stream.
@@ -227,14 +218,10 @@ public class IonReaderBuilder
      * @throws IonException if the source throws {@link IOException}.
      *
      * @see IonSystem#newReader(InputStream)
-     *
-     * @deprecated auto-detecting of and decompression GZIPped Ion data will be
-     * removed in subsequent releases. Use a {@link java.util.zip.GZIPInputStream}
-     * to process GZIPped Ion data.
      */
     public IonReader build(InputStream ionData)
     {
-<span class="fc" id="L237">        return makeReader(validateCatalog(), ionData);</span>
+<span class="fc" id="L224">        return makeReader(validateCatalog(), ionData);</span>
     }
 
     /**
@@ -256,7 +243,7 @@ public class IonReaderBuilder
      */
     public IonReader build(Reader ionText)
     {
-<span class="fc" id="L259">        return makeReader(validateCatalog(), ionText);</span>
+<span class="fc" id="L246">        return makeReader(validateCatalog(), ionText);</span>
     }
 
     /**
@@ -270,7 +257,7 @@ public class IonReaderBuilder
      */
     public IonReader build(IonValue value)
     {
-<span class="fc" id="L273">        return makeReader(validateCatalog(), value);</span>
+<span class="fc" id="L260">        return makeReader(validateCatalog(), value);</span>
     }
 
     /**
@@ -283,37 +270,37 @@ public class IonReaderBuilder
      */
     public IonReader build(String ionText)
     {
-<span class="fc" id="L286">        return makeReader(validateCatalog(), ionText);</span>
+<span class="fc" id="L273">        return makeReader(validateCatalog(), ionText);</span>
     }
 
     private static class Mutable extends IonReaderBuilder
     {
 
         private Mutable()
-<span class="fc" id="L293">        {</span>
-<span class="fc" id="L294">        }</span>
+<span class="fc" id="L280">        {</span>
+<span class="fc" id="L281">        }</span>
 
         private Mutable(IonReaderBuilder that)
         {
-<span class="fc" id="L298">            super(that);</span>
-<span class="fc" id="L299">        }</span>
+<span class="fc" id="L285">            super(that);</span>
+<span class="fc" id="L286">        }</span>
 
         @Override
         public IonReaderBuilder immutable()
         {
-<span class="fc" id="L304">            return new IonReaderBuilder(this);</span>
+<span class="fc" id="L291">            return new IonReaderBuilder(this);</span>
         }
 
         @Override
         public IonReaderBuilder mutable()
         {
-<span class="fc" id="L310">            return this;</span>
+<span class="fc" id="L297">            return this;</span>
         }
 
         @Override
         protected void mutationCheck()
         {
-<span class="fc" id="L316">        }</span>
+<span class="fc" id="L303">        }</span>
 
     }
 

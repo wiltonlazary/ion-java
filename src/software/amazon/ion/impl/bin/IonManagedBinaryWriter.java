@@ -32,13 +32,14 @@ import static software.amazon.ion.impl.bin.Symbols.systemSymbols;
 
 import software.amazon.ion.*;
 import software.amazon.ion.impl.PrivateIonWriter;
-import software.amazon.ion.impl.PrivateLocalSymbolTableTrampoline;
+import software.amazon.ion.impl.PrivateWriterLSTFactory;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.*;
 
+import software.amazon.ion.impl.PrivateWriterLSTFactory;
 import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamCloseMode;
 import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
@@ -67,231 +68,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
         /** Constructs the resolver from the symbols tables added prior to this call. */
         SymbolResolver build();
     }
-    private enum State {preImp, imp, impMID, impName, impVer,  preSym, sym}
-    private class SSTImport {
-        String name;
-        int version;
-        int maxID;
 
-    }
-
-    private class LSTFactory implements PrivateIonWriter {
-
-        private int depth;
-        private SymbolTable symbolTable;
-        private State state;
-        private LinkedList<SSTImport> imports;
-
-        LSTFactory(SymbolTable currentLST) {
-            symbolTable = currentLST;
-        }
-
-        LSTFactory(List<SymbolTable> imports, Iterator<String> symbols) {
-            symbolTable = PrivateLocalSymbolTableTrampoline.LST(imports, symbols);
-        }
-
-        public SymbolTable getSymbolTable() {
-            return symbolTable;
-        }
-
-        public void stepIn(IonType containerType) throws IOException {
-            depth++;
-            switch(state) {
-                case preImp:
-                    //entering the imports list
-                    state = State.imp;
-                    imports = new LinkedList<SSTImport>();
-                    //we need to delete all context when we step out?
-                    break;
-                case imp:
-                    //entering an import struct
-                    imports.add(new SSTImport());
-                    break;
-                case preSym:
-                    //entering the local symbols list
-                    break;
-                case impMID:
-                case impVer:
-                case impName:
-                    throw new UnsupportedOperationException();
-                default:
-                    switch(containerType) {
-                        case LIST:
-
-                        case STRUCT:
-
-                        case SEXP:
-                            throw new UnsupportedOperationException();
-                    }
-            }
-        }
-
-        public void stepOut() {
-            depth--;
-            switch(state) {
-                case imp:
-                    SSTImport temp = imports.getLast();
-                    if(temp.maxID == 0 || temp.name == null || temp.version == 0) throw new UnsupportedOperationException("Illegal Shared Symbol Table Import declared in local symbol table.");
-                    break;
-                case sym:
-
-                case preSym:
-                case impMID:
-                case impVer:
-                case impName:
-                    throw new UnsupportedOperationException();
-            }
-            if(depth == 1) state = null;
-        }
-
-        public void setFieldName(String name) {
-            if(state == null) {
-                if (name.equals("imports")) {
-                    state = State.preImp;
-                } else if (name.equals("symbols")) {
-                    state = State.preSym;
-                } else {
-                    throw new UnsupportedOperationException();
-                }
-            } else if(state == State.imp) {
-
-            }else if(state == State.sym) {
-
-            } else {
-                throw new UnsupportedOperationException();
-            }
-        }
-
-        public void writeString(String value) throws IOException {
-            if state == null;
-            switch(state) {
-
-            }
-        }
-
-        public void writeInt(long value){
-            if(state == State.impVer) {
-                version = (int) value;
-            } else if(state == State.impMID) {
-                maxID = (int) value;
-            } else {
-                throw new UnsupportedOperationException();
-            }
-        }
-
-        public void writeInt(BigInteger value) throws IOException {
-            writeInt(value.longValue());
-        }
-
-        public int getDepth() {
-            return depth;
-        }
-
-        public void writeNull() throws IOException {
-
-        }
-
-        public void writeNull(IonType type) throws IOException {
-
-        }
-        //This isn't really fulfilling the contract, but we're destroying any open content anyway so screw'em.
-        public boolean isInStruct() {
-            return state == null || state == State.imp;
-        }
-
-        public void addTypeAnnotation(String annotation) {
-            throw new UnsupportedOperationException();
-        }
-
-        public void setFieldNameSymbol(SymbolToken name) {
-           setFieldName(name.getText());
-        }
-
-        public IonCatalog getCatalog() {
-            throw new UnsupportedOperationException();
-        }
-
-        public void setTypeAnnotations(String... annotations) {
-            throw new UnsupportedOperationException();
-        }
-
-        public void setTypeAnnotationSymbols(SymbolToken... annotations){
-            throw new UnsupportedOperationException();
-        }
-
-        public void flush() throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        public void finish() throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        public void close() throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        public boolean isFieldNameSet() {
-            throw new UnsupportedOperationException();
-        }
-
-        public void writeIonVersionMarker(){
-            throw new UnsupportedOperationException();
-        }
-
-        public boolean isStreamCopyOptimized(){
-            throw new UnsupportedOperationException();
-        }
-
-        public void writeValue(IonReader reader) throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        public void writeValues(IonReader reader) throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        public void writeBool(boolean value) throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        public void writeFloat(double value) throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        public void writeDecimal(BigDecimal value) throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        public void writeTimestamp(Timestamp value) throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        public void writeSymbol(String content) throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        public void writeSymbolToken(SymbolToken content) throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        public void writeClob(byte[] value) throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        public void writeClob(byte[] value, int start, int len) throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        public void writeBlob(byte[] value) throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        public void writeBlob(byte[] value, int start, int len) throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-    }
 
     private static final class ImportTablePosition
     {
@@ -448,8 +225,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
     private boolean                             closed;
     private boolean                             IVM;
     private boolean                             writeLST;
-    private IonRawBinaryWriter                  user;
-    private LSTWriter                           symbols;
+    private IonWriter                           LSTWriter;
     private PrivateIonWriter                    currentWriter;
 
 
@@ -484,7 +260,8 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
         this.lstIndex = 0;
         this.localsLocked = false;
-        this.lst = PrivateLocalSymbolTableTrampoline.LST(Arrays.asList(builder.initialSymbolTable.getImportedTables()), builder.initialSymbolTable.iterateDeclaredSymbolNames());
+        this.LSTWriter = PrivateWriterLSTFactory.WriterLSTFactory(this.builder.);
+        this.lst = LSTWriter.getSymbolTable();
         this.closed = false;
         this.IVM = true;
         this.writeLST = false;
@@ -568,34 +345,27 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
     }
     //these should be inverted so that calling intern x text results in a new symboltoken if none currently exist, thus we can support repeated symboltokens
     private SymbolToken intern(final String text) {
-        if (text == null)
-        {
-            return null;
-        }
-            SymbolToken token = imports.importedSymbols.get(text);
-            if (token != null)
-            {
-                if (token.getSid() > ION_1_0_MAX_ID)
-                {
-                    // using a symbol from an import triggers emitting locals
-                    writeLST = true;
-                }
-                return token;
-            }
-            // try the locals
-            token = locals.get(text);
-            if (token == null)
-            {
-                if (localsLocked)
-                {
-                    throw new IonException("Local symbol table was locked (made read-only)");
-                }
-                // if we got here, this is a new symbol and we better start up the locals
-                token = symbol(text, imports.localSidStart + locals.size());
-                locals.put(text, token);
+        if (text == null) return null;
+        SymbolToken token = imports.importedSymbols.get(text);
+        if (token != null) {
+            if (token.getSid() > ION_1_0_MAX_ID) {
+                // using a symbol from an import triggers emitting locals
                 writeLST = true;
             }
             return token;
+        }
+        // try the locals
+        token = locals.get(text);
+        if (token == null) {
+            if (localsLocked) {
+                throw new IonException("Local symbol table was locked (made read-only)");
+            }
+            // if we got here, this is a new symbol and we better start up the locals
+            token = symbol(text, imports.localSidStart + locals.size());
+            locals.put(text, token);
+            writeLST = true;
+        }
+        return token;
     }
 
     private SymbolToken intern(final SymbolToken token)
@@ -621,7 +391,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
     }
 
     public SymbolTable getSymbolTable() {
-        return
+        return lst;
     }
 
     // Current Value Meta
@@ -689,14 +459,12 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
     public void stepIn(final IonType containerType) throws IOException
     {
-        userState.beforeStepIn(this, containerType);
         user.stepIn(containerType);
     }
 
     public void stepOut() throws IOException
     {
         user.stepOut();
-        userState.afterStepOut(this);
     }
 
     public boolean isInStruct()
@@ -723,13 +491,11 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
     public void writeInt(long value) throws IOException
     {
-        userState.writeInt(this, value);
         user.writeInt(value);
     }
 
     public void writeInt(final BigInteger value) throws IOException
     {
-        userState.writeInt(this, value);
         user.writeInt(value);
     }
 
@@ -754,20 +520,13 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
         writeSymbolToken(token);
     }
 
-    public void writeSymbolToken(SymbolToken token) throws IOException
-    {
+    public void writeSymbolToken(SymbolToken token) throws IOException {
         token = intern(token);
-        if (token != null && token.getSid() == ION_1_0_SID && user.getDepth() == 0 && !user.hasAnnotations())
-        {
-            if (user.hasWrittenValuesSinceFinished())
-            {
+        if (token != null && token.getSid() == ION_1_0_SID && user.getDepth() == 0 && !user.hasAnnotations()) {
+            if (user.hasWrittenValuesSinceFinished()) {
                 // this explicitly translates SID 2 to an IVM and flushes out local symbol state
                 finish();
-            }
-            else
-            {
-                // TODO determine if redundant IVM writes need to actually be surfaced
-                // we need to signal that we need to write out the IVM even if nothing else is written
+            } else {
                 forceSystemOutput = true;
             }
             return;
@@ -777,7 +536,6 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
     public void writeString(final String value) throws IOException
     {
-        userState.writeString(this, value);
         user.writeString(value);
     }
 
@@ -825,9 +583,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
             throw new IllegalStateException("IonWriter.finish() can only be called at top-level.");
         }
         flush();
-        locals.clear();
         localsLocked = false;
-        symbolState = SymbolState.SYSTEM_SYMBOLS;
         imports = bootstrapImports;
     }
 

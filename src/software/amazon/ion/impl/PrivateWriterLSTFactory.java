@@ -17,7 +17,7 @@ import java.util.ArrayDeque;
 import java.util.LinkedList;
 
 
-public class PrivateLocalSymbolTableTrampoline {
+public class PrivateWriterLSTFactory {
 
     private enum State {preImp, imp, impMID, impName, impVer,  preSym, sym}
 
@@ -32,9 +32,10 @@ public class PrivateLocalSymbolTableTrampoline {
         private int depth;
         private SymbolTable symbolTable;
         private State state;
-        private ArrayDeque<SSTImport> decImports;
-        private ArrayDeque<String> decSymbols;
+        private LinkedList<SSTImport> decImports;
+        private LinkedList<String> decSymbols;
         private IonCatalog catalog;
+        private boolean seenImports;
 
         WriterLSTFactory(SymbolTable currentLST, IonCatalog inCatalog) {
             symbolTable = currentLST;
@@ -56,7 +57,7 @@ public class PrivateLocalSymbolTableTrampoline {
                 case preImp:
                     //entering the decImports list
                     state = State.imp;
-                    decImports = new ArrayDeque<SSTImport>();
+                    decImports = new LinkedList<SSTImport>();
                     //we need to delete all context when we step out?
                     break;
                 case imp:
@@ -64,7 +65,7 @@ public class PrivateLocalSymbolTableTrampoline {
                     decImports.add(new SSTImport());
                     break;
                 case preSym:
-                    decSymbols = new ArrayDeque<String>();
+                    decSymbols = new LinkedList<String>();
                     break;
                 case impMID:
                 case impVer:
@@ -94,11 +95,14 @@ public class PrivateLocalSymbolTableTrampoline {
                         tempImports.add(tempTable);
                     }
 
-                    symbolTable = new LocalSymbolTable(tempImports, decSymbols.iterator());
+                    symbolTable = new LocalSymbolTable(new LocalSymbolTableImports(tempImports), decSymbols);
                     break;
                 case sym:
-                    if(true){//if we've seen decImports
-                        symbolTable = new LocalSymbolTable(decImports, decSymbols.iterator());
+                    if(seenImports) {
+                        for(String sym: decSymbols) {
+                            symbolTable.intern(sym);
+                        }
+
                     }
                 case preSym:
                 case impMID:

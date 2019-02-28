@@ -82,141 +82,12 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
         }
     }
 
-    /** Determines how imported symbols are resolved (including system symbols). */
-    /*package*/ enum ImportedSymbolResolverMode
-    {
-        /** Symbols are copied into a flat map, this is useful if the context can be reused across builders. */
-        FLAT
-        {
-            @Override
-            /*package*/ SymbolResolverBuilder createBuilder()
-            {
-                final Map<String, SymbolToken> symbols = new HashMap<String, SymbolToken>();
-
-                // add in system tokens
-                for (final SymbolToken token : systemSymbols())
-                {
-                    symbols.put(token.getText(), token);
-                }
-
-                return new SymbolResolverBuilder()
-                {
-                    public int addSymbolTable(final SymbolTable table, final int startSid)
-                    {
-                        int maxSid = startSid;
-                        final Iterator<String> iter = table.iterateDeclaredSymbolNames();
-                        while (iter.hasNext())
-                        {
-                            final String text = iter.next();
-                            if (text != null && !symbols.containsKey(text))
-                            {
-                                symbols.put(text, symbol(text, maxSid));
-                            }
-                            maxSid++;
-                        }
-                        return maxSid;
-                    }
-
-                    public SymbolResolver build()
-                    {
-                        return new SymbolResolver()
-                        {
-                            public SymbolToken get(final String text)
-                            {
-                                return symbols.get(text);
-                            }
-                        };
-                    }
-                };
-            }
-        },
-        /** Delegates to a set of symbol tables for symbol resolution, this is useful if the context is thrown away frequently. */
-        DELEGATE
-        {
-            @Override
-            /*package*/ SymbolResolverBuilder createBuilder()
-            {
-                final List<ImportTablePosition> imports = new ArrayList<ImportTablePosition>();
-                imports.add(new ImportTablePosition(systemSymbolTable(), 1));
-                return new SymbolResolverBuilder()
-                {
-                    public int addSymbolTable(final SymbolTable table, final int startId)
-                    {
-                        imports.add(new ImportTablePosition(table, startId));
-                        return startId + table.getMaxId();
-                    }
-
-                    public SymbolResolver build()
-                    {
-                        return new SymbolResolver() {
-                            public SymbolToken get(final String text) {
-                                for (final ImportTablePosition tableImport : imports)
-                                {
-                                    final SymbolToken token = tableImport.table.find(text);
-                                    if (token != null)
-                                    {
-                                        return symbol(text, token.getSid() + tableImport.startId - 1);
-                                    }
-                                }
-                                return null;
-                            }
-                        };
-                    }
-                };
-            }
-        };
-
-        /*package*/ abstract SymbolResolverBuilder createBuilder();
-    }
-
-    /**
-     * Provides the import context for the writer.
-     * This class is immutable and shareable across instances.
-     */
-    /*package*/ static final class ImportedSymbolContext
-    {
-        public final List<SymbolTable>          parents;
-        public final SymbolResolver             importedSymbols;
-        public final int                        localSidStart;
-
-        /*package*/ ImportedSymbolContext(final ImportedSymbolResolverMode mode, final List<SymbolTable> imports)
-        {
-
-            final List<SymbolTable> mutableParents = new ArrayList<SymbolTable>(imports.size());
-
-            final SymbolResolverBuilder builder = mode.createBuilder();
-
-            // add in imports
-            int maxSid = ION_1_0_MAX_ID + 1;
-            for (final SymbolTable st : imports)
-            {
-                if (!st.isSharedTable())
-                {
-                    throw new IonException("Imported symbol table is not shared: " + st);
-                }
-                if (st.isSystemTable())
-                {
-                    // ignore
-                    continue;
-                }
-                mutableParents.add(st);
-                maxSid = builder.addSymbolTable(st, maxSid);
-            }
-
-            this.parents = unmodifiableList(mutableParents);
-            this.importedSymbols = builder.build();
-            this.localSidStart = maxSid;
-        }
-    }
-    /*package*/ static final ImportedSymbolContext ONLY_SYSTEM_IMPORTS =
-        new ImportedSymbolContext(ImportedSymbolResolverMode.FLAT, Collections.<SymbolTable>emptyList());
-
     private static final SymbolTable[] EMPTY_SYMBOL_TABLE_ARRAY = new SymbolTable[0];
 
 
     private final IonCatalog                    catalog;
-    private final ImportedSymbolContext         bootstrapImports;
-    private ImportedSymbolContext               imports;
+    private final SymbolTable[]         bootstrapImports;
+    private SymbolTable[]                   imports;
     private int                                 lstIndex;
     private SymbolTable                         lst;
     private boolean                             localsLocked;
@@ -260,7 +131,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
         this.lstIndex = 0;
         this.localsLocked = false;
-        this.LSTWriter = PrivateWriterLSTFactory.WriterLSTFactory(this.builder.);
+        this.LSTWriter = PrivateWriterLSTFactory.WriterLSTFactory(builder.imports);
         this.lst = LSTWriter.getSymbolTable();
         this.closed = false;
         this.IVM = true;
@@ -269,9 +140,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
         if (builder.initialSymbolTable != null) {
             // build import context from seeded LST
-            final List<SymbolTable> lstImportList = Arrays.asList(builder.initialSymbolTable.getImportedTables());
-            // TODO determine if the resolver mode should be configurable for this use case
-            this.imports = new ImportedSymbolContext(ImportedSymbolResolverMode.DELEGATE, lstImportList);
+            this.imports = builder.initialSymbolTable.getImportedTables();
 
             // intern all of the local symbols provided from LST
             final Iterator<String> symbolIter = builder.initialSymbolTable.iterateDeclaredSymbolNames();

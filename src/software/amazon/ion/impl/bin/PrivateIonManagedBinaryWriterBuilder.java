@@ -71,7 +71,7 @@ public final class PrivateIonManagedBinaryWriterBuilder
     /*package*/ volatile int                    symbolsBlockSize;
     /*package*/ volatile int                    userBlockSize;
     /*package*/ volatile PreallocationMode      preallocationMode;
-    /*package*/ volatile ImportedSymbolContext  imports;
+    /*package*/ volatile List<SymbolTable>  imports;
     /*package*/ volatile IonCatalog             catalog;
     /*package*/ volatile WriteValueOptimization optimization;
     /*package*/ volatile SymbolTable            initialSymbolTable;
@@ -140,31 +140,7 @@ public final class PrivateIonManagedBinaryWriterBuilder
 
     public PrivateIonManagedBinaryWriterBuilder withImports(final List<SymbolTable> tables)
     {
-        return withImports(ImportedSymbolResolverMode.DELEGATE, tables);
-    }
-
-    /**
-     * Adds imports, flattening them to make lookup more efficient.  This is particularly useful
-     * when a builder instance is long lived.
-     */
-    public PrivateIonManagedBinaryWriterBuilder withFlatImports(final SymbolTable... tables)
-    {
-        if (tables != null)
-        {
-            return withFlatImports(Arrays.asList(tables));
-        }
-        return this;
-    }
-
-    /** @see #withFlatImports(SymbolTable...) */
-    public PrivateIonManagedBinaryWriterBuilder withFlatImports(final List<SymbolTable> tables)
-    {
-        return withImports(ImportedSymbolResolverMode.FLAT, tables);
-    }
-
-    /*package*/ PrivateIonManagedBinaryWriterBuilder withImports(final ImportedSymbolResolverMode mode, final List<SymbolTable> tables) {
-        imports = new ImportedSymbolContext(mode, tables);
-        return this;
+        return withImports(tables);
     }
 
     /*package*/ PrivateIonManagedBinaryWriterBuilder withPreallocationMode(final PreallocationMode preallocationMode)

@@ -10,25 +10,22 @@ import software.amazon.ion.IonType;
 import software.amazon.ion.SymbolToken;
 import software.amazon.ion.SymbolTable;
 import software.amazon.ion.Timestamp;
-import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
-import java.util.ArrayDeque;
 import java.util.LinkedList;
 
 
-public class PrivateWriterLSTFactory {
+public final class PrivateWriterLSTFactory {
 
     private enum State {preImp, imp, impMID, impName, impVer,  preSym, sym}
 
-    private class SSTImport {
+    private static class SSTImport {
         String name;
         int version;
         int maxID;
 
     }
 
-    public class WriterLSTFactory implements PrivateIonWriter {
+    public static class LSTWriter implements PrivateIonWriter {
         private int depth;
         private SymbolTable symbolTable;
         private State state;
@@ -37,12 +34,12 @@ public class PrivateWriterLSTFactory {
         private IonCatalog catalog;
         private boolean seenImports;
 
-        WriterLSTFactory(SymbolTable currentLST, IonCatalog inCatalog) {
+        public LSTWriter(SymbolTable currentLST, IonCatalog inCatalog) {
             symbolTable = currentLST;
             catalog = inCatalog;
         }
 
-        WriterLSTFactory(List<SymbolTable> imports, List<String> symbols, IonCatalog inCatalog) {
+        public LSTWriter(List<SymbolTable> imports, List<String> symbols, IonCatalog inCatalog) {
             catalog = inCatalog;
             symbolTable = new LocalSymbolTable(new LocalSymbolTableImports(imports), symbols);
         }
@@ -115,7 +112,7 @@ public class PrivateWriterLSTFactory {
 
         public void setFieldName(String name) {
             if(state == null) {
-                if (name.equals("decImports")) {
+                if (name.equals("imports")) {
                     state = State.preImp;
                 } else if (name.equals("symbols")) {
                     state = State.preSym;
@@ -123,21 +120,39 @@ public class PrivateWriterLSTFactory {
                     throw new UnsupportedOperationException();
                 }
             } else if(state == State.imp) {
-
-            }else if(state == State.sym) {
-
+                if(name.equals("name")) {
+                    state = State.impName;
+                } else if(name.equals("version")) {
+                    state = State.impVer;
+                } else if(name.equals("max_id")) {
+                    state = State.impMID;
+                }
             } else {
                 throw new UnsupportedOperationException();
             }
         }
 
-        public void writeString(String value) throws IOException {
-            if state == null;
+        public void writeString(String value) {
+            if(state == null) throw new UnsupportedOperationException("Open content unsupported via the managed binary writer");
             switch(state) {
                 case sym:
-
+                    symbolTable.intern(value);
+                default:
+                    throw new UnsupportedOperationException("Open content unsupported via the managed binary writer");
 
             }
+        }
+
+        public void writeSymbol(String content){
+            if(state == State.preImp && content.equals("$ion_symbol_table")) {
+                //we are appending to our current context
+
+            } else {
+                throw new UnsupportedOperationException("Open content unsupported via the managed binary writer");
+            }
+        }
+        public void writeSymbolToken(SymbolToken content) throws IOException {
+            writeSymbol(content.getText());
         }
 
         public void writeInt(long value){
@@ -150,7 +165,7 @@ public class PrivateWriterLSTFactory {
             }
         }
 
-        public void writeInt(BigInteger value) throws IOException {
+        public void writeInt(BigInteger value){
             writeInt(value.longValue());
         }
 
@@ -158,11 +173,11 @@ public class PrivateWriterLSTFactory {
             return depth;
         }
 
-        public void writeNull() throws IOException {
+        public void writeNull() {
 
         }
 
-        public void writeNull(IonType type) throws IOException {
+        public void writeNull(IonType type){
 
         }
         //This isn't really fulfilling the contract, but we're destroying any open content anyway so screw'em.
@@ -205,8 +220,8 @@ public class PrivateWriterLSTFactory {
         public void writeFloat(double value) throws IOException { throw new UnsupportedOperationException(); }
         public void writeDecimal(BigDecimal value) throws IOException { throw new UnsupportedOperationException(); }
         public void writeTimestamp(Timestamp value) throws IOException { throw new UnsupportedOperationException(); }
-        public void writeSymbol(String content) throws IOException { throw new UnsupportedOperationException(); }
-        public void writeSymbolToken(SymbolToken content) throws IOException { throw new UnsupportedOperationException(); }
+
+
         public void writeClob(byte[] value) throws IOException { throw new UnsupportedOperationException(); }
         public void writeClob(byte[] value, int start, int len) throws IOException { throw new UnsupportedOperationException(); }
         public void writeBlob(byte[] value) throws IOException { throw new UnsupportedOperationException(); }

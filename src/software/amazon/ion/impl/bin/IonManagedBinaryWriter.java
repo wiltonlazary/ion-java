@@ -48,46 +48,9 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 /** Wraps {@link IonRawBinaryWriter} with symbol table management. */
 /*package*/ final class IonManagedBinaryWriter extends AbstractIonWriter
 {
-
-    private interface SymbolResolver
-    {
-        /** Resolves a {@link SymbolToken} or returns <code>null</code> if the mapping does not exist. */
-        SymbolToken get(String text);
-    }
-
-    private interface SymbolResolverBuilder
-    {
-        /**
-         * Adds the given table's mappings to the resolver to be constructed.
-         *
-         * @param  startSid     The starting local ID.
-         * @return the next available ID.
-         */
-        int addSymbolTable(SymbolTable table, int startSid);
-
-        /** Constructs the resolver from the symbols tables added prior to this call. */
-        SymbolResolver build();
-    }
-
-
-    private static final class ImportTablePosition
-    {
-        public final SymbolTable table;
-        public final int startId;
-
-        public ImportTablePosition(final SymbolTable table, final int startId)
-        {
-            this.table = table;
-            this.startId = startId;
-        }
-    }
-
-    private static final SymbolTable[] EMPTY_SYMBOL_TABLE_ARRAY = new SymbolTable[0];
-
-
     private final IonCatalog                    catalog;
-    private final SymbolTable[]         bootstrapImports;
-    private SymbolTable[]                   imports;
+    private final List<SymbolTable>         bootstrapImports;
+    private List<SymbolTable>                   imports;
     private int                                 lstIndex;
     private SymbolTable                         lst;
     private boolean                             localsLocked;
@@ -131,29 +94,24 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
         this.lstIndex = 0;
         this.localsLocked = false;
-        this.LSTWriter = PrivateWriterLSTFactory.WriterLSTFactory(builder.imports);
-        this.lst = LSTWriter.getSymbolTable();
         this.closed = false;
         this.IVM = true;
         this.writeLST = false;
 
 
         if (builder.initialSymbolTable != null) {
-            // build import context from seeded LST
-            this.imports = builder.initialSymbolTable.getImportedTables();
-
-            // intern all of the local symbols provided from LST
+            this.imports = new ArrayList<>(Arrays.asList(builder.initialSymbolTable.getImportedTables()));
+            ArrayList temp = new ArrayList<String>();
             final Iterator<String> symbolIter = builder.initialSymbolTable.iterateDeclaredSymbolNames();
-            while (symbolIter.hasNext())
-            {
-                final String text = symbolIter.next();
-                intern(text);
+            while (symbolIter.hasNext()) {
+                temp.add(symbolIter.next());
             }
-        }
-        else
-        {
+            this.LSTWriter = new PrivateWriterLSTFactory.LSTWriter(this.imports, temp, builder.catalog);
+        } else {
             this.imports = builder.imports;
+            this.LSTWriter = new PrivateWriterLSTFactory.LSTWriter(this.imports, new ArrayList<String>(), builder.catalog);
         }
+        this.lst = this.LSTWriter.getSymbolTable();
     }
 
     // Compatibility with Implementation Writer Interface

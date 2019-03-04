@@ -14,11 +14,10 @@
 
 package software.amazon.ion.impl.bin;
 
-import static software.amazon.ion.impl.bin.IonManagedBinaryWriter.ONLY_SYSTEM_IMPORTS;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import software.amazon.ion.IonCatalog;
 import software.amazon.ion.IonWriter;
@@ -26,8 +25,6 @@ import software.amazon.ion.SubstituteSymbolTableException;
 import software.amazon.ion.SymbolTable;
 import software.amazon.ion.SystemSymbols;
 import software.amazon.ion.impl.bin.AbstractIonWriter.WriteValueOptimization;
-import software.amazon.ion.impl.bin.IonManagedBinaryWriter.ImportedSymbolContext;
-import software.amazon.ion.impl.bin.IonManagedBinaryWriter.ImportedSymbolResolverMode;
 import software.amazon.ion.impl.bin.IonRawBinaryWriter.PreallocationMode;
 import software.amazon.ion.system.SimpleCatalog;
 
@@ -82,7 +79,7 @@ public final class PrivateIonManagedBinaryWriterBuilder
         this.provider = provider;
         this.symbolsBlockSize = DEFAULT_BLOCK_SIZE;
         this.userBlockSize = DEFAULT_BLOCK_SIZE;
-        this.imports = ONLY_SYSTEM_IMPORTS;
+        this.imports = new ArrayList<SymbolTable>();
         this.preallocationMode = PreallocationMode.PREALLOCATE_2;
         this.catalog = new SimpleCatalog();
         this.optimization = WriteValueOptimization.NONE;

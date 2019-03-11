@@ -34,11 +34,13 @@ public class LSTWriter implements PrivateIonWriter {
     public LSTWriter(SymbolTable currentLST, IonCatalog inCatalog) {
         symbolTable = currentLST;
         catalog = inCatalog;
+        depth = 0;
     }
 
     public LSTWriter(List<SymbolTable> imports, List<String> symbols, IonCatalog inCatalog) {
         catalog = inCatalog;
         symbolTable = new LocalSymbolTable(new LocalSymbolTableImports(imports), symbols);
+        depth = 0;
     }
 
     public SymbolTable getSymbolTable() {

@@ -558,9 +558,9 @@ import software.amazon.ion.Timestamp;
 
     // Additional Current State Meta
 
-    /*package*/ void addTypeAnnotationSymbol(final SymbolToken annotation)
+    public void addTypeAnnotationSymbol(final SymbolToken annotation)
     {
-        if (depth == 0 && annotation.getSid() == ION_SYMBOL_TABLE_SID)
+        if (depth == 0 && currentAnnotations.isEmpty() && annotation.getSid() == ION_SYMBOL_TABLE_SID)
         {
             hasTopLevelSymbolTableAnnotation = true;
         }

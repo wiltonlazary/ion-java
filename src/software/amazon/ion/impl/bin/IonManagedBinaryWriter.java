@@ -47,7 +47,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
     private boolean                             closed;
     private boolean                             flushed;
     private boolean                             writeLST;
-    private PrivateIonWriter                    LSTWriter;
+    private LSTWriter                           lstWriter;
     private IonRawBinaryWriter                  user;
     private IonRawBinaryWriter                  symbols;
     private PrivateIonWriter                    currentWriter;
@@ -98,11 +98,11 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
             while (symbolIter.hasNext()) {
                 temp.add(symbolIter.next());
             }
-            this.LSTWriter = new LSTWriter(Arrays.asList(builder.initialSymbolTable.getImportedTables()), temp, catalog);
+            lstWriter = new LSTWriter(Arrays.asList(builder.initialSymbolTable.getImportedTables()), temp, catalog);
         } else {
-            this.LSTWriter = new LSTWriter(fallbackImports, new ArrayList<String>(), catalog);
+            lstWriter = new LSTWriter(fallbackImports, new ArrayList<String>(), catalog);
         }
-        this.lst = this.LSTWriter.getSymbolTable();
+        lst = lstWriter.getSymbolTable();
     }
 
     // Compatibility with Implementation Writer Interface
@@ -118,7 +118,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
     }
 
     public void writeIonVersionMarker() throws IOException {
-        finish();//is this the expected behavior? seems like what we want is to create a new LST writer.
+        finish();
     }
 
     public int getDepth()
@@ -232,17 +232,26 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
     public void stepIn(final IonType containerType) throws IOException
     {
+        if(currentWriter.getDepth() == 0 && user.hasTopLevelSymbolTableAnnotation()){
+            currentWriter = lstWriter;
+            user.setTypeAnnotationSymbols();
+        }
         currentWriter.stepIn(containerType);
     }
 
     public void stepOut() throws IOException
     {
-        currentWriter.stepOut();
+        if(currentWriter == lstWriter && currentWriter.getDepth() == 1){
+            currentWriter = user;
+            lst = lstWriter.getSymbolTable();
+        } else {
+            currentWriter.stepOut();
+        }
     }
 
     public boolean isInStruct()
     {
-        return user.isInStruct();
+        return currentWriter.isInStruct();
     }
 
     // Write Value Methods
@@ -340,8 +349,8 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
     public void finish() throws IOException {
         if (getDepth() != 0) throw new IllegalStateException("IonWriter.finish() can only be called at top-level.");
         flush();
-        LSTWriter = new LSTWriter(fallbackImports, new ArrayList<String>(), catalog);
-        lst = LSTWriter.getSymbolTable();
+        lstWriter = new LSTWriter(fallbackImports, new ArrayList<String>(), catalog);
+        lst = lstWriter.getSymbolTable();
         flushed = false;
     }
 

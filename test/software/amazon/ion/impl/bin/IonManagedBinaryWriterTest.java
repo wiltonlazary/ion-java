@@ -114,8 +114,6 @@ public class IonManagedBinaryWriterTest extends IonRawBinaryWriterTest
     @Inject("importedSymbolResolverMode")
     public static final ImportedSymbolResolverMode[] RESOLVER_DIMENSIONS = ImportedSymbolResolverMode.values();
 
-    private ImportedSymbolResolverMode importedSymbolResolverMode;
-
     public void setImportedSymbolResolverMode(final ImportedSymbolResolverMode mode)
     {
         importedSymbolResolverMode = mode;

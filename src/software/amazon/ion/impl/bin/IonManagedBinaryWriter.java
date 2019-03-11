@@ -14,32 +14,26 @@
 
 package software.amazon.ion.impl.bin;
 
-import static java.util.Collections.unmodifiableList;
 import static software.amazon.ion.IonType.LIST;
 import static software.amazon.ion.IonType.STRUCT;
 import static software.amazon.ion.SystemSymbols.IMPORTS_SID;
-import static software.amazon.ion.SystemSymbols.ION_1_0_MAX_ID;
 import static software.amazon.ion.SystemSymbols.ION_1_0_SID;
 import static software.amazon.ion.SystemSymbols.ION_SYMBOL_TABLE_SID;
 import static software.amazon.ion.SystemSymbols.MAX_ID_SID;
 import static software.amazon.ion.SystemSymbols.NAME_SID;
 import static software.amazon.ion.SystemSymbols.SYMBOLS_SID;
 import static software.amazon.ion.SystemSymbols.VERSION_SID;
-import static software.amazon.ion.impl.bin.Symbols.symbol;
 import static software.amazon.ion.impl.bin.Symbols.systemSymbol;
-import static software.amazon.ion.impl.bin.Symbols.systemSymbolTable;
-import static software.amazon.ion.impl.bin.Symbols.systemSymbols;
 
 import software.amazon.ion.*;
 import software.amazon.ion.impl.PrivateIonWriter;
-import software.amazon.ion.impl.PrivateWriterLSTFactory;
+import software.amazon.ion.impl.LSTWriter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.*;
 
-import software.amazon.ion.impl.PrivateWriterLSTFactory;
 import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamCloseMode;
 import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
@@ -49,18 +43,17 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 /*package*/ final class IonManagedBinaryWriter extends AbstractIonWriter
 {
     private final IonCatalog                    catalog;
-    private final List<SymbolTable>         bootstrapImports;
-    private List<SymbolTable>                   imports;
-    private int                                 lstIndex;
-    private SymbolTable                         lst;
-    private boolean                             localsLocked;
-    private final IonRawBinaryWriter            symbols;
-    private final IonRawBinaryWriter            user;
+    private final List<SymbolTable>             fallbackImports;
     private boolean                             closed;
-    private boolean                             IVM;
+    private boolean                             flushed;
     private boolean                             writeLST;
-    private IonWriter                           LSTWriter;
+    private PrivateIonWriter                    LSTWriter;
+    private IonRawBinaryWriter                  user;
+    private IonRawBinaryWriter                  symbols;
     private PrivateIonWriter                    currentWriter;
+    private SymbolTable                         lst;
+    private int                                 lstIndex;
+    private boolean                             IVM;
 
 
     /*package*/ IonManagedBinaryWriter(final PrivateIonManagedBinaryWriterBuilder builder,
@@ -68,7 +61,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
                                        throws IOException
     {
         super(builder.optimization);
-        this.symbols = new IonRawBinaryWriter(
+        symbols = new IonRawBinaryWriter(
             builder.provider,
             builder.symbolsBlockSize,
             out,
@@ -78,7 +71,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
             builder.preallocationMode,
             builder.isFloatBinary32Enabled
         );
-        this.user = new IonRawBinaryWriter(
+        user = new IonRawBinaryWriter(
             builder.provider,
             builder.userBlockSize,
             out,
@@ -89,27 +82,25 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
             builder.isFloatBinary32Enabled
         );
 
-        this.catalog = builder.catalog;
-        this.bootstrapImports = builder.imports;
-
-        this.lstIndex = 0;
-        this.localsLocked = false;
-        this.closed = false;
-        this.IVM = true;
-        this.writeLST = false;
+        currentWriter = user;
+        catalog = builder.catalog;
+        fallbackImports = builder.imports;
+        lstIndex = 0;
+        closed = false;
+        IVM = true;
+        writeLST = false;
+        flushed = false;
 
 
         if (builder.initialSymbolTable != null) {
-            this.imports = new ArrayList<>(Arrays.asList(builder.initialSymbolTable.getImportedTables()));
             ArrayList temp = new ArrayList<String>();
             final Iterator<String> symbolIter = builder.initialSymbolTable.iterateDeclaredSymbolNames();
             while (symbolIter.hasNext()) {
                 temp.add(symbolIter.next());
             }
-            this.LSTWriter = new PrivateWriterLSTFactory.LSTWriter(this.imports, temp, builder.catalog);
+            this.LSTWriter = new LSTWriter(Arrays.asList(builder.initialSymbolTable.getImportedTables()), temp, catalog);
         } else {
-            this.imports = builder.imports;
-            this.LSTWriter = new PrivateWriterLSTFactory.LSTWriter(this.imports, new ArrayList<String>(), builder.catalog);
+            this.LSTWriter = new LSTWriter(fallbackImports, new ArrayList<String>(), catalog);
         }
         this.lst = this.LSTWriter.getSymbolTable();
     }
@@ -126,11 +117,8 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
         return user.isFieldNameSet();
     }
 
-    public void writeIonVersionMarker() throws IOException
-    {
-        // this has to force a reset of symbol table context
-        // this seems wierd.
-        finish();
+    public void writeIonVersionMarker() throws IOException {
+        finish();//is this the expected behavior? seems like what we want is to create a new LST writer.
     }
 
     public int getDepth()
@@ -142,10 +130,11 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
         if (IVM) symbols.writeIonVersionMarker();
         symbols.addTypeAnnotationSymbol(systemSymbol(ION_SYMBOL_TABLE_SID));
         symbols.stepIn(STRUCT);
-        if (imports.parents.size() > 0 && this.hasNotWritten) {
+        SymbolTable[] tempImports = lst.getImportedTables();
+        if (!flushed && tempImports.length > 0) {
             symbols.setFieldNameSymbol(systemSymbol(IMPORTS_SID));
             symbols.stepIn(LIST);
-            for (final SymbolTable st : imports.parents) {
+            for (final SymbolTable st : tempImports) {
                 symbols.stepIn(STRUCT);
                 symbols.setFieldNameSymbol(systemSymbol(NAME_SID));
                 symbols.writeString(st.getName());
@@ -172,47 +161,20 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
     }
     //these should be inverted so that calling intern x text results in a new symboltoken if none currently exist, thus we can support repeated symboltokens
     private SymbolToken intern(final String text) {
-        if (text == null) return null;
-        SymbolToken token = imports.importedSymbols.get(text);
-        if (token != null) {
-            if (token.getSid() > ION_1_0_MAX_ID) {
-                // using a symbol from an import triggers emitting locals
-                writeLST = true;
-            }
-            return token;
-        }
-        // try the locals
-        token = locals.get(text);
-        if (token == null) {
-            if (localsLocked) {
-                throw new IonException("Local symbol table was locked (made read-only)");
-            }
-            // if we got here, this is a new symbol and we better start up the locals
-            token = symbol(text, imports.localSidStart + locals.size());
-            locals.put(text, token);
-            writeLST = true;
-        }
-        return token;
+        if (text == null) return null; //maybe this should just throw...
+        writeLST = true;
+        return lst.intern(text);
     }
 
-    private SymbolToken intern(final SymbolToken token)
-    {
-        if (token == null)
-        {
-            return null;
-        }
+    private SymbolToken intern(final SymbolToken token) {
+        if (token == null) return null;
+        writeLST = true;
         final String text = token.getText();
-        if (text != null)
-        {
+        if (text != null) {
             // string content always makes us intern
             return intern(text);
         }
-        final int sid = token.getSid();
-        if (sid > getSymbolTable().getMaxId()) {
-            // There is no slot for this symbol ID in the symbol table,
-            // so an error would be raised on read. Fail early on write.
-            throw new UnknownSymbolException(sid);
-        }
+        if (lst.getMaxId() < token.getSid()) throw new UnknownSymbolException(token.getSid());
         // no text, we just return what we got
         return token;
     }
@@ -223,75 +185,59 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
     // Current Value Meta
 
-    public void setFieldName(final String name)
-    {
-        if (!isInStruct())
-        {
-            throw new IllegalStateException("IonWriter.setFieldName() must be called before writing a value into a struct.");
-        }
-        if (name == null)
-        {
-            throw new NullPointerException("Null field name is not allowed.");
-        }
-        final SymbolToken token = intern(name);
-        user.setFieldNameSymbol(token);
+    public void setFieldName(final String name) {
+        if (!isInStruct()) throw new IllegalStateException("IonWriter.setFieldName() must be called before writing a value into a struct.");
+        if (name == null) throw new NullPointerException("Null field name is not allowed.");
+        currentWriter.setFieldNameSymbol(intern(name));
     }
 
-    public void setFieldNameSymbol(SymbolToken token)
-    {
-        token = intern(token);
-        user.setFieldNameSymbol(token);
+    public void setFieldNameSymbol(SymbolToken token) {
+        currentWriter.setFieldNameSymbol(intern(token));
     }
 
-    public void setTypeAnnotations(final String... annotations)
-    {
-        if (annotations == null)
-        {
-            user.setTypeAnnotationSymbols((SymbolToken[]) null);
-        }
-        else
-        {
-            final SymbolToken[] tokens = new SymbolToken[annotations.length];
-            for (int i = 0; i < tokens.length; i++)
-            {
+    public void setTypeAnnotations(final String... annotations) {
+        if (annotations == null) {
+            currentWriter.setTypeAnnotationSymbols((SymbolToken[]) null);
+            //null is illegal in an annotation, why do we need this logic?
+        } else {
+            SymbolToken[] tokens = new SymbolToken[annotations.length];
+            for (int i = 0; i < tokens.length; i++) {
                 tokens[i] = intern(annotations[i]);
             }
-            user.setTypeAnnotationSymbols(tokens);
+            currentWriter.setTypeAnnotationSymbols(tokens);
         }
     }
 
     public void setTypeAnnotationSymbols(final SymbolToken... annotations)
     {
-        if (annotations == null)
-        {
-            user.setTypeAnnotationSymbols((SymbolToken[]) null);
-        }
-        else
-        {
-            for (int i = 0; i < annotations.length; i++)
-            {
-                annotations[i] = intern(annotations[i]);
+        if (annotations == null) {
+            currentWriter.setTypeAnnotationSymbols((SymbolToken[]) null);
+        } else {
+            for (int i = 0; i < annotations.length; i++) {
+                annotations[i] = intern(annotations[i]);//this is going to degrade perf badly TODO fix when import descriptors are added to ST
             }
-            user.setTypeAnnotationSymbols(annotations);
+            currentWriter.setTypeAnnotationSymbols(annotations);
         }
     }
 
-    public void addTypeAnnotation(final String annotation)
-    {
-        final SymbolToken token = intern(annotation);
-        user.addTypeAnnotationSymbol(token);
+    public void addTypeAnnotation(final String annotation) {
+        currentWriter.addTypeAnnotationSymbol(intern(annotation));
+    }
+
+    public void addTypeAnnotationSymbol(final SymbolToken annotation) {
+        currentWriter.addTypeAnnotationSymbol(intern(annotation));
     }
 
     // Container Manipulation
 
     public void stepIn(final IonType containerType) throws IOException
     {
-        user.stepIn(containerType);
+        currentWriter.stepIn(containerType);
     }
 
     public void stepOut() throws IOException
     {
-        user.stepOut();
+        currentWriter.stepOut();
     }
 
     public boolean isInStruct()
@@ -301,50 +247,40 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
     // Write Value Methods
 
-    public void writeNull() throws IOException
-    {
-        user.writeNull();
+    public void writeNull() throws IOException {
+        currentWriter.writeNull();
     }
 
-    public void writeNull(final IonType type) throws IOException
-    {
-        user.writeNull(type);
+    public void writeNull(final IonType type) throws IOException {
+        currentWriter.writeNull(type);
     }
 
-    public void writeBool(final boolean value) throws IOException
-    {
-        user.writeBool(value);
+    public void writeBool(final boolean value) throws IOException {
+        currentWriter.writeBool(value);
     }
 
-    public void writeInt(long value) throws IOException
-    {
-        user.writeInt(value);
+    public void writeInt(long value) throws IOException {
+        currentWriter.writeInt(value);
     }
 
-    public void writeInt(final BigInteger value) throws IOException
-    {
-        user.writeInt(value);
+    public void writeInt(final BigInteger value) throws IOException {
+        currentWriter.writeInt(value);
     }
 
-    public void writeFloat(final double value) throws IOException
-    {
-        user.writeFloat(value);
+    public void writeFloat(final double value) throws IOException {
+        currentWriter.writeFloat(value);
     }
 
-    public void writeDecimal(final BigDecimal value) throws IOException
-    {
-        user.writeDecimal(value);
+    public void writeDecimal(final BigDecimal value) throws IOException {
+        currentWriter.writeDecimal(value);
     }
 
-    public void writeTimestamp(final Timestamp value) throws IOException
-    {
-        user.writeTimestamp(value);
+    public void writeTimestamp(final Timestamp value) throws IOException {
+        currentWriter.writeTimestamp(value);
     }
 
-    public void writeSymbol(String content) throws IOException
-    {
-        final SymbolToken token = intern(content);
-        writeSymbolToken(token);
+    public void writeSymbol(String content) throws IOException {
+        writeSymbolToken(intern(content));
     }
 
     public void writeSymbolToken(SymbolToken token) throws IOException {
@@ -353,37 +289,35 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
             if (user.hasWrittenValuesSinceFinished()) {
                 // this explicitly translates SID 2 to an IVM and flushes out local symbol state
                 finish();
-            } else {
-                forceSystemOutput = true;
             }
             return;
         }
-        user.writeSymbolToken(token);
+        currentWriter.writeSymbolToken(token);
     }
 
     public void writeString(final String value) throws IOException
     {
-        user.writeString(value);
+        currentWriter.writeString(value);
     }
 
     public void writeClob(byte[] data) throws IOException
     {
-        user.writeClob(data);
+        currentWriter.writeClob(data);
     }
 
     public void writeClob(final byte[] data, final int offset, final int length) throws IOException
     {
-        user.writeClob(data, offset, length);
+        currentWriter.writeClob(data, offset, length);
     }
 
     public void writeBlob(byte[] data) throws IOException
     {
-        user.writeBlob(data);
+        currentWriter.writeBlob(data);
     }
 
     public void writeBlob(final byte[] data, final int offset, final int length) throws IOException
     {
-        user.writeBlob(data, offset, length);
+        currentWriter.writeBlob(data, offset, length);
     }
 
     public void writeBytes(byte[] data, int off, int len) throws IOException
@@ -403,41 +337,27 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
         user.flush();
     }
 
-    public void finish() throws IOException
-    {
-        if (getDepth() != 0)
-        {
-            throw new IllegalStateException("IonWriter.finish() can only be called at top-level.");
-        }
+    public void finish() throws IOException {
+        if (getDepth() != 0) throw new IllegalStateException("IonWriter.finish() can only be called at top-level.");
         flush();
-        localsLocked = false;
-        imports = bootstrapImports;
+        LSTWriter = new LSTWriter(fallbackImports, new ArrayList<String>(), catalog);
+        lst = LSTWriter.getSymbolTable();
+        flushed = false;
     }
 
-    public void close() throws IOException
-    {
-        if (closed)
-        {
-            return;
-        }
-        closed = true;
-        try
-        {
-            finish();
-        }
-        catch (IllegalStateException e)
-        {
-            // callers do not expect this...
-        }
-        finally
-        {
-            try
-            {
-                symbols.close();
-            }
-            finally
-            {
-                user.close();
+    public void close() throws IOException {
+        if (!closed) {
+            closed = true;
+            try {
+                finish();
+            } catch (IllegalStateException e) {
+                // callers do not expect this... THIS IS A BIG RED FLAG
+            } finally {
+                try {
+                    symbols.close();
+                } finally {
+                    user.close();
+                }
             }
         }
     }

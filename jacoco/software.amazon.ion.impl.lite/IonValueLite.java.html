@@ -71,6 +71,16 @@ import software.amazon.ion.system.IonTextWriterBuilder;
     protected static final int IS_IVM             = 0x10;
     protected static final int IS_AUTO_CREATED    = 0x20;
     protected static final int IS_SYMBOL_PRESENT  = 0x40;
+    /**
+     * Symbol ID present refers to there being the &lt;i&gt;possibility&lt;/i&gt; that the IonValueLite, or it's contained sub graph
+     * &lt;i&gt;(e.g. if it is a {@link IonContainerLite} based sub type)&lt;/i&gt; contains one or more defined
+     * Symbol ID's (SID)'s. This flag is used to track lifecycle, such that operations that require SID's are purged
+     * from the IonValueLite and it's contained sub-DOM can conduct a fast evaluation rather than having to do a full
+     * contained graph traversal on each and every invocation. For more detail on impact see
+     * &lt;a href=&quot;https://issues.amazon.com/issues/IONPT-8&quot;&gt;IONPT-8&lt;/a&gt;
+     */
+    protected static final int IS_SYMBOL_ID_PRESENT = 0x80;
+
     private   static final int ELEMENT_MASK       = 0xff;
     protected static final int ELEMENT_SHIFT      = 8; // low 8 bits is flag, upper 24 (or 48 is element id)
 
@@ -83,7 +93,7 @@ import software.amazon.ion.system.IonTextWriterBuilder;
      * @return the metadata from _flags at the given mask.
      */
     protected final int _getMetadata(int mask, int shift) {
-<span class="fc" id="L86">        return (_flags &amp; mask) &gt;&gt;&gt; shift;</span>
+<span class="fc" id="L96">        return (_flags &amp; mask) &gt;&gt;&gt; shift;</span>
     }
 
     /**
@@ -99,105 +109,116 @@ import software.amazon.ion.system.IonTextWriterBuilder;
      *              it starts at the index of the mask's LSB.
      */
     protected final void _setMetadata(int metadata, int mask, int shift) {
-<span class="pc bpc" id="L102" title="2 of 4 branches missed.">        assert(mask &lt;= ELEMENT_MASK); // don't overwrite the element ID</span>
-<span class="fc" id="L103">        _flags &amp;= ~mask;</span>
-<span class="fc" id="L104">        _flags |= ((metadata &lt;&lt; shift) &amp; mask);</span>
-<span class="fc" id="L105">    }</span>
+<span class="pc bpc" id="L112" title="2 of 4 branches missed.">        assert(mask &lt;= ELEMENT_MASK); // don't overwrite the element ID</span>
+<span class="fc" id="L113">        _flags &amp;= ~mask;</span>
+<span class="fc" id="L114">        _flags |= ((metadata &lt;&lt; shift) &amp; mask);</span>
+<span class="fc" id="L115">    }</span>
 
     protected final void _elementid(int elementid) {
-<span class="fc" id="L108">        _flags &amp;= ELEMENT_MASK;</span>
-<span class="fc" id="L109">        _flags |= (elementid &lt;&lt; ELEMENT_SHIFT);</span>
-<span class="pc bpc" id="L110" title="2 of 4 branches missed.">        assert(_elementid() == elementid);</span>
-<span class="fc" id="L111">    }</span>
+<span class="fc" id="L118">        _flags &amp;= ELEMENT_MASK;</span>
+<span class="fc" id="L119">        _flags |= (elementid &lt;&lt; ELEMENT_SHIFT);</span>
+<span class="pc bpc" id="L120" title="2 of 4 branches missed.">        assert(_elementid() == elementid);</span>
+<span class="fc" id="L121">    }</span>
     protected final int _elementid() {
-<span class="fc" id="L113">        int elementid =  _flags  &gt;&gt;&gt; ELEMENT_SHIFT;</span>
-<span class="fc" id="L114">        return elementid;</span>
+<span class="fc" id="L123">        int elementid =  _flags  &gt;&gt;&gt; ELEMENT_SHIFT;</span>
+<span class="fc" id="L124">        return elementid;</span>
     }
 
     private final boolean is_true(int flag_bit) {
-<span class="fc bfc" id="L118" title="All 2 branches covered.">        return ((_flags &amp; flag_bit) != 0);</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        return ((_flags &amp; flag_bit) != 0);</span>
     }
     private final void set_flag(int flag_bit) {
-<span class="pc bpc" id="L121" title="2 of 4 branches missed.">        assert(flag_bit != 0);</span>
-<span class="fc" id="L122">        _flags |= flag_bit;</span>
-<span class="fc" id="L123">    }</span>
+<span class="pc bpc" id="L131" title="2 of 4 branches missed.">        assert(flag_bit != 0);</span>
+<span class="fc" id="L132">        _flags |= flag_bit;</span>
+<span class="fc" id="L133">    }</span>
     private final void clear_flag(int flag_bit) {
-<span class="pc bpc" id="L125" title="2 of 4 branches missed.">        assert(flag_bit != 0);</span>
-<span class="fc" id="L126">        _flags &amp;= ~flag_bit;</span>
-<span class="fc" id="L127">    }</span>
+<span class="pc bpc" id="L135" title="2 of 4 branches missed.">        assert(flag_bit != 0);</span>
+<span class="fc" id="L136">        _flags &amp;= ~flag_bit;</span>
+<span class="fc" id="L137">    }</span>
 
-<span class="fc" id="L129">    protected final boolean _isLocked() { return is_true(IS_LOCKED); }</span>
+<span class="fc" id="L139">    protected final boolean _isLocked() { return is_true(IS_LOCKED); }</span>
     protected final boolean _isLocked(boolean flag) {
-<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (flag) {</span>
-<span class="fc" id="L132">            set_flag(IS_LOCKED);</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (flag) {</span>
+<span class="fc" id="L142">            set_flag(IS_LOCKED);</span>
         }
         else {
-<span class="nc" id="L135">            clear_flag(IS_LOCKED);</span>
+<span class="nc" id="L145">            clear_flag(IS_LOCKED);</span>
         }
-<span class="fc" id="L137">        return flag;</span>
+<span class="fc" id="L147">        return flag;</span>
     }
-<span class="nc" id="L139">    protected final boolean _isSystemValue() { return is_true(IS_SYSTEM_VALUE); }</span>
+<span class="nc" id="L149">    protected final boolean _isSystemValue() { return is_true(IS_SYSTEM_VALUE); }</span>
     protected final boolean _isSystemValue(boolean flag) {
-<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (flag) {</span>
-<span class="nc" id="L142">            set_flag(IS_SYSTEM_VALUE);</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (flag) {</span>
+<span class="nc" id="L152">            set_flag(IS_SYSTEM_VALUE);</span>
         }
         else {
-<span class="nc" id="L145">            clear_flag(IS_SYSTEM_VALUE);</span>
+<span class="nc" id="L155">            clear_flag(IS_SYSTEM_VALUE);</span>
         }
-<span class="nc" id="L147">        return flag;</span>
+<span class="nc" id="L157">        return flag;</span>
     }
-<span class="fc" id="L149">    protected final boolean _isNullValue() { return is_true(IS_NULL_VALUE); }</span>
+<span class="fc" id="L159">    protected final boolean _isNullValue() { return is_true(IS_NULL_VALUE); }</span>
     protected final boolean _isNullValue(boolean flag) {
-<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (flag) {</span>
-<span class="fc" id="L152">            set_flag(IS_NULL_VALUE);</span>
-        }
-        else {
-<span class="fc" id="L155">            clear_flag(IS_NULL_VALUE);</span>
-        }
-<span class="fc" id="L157">        return flag;</span>
-    }
-<span class="fc" id="L159">    protected final boolean _isBoolTrue() { return is_true(IS_BOOL_TRUE); }</span>
-    protected final boolean _isBoolTrue(boolean flag) {
 <span class="fc bfc" id="L161" title="All 2 branches covered.">        if (flag) {</span>
-<span class="fc" id="L162">            set_flag(IS_BOOL_TRUE);</span>
+<span class="fc" id="L162">            set_flag(IS_NULL_VALUE);</span>
         }
         else {
-<span class="fc" id="L165">            clear_flag(IS_BOOL_TRUE);</span>
+<span class="fc" id="L165">            clear_flag(IS_NULL_VALUE);</span>
         }
 <span class="fc" id="L167">        return flag;</span>
     }
+<span class="fc" id="L169">    protected final boolean _isBoolTrue() { return is_true(IS_BOOL_TRUE); }</span>
+    protected final boolean _isBoolTrue(boolean flag) {
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (flag) {</span>
+<span class="fc" id="L172">            set_flag(IS_BOOL_TRUE);</span>
+        }
+        else {
+<span class="fc" id="L175">            clear_flag(IS_BOOL_TRUE);</span>
+        }
+<span class="fc" id="L177">        return flag;</span>
+    }
 
-<span class="nc" id="L170">    protected final boolean _isIVM() { return is_true(IS_IVM); }</span>
+<span class="nc" id="L180">    protected final boolean _isIVM() { return is_true(IS_IVM); }</span>
     protected final boolean _isIVM(boolean flag) {
-<span class="nc bnc" id="L172" title="All 2 branches missed.">        if (flag) {</span>
-<span class="nc" id="L173">            set_flag(IS_IVM);</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        if (flag) {</span>
+<span class="nc" id="L183">            set_flag(IS_IVM);</span>
         }
         else {
-<span class="nc" id="L176">            clear_flag(IS_IVM);</span>
+<span class="nc" id="L186">            clear_flag(IS_IVM);</span>
         }
-<span class="nc" id="L178">        return flag;</span>
+<span class="nc" id="L188">        return flag;</span>
     }
 
-<span class="fc" id="L181">    protected final boolean _isAutoCreated() { return is_true(IS_AUTO_CREATED); }</span>
+<span class="fc" id="L191">    protected final boolean _isAutoCreated() { return is_true(IS_AUTO_CREATED); }</span>
     protected final boolean _isAutoCreated(boolean flag) {
-<span class="nc bnc" id="L183" title="All 2 branches missed.">        if (flag) {</span>
-<span class="nc" id="L184">            set_flag(IS_AUTO_CREATED);</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        if (flag) {</span>
+<span class="nc" id="L194">            set_flag(IS_AUTO_CREATED);</span>
         }
         else {
-<span class="nc" id="L187">            clear_flag(IS_AUTO_CREATED);</span>
+<span class="nc" id="L197">            clear_flag(IS_AUTO_CREATED);</span>
         }
-<span class="nc" id="L189">        return flag;</span>
+<span class="nc" id="L199">        return flag;</span>
     }
 
-<span class="fc" id="L192">    protected final boolean _isSymbolPresent() { return is_true(IS_SYMBOL_PRESENT); }</span>
+<span class="fc" id="L202">    protected final boolean _isSymbolPresent() { return is_true(IS_SYMBOL_PRESENT); }</span>
     protected final boolean _isSymbolPresent(boolean flag) {
-<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        if (flag) {</span>
-<span class="fc" id="L195">            set_flag(IS_SYMBOL_PRESENT);</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">        if (flag) {</span>
+<span class="fc" id="L205">            set_flag(IS_SYMBOL_PRESENT);</span>
         }
         else {
-<span class="nc" id="L198">            clear_flag(IS_SYMBOL_PRESENT);</span>
+<span class="nc" id="L208">            clear_flag(IS_SYMBOL_PRESENT);</span>
         }
-<span class="fc" id="L200">        return flag;</span>
+<span class="fc" id="L210">        return flag;</span>
+    }
+
+<span class="fc" id="L213">    protected final boolean _isSymbolIdPresent() { return is_true(IS_SYMBOL_ID_PRESENT); }</span>
+    protected final boolean _isSymbolIdPresent(boolean flag) {
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        if (flag) {</span>
+<span class="fc" id="L216">            set_flag(IS_SYMBOL_ID_PRESENT);</span>
+        }
+        else {
+<span class="fc" id="L219">            clear_flag(IS_SYMBOL_ID_PRESENT);</span>
+        }
+<span class="fc" id="L221">        return flag;</span>
     }
 
     /**
@@ -209,21 +230,21 @@ import software.amazon.ion.system.IonTextWriterBuilder;
     static class LazySymbolTableProvider
         implements SymbolTableProvider
     {
-<span class="fc" id="L212">        SymbolTable symtab = null;</span>
+<span class="fc" id="L233">        SymbolTable symtab = null;</span>
         final IonValueLite value;
 
         LazySymbolTableProvider(IonValueLite value)
-<span class="fc" id="L216">        {</span>
-<span class="fc" id="L217">            this.value = value;</span>
-<span class="fc" id="L218">        }</span>
+<span class="fc" id="L237">        {</span>
+<span class="fc" id="L238">            this.value = value;</span>
+<span class="fc" id="L239">        }</span>
 
         public SymbolTable getSymbolTable()
         {
-<span class="fc bfc" id="L222" title="All 2 branches covered.">            if (symtab == null)</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">            if (symtab == null)</span>
             {
-<span class="fc" id="L224">                symtab = value.getSymbolTable();</span>
+<span class="fc" id="L245">                symtab = value.getSymbolTable();</span>
             }
-<span class="fc" id="L226">            return symtab;</span>
+<span class="fc" id="L247">            return symtab;</span>
         }
 
     }
@@ -243,7 +264,7 @@ import software.amazon.ion.system.IonTextWriterBuilder;
      * Otherwise, at least one must be defined.
      */
     private   int              _flags;
-<span class="fc" id="L246">    private   int              _fieldId = UNKNOWN_SYMBOL_ID;</span>
+<span class="fc" id="L267">    private   int              _fieldId = UNKNOWN_SYMBOL_ID;</span>
 
     /** Not null. */
     protected IonContext       _context;
@@ -266,13 +287,13 @@ import software.amazon.ion.system.IonTextWriterBuilder;
      * @param isNull if true, sets the null bit in the flags member field
      */
     IonValueLite(ContainerlessContext context, boolean isNull)
-<span class="fc" id="L269">    {</span>
-<span class="pc bpc" id="L270" title="2 of 4 branches missed.">        assert context != null;</span>
-<span class="fc" id="L271">        _context = context;</span>
-<span class="fc bfc" id="L272" title="All 2 branches covered.">        if (isNull) {</span>
-<span class="fc" id="L273">            set_flag(IS_NULL_VALUE);</span>
+<span class="fc" id="L290">    {</span>
+<span class="pc bpc" id="L291" title="2 of 4 branches missed.">        assert context != null;</span>
+<span class="fc" id="L292">        _context = context;</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        if (isNull) {</span>
+<span class="fc" id="L294">            set_flag(IS_NULL_VALUE);</span>
         }
-<span class="fc" id="L275">    }</span>
+<span class="fc" id="L296">    }</span>
 
     /**
      * Copy Constructor *purely* for cloning - NOTE; this means that the clone is not &lt;i&gt;perfect&lt;/i&gt;
@@ -281,85 +302,94 @@ import software.amazon.ion.system.IonTextWriterBuilder;
      * @param existing the non-null existing IonValueLite entity to clone
      * @param context the non-null parent context to use for the cloned entity.
      */
-<span class="fc" id="L284">    IonValueLite(IonValueLite existing, IonContext context) {</span>
+<span class="fc" id="L305">    IonValueLite(IonValueLite existing, IonContext context) {</span>
         // Symbols are *immutable* therefore a shallow copy is sufficient
-<span class="fc bfc" id="L286" title="All 2 branches covered.">        if (null == existing._annotations) {</span>
-<span class="fc" id="L287">            this._annotations = null;</span>
+<span class="fc" id="L307">        boolean hasSIDsRetained = false;</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">        if (null == existing._annotations) {</span>
+<span class="fc" id="L309">            this._annotations = null;</span>
         } else {
-<span class="fc" id="L289">            int size = existing._annotations.length;</span>
-<span class="fc" id="L290">            this._annotations = new SymbolToken[size];</span>
-<span class="fc bfc" id="L291" title="All 2 branches covered.">            for (int i = 0; i &lt; size; i++) {</span>
-<span class="fc" id="L292">                SymbolToken existingToken = existing._annotations[i];</span>
-<span class="pc bpc" id="L293" title="1 of 2 branches missed.">                if (existingToken != null) {</span>
-<span class="fc" id="L294">                    String text = existingToken.getText();</span>
-<span class="fc bfc" id="L295" title="All 2 branches covered.">                    if (text != null) {</span>
-<span class="fc" id="L296">                        this._annotations[i] =</span>
-<span class="fc" id="L297">                            PrivateUtils.newSymbolToken(text, UNKNOWN_SYMBOL_ID);</span>
+<span class="fc" id="L311">            int size = existing._annotations.length;</span>
+<span class="fc" id="L312">            this._annotations = new SymbolToken[size];</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">            for (int i = 0; i &lt; size; i++) {</span>
+<span class="fc" id="L314">                SymbolToken existingToken = existing._annotations[i];</span>
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">                if (existingToken != null) {</span>
+<span class="fc" id="L316">                    String text = existingToken.getText();</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">                    if (text != null) {</span>
+<span class="fc" id="L318">                        this._annotations[i] =</span>
+<span class="fc" id="L319">                            PrivateUtils.newSymbolToken(text, UNKNOWN_SYMBOL_ID);</span>
                     } else {
-                        // TODO - this is clearly wrong; however was the existing behavior as
-                        // existing under #getAnnotationTypeSymbols();
-<span class="fc" id="L301">                        this._annotations[i] = existing._annotations[i];</span>
+                        // TODO - IONJAVA-579 needs consistent handling, should attempt to resolve and if it cant; fail
+<span class="fc" id="L322">                        this._annotations[i] = existing._annotations[i];</span>
+<span class="pc bpc" id="L323" title="1 of 2 branches missed.">                        hasSIDsRetained |= this._annotations[i].getSid() &gt; UNKNOWN_SYMBOL_ID;</span>
                     }
                 }
             }
         }
         // We don't copy the field name, that happens in IonStruct's clone
-<span class="fc" id="L307">        this._flags       = existing._flags;</span>
-<span class="fc" id="L308">        this._context     = context;</span>
+<span class="fc" id="L329">        this._flags       = existing._flags;</span>
+<span class="fc" id="L330">        this._context     = context;</span>
 
         // as IonValue.clone() mandates that the returned value is mutable, regardless of the
         // existing 'read only' flag - we force the deep-copy back to being mutable
-<span class="fc" id="L312">        clear_flag(IS_LOCKED);</span>
-<span class="fc" id="L313">    }</span>
+<span class="fc" id="L334">        clear_flag(IS_LOCKED);</span>
+        // whilst the clone *should* guarantee symbol context is purged, the annotation behavior existing above
+        // under the TO DO for IONJAVA-579 does mean that SID context can be propogated through a clone, therefore
+        // the encoding flag has to reflect this reality
+<span class="fc" id="L338">        _isSymbolIdPresent(hasSIDsRetained);</span>
+<span class="fc" id="L339">    }</span>
 
     public abstract void accept(ValueVisitor visitor) throws Exception;
 
     public /* synchronized */ void addTypeAnnotation(String annotation)
     {
-<span class="fc" id="L319">        checkForLock();</span>
+<span class="fc" id="L345">        checkForLock();</span>
 
-<span class="pc bpc" id="L321" title="2 of 4 branches missed.">        if (annotation == null || annotation.length() &lt; 1) {</span>
-<span class="nc" id="L322">            throw new IllegalArgumentException(&quot;a user type annotation must be a non-empty string&quot;);</span>
+<span class="pc bpc" id="L347" title="2 of 4 branches missed.">        if (annotation == null || annotation.length() &lt; 1) {</span>
+<span class="nc" id="L348">            throw new IllegalArgumentException(&quot;a user type annotation must be a non-empty string&quot;);</span>
         }
 
         // we don't add duplicate annotations
-<span class="fc bfc" id="L326" title="All 2 branches covered.">        if (hasTypeAnnotation(annotation)) return;</span>
+<span class="fc bfc" id="L352" title="All 2 branches covered.">        if (hasTypeAnnotation(annotation)) return;</span>
 
-<span class="fc" id="L328">        SymbolToken sym = newSymbolToken(annotation, UNKNOWN_SYMBOL_ID);</span>
+<span class="fc" id="L354">        SymbolToken sym = newSymbolToken(annotation, UNKNOWN_SYMBOL_ID);</span>
 
-<span class="fc bfc" id="L330" title="All 2 branches covered.">        int old_len = (_annotations == null) ? 0 : _annotations.length;</span>
-<span class="fc bfc" id="L331" title="All 2 branches covered.">        if (old_len &gt; 0) {</span>
-<span class="fc bfc" id="L332" title="All 2 branches covered.">            for (int ii=0; ii&lt;old_len; ii++) {</span>
-<span class="fc bfc" id="L333" title="All 2 branches covered.">                if (_annotations[ii] == null) {</span>
-<span class="fc" id="L334">                    _annotations[ii] = sym;</span>
-<span class="fc" id="L335">                    return;</span>
+<span class="fc bfc" id="L356" title="All 2 branches covered.">        int old_len = (_annotations == null) ? 0 : _annotations.length;</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">        if (old_len &gt; 0) {</span>
+<span class="fc bfc" id="L358" title="All 2 branches covered.">            for (int ii=0; ii&lt;old_len; ii++) {</span>
+<span class="fc bfc" id="L359" title="All 2 branches covered.">                if (_annotations[ii] == null) {</span>
+<span class="fc" id="L360">                    _annotations[ii] = sym;</span>
+<span class="fc" id="L361">                    return;</span>
                 }
             }
         }
 
-<span class="fc bfc" id="L340" title="All 2 branches covered.">        int new_len = (old_len == 0) ? 1 : old_len * 2;</span>
-<span class="fc" id="L341">        SymbolToken temp[] = new SymbolToken[new_len];</span>
-<span class="fc bfc" id="L342" title="All 2 branches covered.">        if (old_len &gt; 0) {</span>
-<span class="fc" id="L343">            System.arraycopy(_annotations, 0, temp, 0, old_len);</span>
+<span class="fc bfc" id="L366" title="All 2 branches covered.">        int new_len = (old_len == 0) ? 1 : old_len * 2;</span>
+<span class="fc" id="L367">        SymbolToken temp[] = new SymbolToken[new_len];</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">        if (old_len &gt; 0) {</span>
+<span class="fc" id="L369">            System.arraycopy(_annotations, 0, temp, 0, old_len);</span>
         }
-<span class="fc" id="L345">        _annotations = temp;</span>
-<span class="fc" id="L346">        _annotations[old_len] = sym;</span>
-<span class="fc" id="L347">    }</span>
+<span class="fc" id="L371">        _annotations = temp;</span>
+<span class="fc" id="L372">        _annotations[old_len] = sym;</span>
+<span class="fc" id="L373">    }</span>
 
     public final /* synchronized */ void clearTypeAnnotations()
     {
-<span class="fc" id="L351">        checkForLock();</span>
+<span class="fc" id="L377">        checkForLock();</span>
 
-<span class="pc bpc" id="L353" title="1 of 2 branches missed.">        int old_len = (_annotations == null) ? 0 : _annotations.length;</span>
-<span class="pc bpc" id="L354" title="1 of 2 branches missed.">        if (old_len &gt; 0) {</span>
-<span class="nc bnc" id="L355" title="All 2 branches missed.">            for (int ii=0; ii&lt;old_len; ii++) {</span>
-<span class="nc bnc" id="L356" title="All 2 branches missed.">                if (_annotations[ii] == null) {</span>
-<span class="nc" id="L357">                    break;</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">        int old_len = (_annotations == null) ? 0 : _annotations.length;</span>
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">        if (old_len &gt; 0) {</span>
+<span class="nc bnc" id="L381" title="All 2 branches missed.">            for (int ii=0; ii&lt;old_len; ii++) {</span>
+<span class="nc bnc" id="L382" title="All 2 branches missed.">                if (_annotations[ii] == null) {</span>
+<span class="nc" id="L383">                    break;</span>
                 }
-<span class="nc" id="L359">                _annotations[ii] = null;</span>
+<span class="nc" id="L385">                _annotations[ii] = null;</span>
             }
         }
-<span class="fc" id="L362">    }</span>
+
+        // although annotations have been removed from the node, which *may* mean the sub-graph from this Node is
+        // now without encodings... the check is expensive for container types (need to check all immediate children)
+        // and so we will opt to clear down encoding present in a lazy fashion (e.g. when something actually needs it)
+<span class="fc" id="L392">    }</span>
 
     /**
      * {@inheritDoc}
@@ -394,7 +424,7 @@ import software.amazon.ion.system.IonTextWriterBuilder;
         // This works for all child types with the exception of
         // IonDatagramLite which has a different, explicit behavior for hashCode()
         // (hence this method cannot be final).
-<span class="fc" id="L397">        return hashCode(new LazySymbolTableProvider(this));</span>
+<span class="fc" id="L427">        return hashCode(new LazySymbolTableProvider(this));</span>
     }
 
     /*
@@ -405,28 +435,28 @@ import software.amazon.ion.system.IonTextWriterBuilder;
 
     public IonContainerLite getContainer()
     {
-<span class="fc" id="L408">        return _context.getContextContainer();</span>
+<span class="fc" id="L438">        return _context.getContextContainer();</span>
     }
 
     public IonValueLite topLevelValue()
     {
-<span class="pc bpc" id="L413" title="2 of 4 branches missed.">        assert ! (this instanceof IonDatagram);</span>
+<span class="pc bpc" id="L443" title="2 of 4 branches missed.">        assert ! (this instanceof IonDatagram);</span>
 
-<span class="fc" id="L415">        IonValueLite value = this;</span>
+<span class="fc" id="L445">        IonValueLite value = this;</span>
         for (;;) {
-<span class="fc" id="L417">            IonContainerLite c = value._context.getContextContainer();</span>
-<span class="fc bfc" id="L418" title="All 4 branches covered.">            if (c == null || c instanceof IonDatagram) {</span>
-<span class="fc" id="L419">                break;</span>
+<span class="fc" id="L447">            IonContainerLite c = value._context.getContextContainer();</span>
+<span class="fc bfc" id="L448" title="All 4 branches covered.">            if (c == null || c instanceof IonDatagram) {</span>
+<span class="fc" id="L449">                break;</span>
             }
-<span class="fc" id="L421">            value = c;</span>
-<span class="fc" id="L422">        }</span>
-<span class="fc" id="L423">        return value;</span>
+<span class="fc" id="L451">            value = c;</span>
+<span class="fc" id="L452">        }</span>
+<span class="fc" id="L453">        return value;</span>
     }
 
 
     public final int getElementId()
     {
-<span class="fc" id="L429">        return this._elementid();</span>
+<span class="fc" id="L459">        return this._elementid();</span>
     }
 
     public SymbolToken getFieldNameSymbol()
@@ -438,81 +468,120 @@ import software.amazon.ion.system.IonTextWriterBuilder;
         // However, the current invariants on these fields are nonexistant so
         // I do not trust that its safe to alter them here.
 
-<span class="fc" id="L441">        return getFieldNameSymbol(new LazySymbolTableProvider(this));</span>
+<span class="fc" id="L471">        return getFieldNameSymbol(new LazySymbolTableProvider(this));</span>
     }
 
     public final SymbolToken getFieldNameSymbol(SymbolTableProvider symbolTableProvider)
     {
-<span class="fc" id="L446">        int sid = _fieldId;</span>
-<span class="fc" id="L447">        String text = _fieldName;</span>
-<span class="fc bfc" id="L448" title="All 2 branches covered.">        if (text != null)</span>
+<span class="fc" id="L476">        int sid = _fieldId;</span>
+<span class="fc" id="L477">        String text = _fieldName;</span>
+<span class="fc bfc" id="L478" title="All 2 branches covered.">        if (text != null)</span>
         {
-<span class="pc bpc" id="L450" title="1 of 2 branches missed.">            if (sid == UNKNOWN_SYMBOL_ID)</span>
+<span class="pc bpc" id="L480" title="1 of 2 branches missed.">            if (sid == UNKNOWN_SYMBOL_ID)</span>
             {
-<span class="fc" id="L452">                SymbolToken tok = symbolTableProvider.getSymbolTable().find(text);</span>
-<span class="fc bfc" id="L453" title="All 2 branches covered.">                if (tok != null)</span>
+<span class="fc" id="L482">                SymbolToken tok = symbolTableProvider.getSymbolTable().find(text);</span>
+<span class="fc bfc" id="L483" title="All 2 branches covered.">                if (tok != null)</span>
                 {
-<span class="fc" id="L455">                    return tok;</span>
+<span class="fc" id="L485">                    return tok;</span>
                 }
-<span class="fc" id="L457">            }</span>
+<span class="fc" id="L487">            }</span>
         }
-<span class="fc bfc" id="L459" title="All 2 branches covered.">        else if (sid &gt; 0) {</span>
-<span class="fc" id="L460">            text = symbolTableProvider.getSymbolTable().findKnownSymbol(sid);</span>
+<span class="fc bfc" id="L489" title="All 2 branches covered.">        else if (sid &gt; 0) {</span>
+<span class="fc" id="L490">            text = symbolTableProvider.getSymbolTable().findKnownSymbol(sid);</span>
         }
-<span class="fc bfc" id="L462" title="All 2 branches covered.">        else if(sid != 0){</span>
+<span class="fc bfc" id="L492" title="All 2 branches covered.">        else if(sid != 0){</span>
             // not a struct field
-<span class="fc" id="L464">            return null;</span>
+<span class="fc" id="L494">            return null;</span>
         }
-<span class="fc" id="L466">        return PrivateUtils.newSymbolToken(text, sid);</span>
+<span class="fc" id="L496">        return PrivateUtils.newSymbolToken(text, sid);</span>
     }
 
     public final SymbolToken getKnownFieldNameSymbol()
     {
-<span class="fc" id="L471">        SymbolToken token = this.getFieldNameSymbol();</span>
-<span class="pc bpc" id="L472" title="2 of 4 branches missed.">        if (token.getText() == null &amp;&amp; token.getSid() != 0) {</span>
-<span class="nc" id="L473">            throw new UnknownSymbolException(_fieldId);</span>
+<span class="fc" id="L501">        SymbolToken token = this.getFieldNameSymbol();</span>
+<span class="pc bpc" id="L502" title="2 of 4 branches missed.">        if (token.getText() == null &amp;&amp; token.getSid() != 0) {</span>
+<span class="nc" id="L503">            throw new UnknownSymbolException(_fieldId);</span>
         }
-<span class="fc" id="L475">        return token;</span>
+<span class="fc" id="L505">        return token;</span>
+    }
+
+    final boolean clearSymbolIDValues()
+    {
+        // short circuit exit - no SID's present to remove - so can exit immediately
+<span class="fc bfc" id="L511" title="All 2 branches covered.">        if (!_isSymbolIdPresent())</span>
+        {
+<span class="fc" id="L513">            return true;</span>
+        }
+
+<span class="fc" id="L516">        boolean allSIDsRemoved = attemptClearSymbolIDValues();</span>
+        // if all the SID's have been successfully removed - the SID Present flag can be set to false
+<span class="fc bfc" id="L518" title="All 2 branches covered.">        if (allSIDsRemoved)</span>
+        {
+            // clear the symbolID status flag
+<span class="fc" id="L521">            _isSymbolIdPresent(false);</span>
+        }
+<span class="fc" id="L523">        return allSIDsRemoved;</span>
     }
 
     /**
      * Sets this value's symbol table to null, and erases any SIDs here and
      * recursively.
+     *
+     * @return true if all SID's have been successfully removed, otherwise false
      */
-    void clearSymbolIDValues()
+    boolean attemptClearSymbolIDValues()
     {
-<span class="fc bfc" id="L484" title="All 2 branches covered.">        if (_fieldName != null)</span>
+<span class="fc" id="L534">        boolean sidsRemain = false;</span>
+<span class="fc bfc" id="L535" title="All 2 branches covered.">        if (_fieldName != null)</span>
         {
-<span class="fc" id="L486">            _fieldId = UNKNOWN_SYMBOL_ID;</span>
+<span class="fc" id="L537">            _fieldId = UNKNOWN_SYMBOL_ID;</span>
+<span class="fc bfc" id="L538" title="All 2 branches covered.">        } else if (_fieldId &gt; UNKNOWN_SYMBOL_ID)</span>
+        {
+            // retaining the field SID, as it couldn't be cleared due to loss of context
+            // TODO - for SID handling consistency; this should attempt resolution first
+<span class="fc" id="L542">            sidsRemain = true;</span>
         }
 
-<span class="fc bfc" id="L489" title="All 2 branches covered.">        if (_annotations != null)</span>
+<span class="fc bfc" id="L545" title="All 2 branches covered.">        if (_annotations != null)</span>
         {
-<span class="fc bfc" id="L491" title="All 2 branches covered.">            for (int i = 0; i &lt; _annotations.length; i++)</span>
+<span class="fc bfc" id="L547" title="All 2 branches covered.">            for (int i = 0; i &lt; _annotations.length; i++)</span>
             {
-<span class="fc" id="L493">                SymbolToken annotation = _annotations[i];</span>
+<span class="fc" id="L549">                SymbolToken annotation = _annotations[i];</span>
 
                 // _annotations may have nulls at the end.
-<span class="pc bpc" id="L496" title="1 of 2 branches missed.">                if (annotation == null) break;</span>
+<span class="pc bpc" id="L552" title="1 of 2 branches missed.">                if (annotation == null) break;</span>
 
-<span class="fc" id="L498">                String text = annotation.getText();</span>
-<span class="fc bfc" id="L499" title="All 4 branches covered.">                if (text != null &amp;&amp; annotation.getSid() != UNKNOWN_SYMBOL_ID)</span>
+<span class="fc" id="L554">                String text = annotation.getText();</span>
+                // TODO - for SID handling consistency; this should attempt resolution first, not just drop entry
+<span class="fc bfc" id="L556" title="All 4 branches covered.">                if (text != null &amp;&amp; annotation.getSid() != UNKNOWN_SYMBOL_ID)</span>
                 {
-<span class="fc" id="L501">                    _annotations[i] =</span>
-<span class="fc" id="L502">                        newSymbolToken(text, UNKNOWN_SYMBOL_ID);</span>
+<span class="fc" id="L558">                    _annotations[i] =</span>
+<span class="fc" id="L559">                        newSymbolToken(text, UNKNOWN_SYMBOL_ID);</span>
                 }
             }
         }
-<span class="fc" id="L506">    }</span>
 
+<span class="fc bfc" id="L564" title="All 2 branches covered.">        return !sidsRemain;</span>
+    }
+
+    protected void cascadeSIDPresentToContextRoot() {
+        // start with self
+<span class="fc" id="L569">        IonValueLite node = this;</span>
+        // iterate from leaf to context root setting encoding present until either context root is hit OR a node is
+        // encountered that already has encodings present (and so no further propogation is required).
+<span class="fc bfc" id="L572" title="All 4 branches covered.">        while (null != node &amp;&amp; !node._isSymbolIdPresent()) {</span>
+<span class="fc" id="L573">            node._isSymbolIdPresent(true);</span>
+<span class="fc" id="L574">            node = node.getContainer();</span>
+        }
+<span class="fc" id="L576">    }</span>
 
     final void setFieldName(String name)
     {
-<span class="pc bpc" id="L511" title="2 of 4 branches missed.">        assert getContainer() instanceof IonStructLite;</span>
+<span class="pc bpc" id="L580" title="2 of 4 branches missed.">        assert getContainer() instanceof IonStructLite;</span>
         // We can never change a field name once it's set.
-<span class="pc bpc" id="L513" title="3 of 6 branches missed.">        assert _fieldId == UNKNOWN_SYMBOL_ID &amp;&amp; _fieldName == null;</span>
-<span class="fc" id="L514">        _fieldName = name;</span>
-<span class="fc" id="L515">    }</span>
+<span class="pc bpc" id="L582" title="3 of 6 branches missed.">        assert _fieldId == UNKNOWN_SYMBOL_ID &amp;&amp; _fieldName == null;</span>
+<span class="fc" id="L583">        _fieldName = name;</span>
+<span class="fc" id="L584">    }</span>
 
     /**
      * Sets the field name and ID based on a SymbolToken.
@@ -522,18 +591,24 @@ import software.amazon.ion.system.IonTextWriterBuilder;
      */
     final void setFieldNameSymbol(SymbolToken name)
     {
-<span class="pc bpc" id="L525" title="3 of 6 branches missed.">        assert _fieldId == UNKNOWN_SYMBOL_ID &amp;&amp; _fieldName == null;</span>
-<span class="fc" id="L526">        _fieldName = name.getText();</span>
-<span class="fc" id="L527">        _fieldId   = name.getSid();</span>
-<span class="fc" id="L528">    }</span>
+<span class="pc bpc" id="L594" title="3 of 6 branches missed.">        assert _fieldId == UNKNOWN_SYMBOL_ID &amp;&amp; _fieldName == null;</span>
+<span class="fc" id="L595">        _fieldName = name.getText();</span>
+<span class="fc" id="L596">        _fieldId   = name.getSid();</span>
+
+        // if a SID has been added by this operation to a previously SID-less node we have to mark upwards
+        // towards the context root that a SID is present
+<span class="fc bfc" id="L600" title="All 4 branches covered.">        if (UNKNOWN_SYMBOL_ID != _fieldId &amp;&amp; !_isSymbolIdPresent()) {</span>
+<span class="fc" id="L601">            cascadeSIDPresentToContextRoot();</span>
+        }
+<span class="fc" id="L603">    }</span>
 
     public final String getFieldName()
     {
-<span class="fc bfc" id="L532" title="All 2 branches covered.">        if (_fieldName != null) return _fieldName;</span>
-<span class="fc bfc" id="L533" title="All 2 branches covered.">        if (_fieldId &lt;= 0) return null;</span>
+<span class="fc bfc" id="L607" title="All 2 branches covered.">        if (_fieldName != null) return _fieldName;</span>
+<span class="fc bfc" id="L608" title="All 2 branches covered.">        if (_fieldId &lt;= 0) return null;</span>
 
         // TODO amzn/ion-java#27 why no symtab lookup, like getFieldNameSymbol()?
-<span class="fc" id="L536">        throw new UnknownSymbolException(_fieldId);</span>
+<span class="fc" id="L611">        throw new UnknownSymbolException(_fieldId);</span>
     }
 
     /**
@@ -541,186 +616,199 @@ import software.amazon.ion.system.IonTextWriterBuilder;
      */
     public SymbolTable getSymbolTable()
     {
-<span class="pc bpc" id="L544" title="2 of 4 branches missed.">        assert ! (this instanceof IonDatagram);</span>
+<span class="pc bpc" id="L619" title="2 of 4 branches missed.">        assert ! (this instanceof IonDatagram);</span>
 
-<span class="fc" id="L546">        SymbolTable symbols = topLevelValue()._context.getContextSymbolTable();</span>
-<span class="fc bfc" id="L547" title="All 2 branches covered.">        if (symbols != null) {</span>
-<span class="fc" id="L548">            return symbols;</span>
+<span class="fc" id="L621">        SymbolTable symbols = topLevelValue()._context.getContextSymbolTable();</span>
+<span class="fc bfc" id="L622" title="All 2 branches covered.">        if (symbols != null) {</span>
+<span class="fc" id="L623">            return symbols;</span>
         }
-<span class="fc" id="L550">        return _context.getSystem().getSystemSymbolTable();</span>
+<span class="fc" id="L625">        return _context.getSystem().getSystemSymbolTable();</span>
     }
 
     public SymbolTable getAssignedSymbolTable()
     {
-<span class="pc bpc" id="L555" title="2 of 4 branches missed.">        assert ! (this instanceof IonDatagram);</span>
+<span class="pc bpc" id="L630" title="2 of 4 branches missed.">        assert ! (this instanceof IonDatagram);</span>
 
-<span class="fc" id="L557">        SymbolTable symbols = _context.getContextSymbolTable();</span>
-<span class="fc" id="L558">        return symbols;</span>
+<span class="fc" id="L632">        SymbolTable symbols = _context.getContextSymbolTable();</span>
+<span class="fc" id="L633">        return symbols;</span>
     }
 
     public IonSystemLite getSystem()
     {
-<span class="fc" id="L563">        return _context.getSystem();</span>
+<span class="fc" id="L638">        return _context.getSystem();</span>
     }
 
     public IonType getType()
     {
-<span class="nc" id="L568">        throw new UnsupportedOperationException(&quot;this type &quot;+this.getClass().getSimpleName()+&quot; should not be instanciated, there is not IonType associated with it&quot;);</span>
+<span class="nc" id="L643">        throw new UnsupportedOperationException(&quot;this type &quot;+this.getClass().getSimpleName()+&quot; should not be instanciated, there is not IonType associated with it&quot;);</span>
     }
 
     public SymbolToken[] getTypeAnnotationSymbols()
     {
-<span class="fc" id="L573">        return getTypeAnnotationSymbols(new LazySymbolTableProvider(this));</span>
+<span class="fc" id="L648">        return getTypeAnnotationSymbols(new LazySymbolTableProvider(this));</span>
     }
 
     public final SymbolToken[] getTypeAnnotationSymbols(SymbolTableProvider symbolTableProvider)
     {
         // first we have to count the number of non-null
         // elements there are in the annotations array
-<span class="fc" id="L580">        int count = 0;</span>
-<span class="fc bfc" id="L581" title="All 2 branches covered.">        if (_annotations != null) {</span>
-<span class="fc bfc" id="L582" title="All 2 branches covered.">            for (int i = 0; i &lt; _annotations.length; i++) {</span>
-<span class="fc bfc" id="L583" title="All 2 branches covered.">                if (_annotations[i] != null) {</span>
-<span class="fc" id="L584">                    count++;</span>
+<span class="fc" id="L655">        int count = 0;</span>
+<span class="fc bfc" id="L656" title="All 2 branches covered.">        if (_annotations != null) {</span>
+<span class="fc bfc" id="L657" title="All 2 branches covered.">            for (int i = 0; i &lt; _annotations.length; i++) {</span>
+<span class="fc bfc" id="L658" title="All 2 branches covered.">                if (_annotations[i] != null) {</span>
+<span class="fc" id="L659">                    count++;</span>
                 }
             }
         }
         // if there aren't any, we're done
-<span class="fc bfc" id="L589" title="All 2 branches covered.">        if (count == 0) {</span>
-<span class="fc" id="L590">            return SymbolToken.EMPTY_ARRAY;</span>
+<span class="fc bfc" id="L664" title="All 2 branches covered.">        if (count == 0) {</span>
+<span class="fc" id="L665">            return SymbolToken.EMPTY_ARRAY;</span>
         }
 
-<span class="fc" id="L593">        SymbolToken[] users_copy = new SymbolToken[count];</span>
-<span class="fc bfc" id="L594" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++)</span>
+<span class="fc" id="L668">        SymbolToken[] users_copy = new SymbolToken[count];</span>
+<span class="fc bfc" id="L669" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++)</span>
         {
-<span class="fc" id="L596">            SymbolToken token = _annotations[i];</span>
-<span class="fc" id="L597">            String text = token.getText();</span>
-<span class="pc bpc" id="L598" title="1 of 4 branches missed.">            if (text != null &amp;&amp; token.getSid() == UNKNOWN_SYMBOL_ID)</span>
+<span class="fc" id="L671">            SymbolToken token = _annotations[i];</span>
+<span class="fc" id="L672">            String text = token.getText();</span>
+<span class="pc bpc" id="L673" title="1 of 4 branches missed.">            if (text != null &amp;&amp; token.getSid() == UNKNOWN_SYMBOL_ID)</span>
             {
                 // TODO amzn/ion-java#27 We should memoize the result of symtab lookups
                 // into _annotations.
                 // See getFieldNameSymbol() for challenges doing so.
 
-<span class="fc" id="L604">                SymbolToken interned = symbolTableProvider.getSymbolTable().find(text);</span>
-<span class="fc bfc" id="L605" title="All 2 branches covered.">                if (interned != null)</span>
+<span class="fc" id="L679">                SymbolToken interned = symbolTableProvider.getSymbolTable().find(text);</span>
+<span class="fc bfc" id="L680" title="All 2 branches covered.">                if (interned != null)</span>
                 {
-<span class="fc" id="L607">                    token = interned;</span>
+<span class="fc" id="L682">                    token = interned;</span>
                 }
             }
 
-<span class="fc" id="L611">            users_copy[i] = token;</span>
+<span class="fc" id="L686">            users_copy[i] = token;</span>
         }
-<span class="fc" id="L613">        return users_copy;</span>
+<span class="fc" id="L688">        return users_copy;</span>
     }
 
     public void setTypeAnnotationSymbols(SymbolToken... annotations)
     {
-<span class="fc" id="L618">        checkForLock();</span>
+<span class="fc" id="L693">        checkForLock();</span>
 
-<span class="pc bpc" id="L620" title="1 of 4 branches missed.">        if (annotations == null || annotations.length == 0)</span>
+<span class="pc bpc" id="L695" title="1 of 4 branches missed.">        if (annotations == null || annotations.length == 0)</span>
         {
             // Normalize all empty lists to the same instance.
-<span class="fc" id="L623">            _annotations = SymbolToken.EMPTY_ARRAY;</span>
+<span class="fc" id="L698">            _annotations = SymbolToken.EMPTY_ARRAY;</span>
         }
         else
         {
-<span class="fc" id="L627">            _annotations = annotations.clone();</span>
+<span class="fc" id="L702">            _annotations = annotations.clone();</span>
+
+            // new annotations could have SID's - so if this node is not currently marked as SID
+            // present then the new annotations have to be interrogated to see if they contain SID's and if they
+            // do - the SID Present flag must be cascaded.
+<span class="fc bfc" id="L707" title="All 2 branches covered.">            if (!_isSymbolIdPresent()) {</span>
+<span class="fc bfc" id="L708" title="All 2 branches covered.">                for (SymbolToken token : _annotations) {</span>
+                    // upon finding first match of a symbol token containing a SID - cascade upwards and exit
+<span class="pc bpc" id="L710" title="1 of 4 branches missed.">                    if (null != token &amp;&amp; UNKNOWN_SYMBOL_ID != token.getSid()) {</span>
+<span class="fc" id="L711">                        cascadeSIDPresentToContextRoot();</span>
+<span class="fc" id="L712">                        break;</span>
+                    }
+                }
+            }
         }
-<span class="fc" id="L629">    }</span>
+<span class="fc" id="L717">    }</span>
 
     public final String[] getTypeAnnotations()
     {
         // first we have to count the number of non-null
         // elements there are in the annotations array
-<span class="fc" id="L635">        int count = 0;</span>
-<span class="fc bfc" id="L636" title="All 2 branches covered.">        if (_annotations != null) {</span>
-<span class="fc bfc" id="L637" title="All 2 branches covered.">            for (int ii=0; ii&lt;_annotations.length; ) {</span>
-<span class="fc bfc" id="L638" title="All 2 branches covered.">                if (_annotations[ii] == null) {</span>
-<span class="fc" id="L639">                    break;</span>
+<span class="fc" id="L723">        int count = 0;</span>
+<span class="fc bfc" id="L724" title="All 2 branches covered.">        if (_annotations != null) {</span>
+<span class="fc bfc" id="L725" title="All 2 branches covered.">            for (int ii=0; ii&lt;_annotations.length; ) {</span>
+<span class="fc bfc" id="L726" title="All 2 branches covered.">                if (_annotations[ii] == null) {</span>
+<span class="fc" id="L727">                    break;</span>
                 }
-<span class="fc" id="L641">                ii++;</span>
-<span class="fc" id="L642">                count = ii;</span>
+<span class="fc" id="L729">                ii++;</span>
+<span class="fc" id="L730">                count = ii;</span>
             }
         }
         // if there aren't any, we're done
-<span class="fc bfc" id="L646" title="All 2 branches covered.">        if (count == 0) {</span>
-<span class="fc" id="L647">            return EMPTY_STRING_ARRAY;</span>
+<span class="fc bfc" id="L734" title="All 2 branches covered.">        if (count == 0) {</span>
+<span class="fc" id="L735">            return EMPTY_STRING_ARRAY;</span>
         }
 
-<span class="fc" id="L650">        return PrivateUtils.toStrings(_annotations, count);</span>
+<span class="fc" id="L738">        return PrivateUtils.toStrings(_annotations, count);</span>
     }
 
     public void setTypeAnnotations(String... annotations)
     {
-<span class="fc" id="L655">        checkForLock();</span>
+<span class="fc" id="L743">        checkForLock();</span>
 
-<span class="fc" id="L657">        _annotations = PrivateUtils.newSymbolTokens(getSymbolTable(),</span>
+<span class="fc" id="L745">        _annotations = PrivateUtils.newSymbolTokens(getSymbolTable(),</span>
                                                        annotations);
-<span class="fc" id="L659">    }</span>
+<span class="fc" id="L747">    }</span>
 
     public final boolean hasTypeAnnotation(String annotation)
     {
-<span class="fc bfc" id="L663" title="All 4 branches covered.">        if (annotation != null &amp;&amp; annotation.length() &gt; 0) {</span>
-<span class="fc" id="L664">            int pos = findTypeAnnotation(annotation);</span>
-<span class="fc bfc" id="L665" title="All 2 branches covered.">            if (pos &gt;= 0) {</span>
-<span class="fc" id="L666">                return true;</span>
+<span class="fc bfc" id="L751" title="All 4 branches covered.">        if (annotation != null &amp;&amp; annotation.length() &gt; 0) {</span>
+<span class="fc" id="L752">            int pos = findTypeAnnotation(annotation);</span>
+<span class="fc bfc" id="L753" title="All 2 branches covered.">            if (pos &gt;= 0) {</span>
+<span class="fc" id="L754">                return true;</span>
             }
         }
-<span class="fc" id="L669">        return false;</span>
+<span class="fc" id="L757">        return false;</span>
     }
 
     @Override
     public final int findTypeAnnotation(String annotation)
     {
-<span class="pc bpc" id="L675" title="3 of 6 branches missed.">        assert(annotation != null &amp;&amp; annotation.length() &gt; 0);</span>
+<span class="pc bpc" id="L763" title="3 of 6 branches missed.">        assert(annotation != null &amp;&amp; annotation.length() &gt; 0);</span>
 
-<span class="fc bfc" id="L677" title="All 2 branches covered.">        if (_annotations != null) {</span>
-<span class="fc bfc" id="L678" title="All 2 branches covered.">            for (int ii=0; ii&lt;_annotations.length; ii++) {</span>
-<span class="fc" id="L679">                SymbolToken a = _annotations[ii];</span>
-<span class="fc bfc" id="L680" title="All 2 branches covered.">                if (a == null) {</span>
-<span class="fc" id="L681">                    break;</span>
+<span class="fc bfc" id="L765" title="All 2 branches covered.">        if (_annotations != null) {</span>
+<span class="fc bfc" id="L766" title="All 2 branches covered.">            for (int ii=0; ii&lt;_annotations.length; ii++) {</span>
+<span class="fc" id="L767">                SymbolToken a = _annotations[ii];</span>
+<span class="fc bfc" id="L768" title="All 2 branches covered.">                if (a == null) {</span>
+<span class="fc" id="L769">                    break;</span>
                 }
-<span class="fc bfc" id="L683" title="All 2 branches covered.">                if (annotation.equals(a.getText())) {</span>
-<span class="fc" id="L684">                    return ii;</span>
+<span class="fc bfc" id="L771" title="All 2 branches covered.">                if (annotation.equals(a.getText())) {</span>
+<span class="fc" id="L772">                    return ii;</span>
                 }
             }
         }
-<span class="fc" id="L688">        return -1;</span>
+<span class="fc" id="L776">        return -1;</span>
     }
 
     protected int hashTypeAnnotations(final int original, SymbolTableProvider symbolTableProvider)
     {
-<span class="fc" id="L693">        final SymbolToken[] tokens = getTypeAnnotationSymbols(symbolTableProvider);</span>
-<span class="fc bfc" id="L694" title="All 2 branches covered.">        if (tokens.length == 0)</span>
+<span class="fc" id="L781">        final SymbolToken[] tokens = getTypeAnnotationSymbols(symbolTableProvider);</span>
+<span class="fc bfc" id="L782" title="All 2 branches covered.">        if (tokens.length == 0)</span>
         {
-<span class="fc" id="L696">            return original;</span>
+<span class="fc" id="L784">            return original;</span>
         }
 
-<span class="fc" id="L699">        final int sidHashSalt   = 127;      // prime to salt sid of annotation</span>
-<span class="fc" id="L700">        final int textHashSalt  = 31;       // prime to salt text of annotation</span>
-<span class="fc" id="L701">        final int prime = 8191;</span>
-<span class="fc" id="L702">        int result = original ^ TYPE_ANNOTATION_HASH_SIGNATURE;</span>
+<span class="fc" id="L787">        final int sidHashSalt   = 127;      // prime to salt sid of annotation</span>
+<span class="fc" id="L788">        final int textHashSalt  = 31;       // prime to salt text of annotation</span>
+<span class="fc" id="L789">        final int prime = 8191;</span>
+<span class="fc" id="L790">        int result = original ^ TYPE_ANNOTATION_HASH_SIGNATURE;</span>
 
-<span class="fc" id="L704">        result = prime * original + tokens.length;</span>
+<span class="fc" id="L792">        result = prime * original + tokens.length;</span>
 
-<span class="fc bfc" id="L706" title="All 2 branches covered.">        for (final SymbolToken token : tokens)</span>
+<span class="fc bfc" id="L794" title="All 2 branches covered.">        for (final SymbolToken token : tokens)</span>
         {
-<span class="fc" id="L708">            String text = token.getText();</span>
+<span class="fc" id="L796">            String text = token.getText();</span>
 
-<span class="fc bfc" id="L710" title="All 2 branches covered.">            int tokenHashCode = text == null</span>
-<span class="fc" id="L711">                ? token.getSid()  * sidHashSalt</span>
-<span class="fc" id="L712">                : text.hashCode() * textHashSalt;</span>
+<span class="fc bfc" id="L798" title="All 2 branches covered.">            int tokenHashCode = text == null</span>
+<span class="fc" id="L799">                ? token.getSid()  * sidHashSalt</span>
+<span class="fc" id="L800">                : text.hashCode() * textHashSalt;</span>
 
             // mixing to account for small text and sid deltas
-<span class="fc" id="L715">            tokenHashCode ^= (tokenHashCode &lt;&lt; 19) ^ (tokenHashCode &gt;&gt; 13);</span>
+<span class="fc" id="L803">            tokenHashCode ^= (tokenHashCode &lt;&lt; 19) ^ (tokenHashCode &gt;&gt; 13);</span>
 
-<span class="fc" id="L717">            result = prime * result + tokenHashCode;</span>
+<span class="fc" id="L805">            result = prime * result + tokenHashCode;</span>
 
             // mixing at each step to make the hash code order-dependent
-<span class="fc" id="L720">            result ^= (result &lt;&lt; 25) ^ (result &gt;&gt; 7);</span>
+<span class="fc" id="L808">            result ^= (result &lt;&lt; 25) ^ (result &gt;&gt; 7);</span>
         }
 
-<span class="fc" id="L723">        return result;</span>
+<span class="fc" id="L811">        return result;</span>
     }
 
     /**
@@ -737,40 +825,40 @@ import software.amazon.ion.system.IonTextWriterBuilder;
     @Override
     public final boolean equals(final Object other)
     {
-<span class="fc bfc" id="L740" title="All 2 branches covered.">        if (other == this) {</span>
+<span class="fc bfc" id="L828" title="All 2 branches covered.">        if (other == this) {</span>
             // we shouldn't make 3 deep method calls for this common case
-<span class="fc" id="L742">            return true;</span>
+<span class="fc" id="L830">            return true;</span>
         }
-<span class="pc bpc" id="L744" title="1 of 2 branches missed.">        if (other instanceof IonValue)</span>
+<span class="pc bpc" id="L832" title="1 of 2 branches missed.">        if (other instanceof IonValue)</span>
         {
-<span class="fc" id="L746">            return ionEquals(this, (IonValue) other);</span>
+<span class="fc" id="L834">            return ionEquals(this, (IonValue) other);</span>
         }
-<span class="nc" id="L748">        return false;</span>
+<span class="nc" id="L836">        return false;</span>
     }
 
 
     public final boolean isNullValue()
     {
-<span class="fc" id="L754">        return _isNullValue();</span>
+<span class="fc" id="L842">        return _isNullValue();</span>
     }
 
     public final boolean isReadOnly()
     {
-<span class="fc" id="L759">        return _isLocked();</span>
+<span class="fc" id="L847">        return _isLocked();</span>
     }
 
     public void makeReadOnly()
     {
-<span class="fc bfc" id="L764" title="All 2 branches covered.">        if (!_isLocked()) {</span>
-<span class="fc" id="L765">            makeReadOnlyInternal();</span>
+<span class="fc bfc" id="L852" title="All 2 branches covered.">        if (!_isLocked()) {</span>
+<span class="fc" id="L853">            makeReadOnlyInternal();</span>
         }
-<span class="fc" id="L767">    }</span>
+<span class="fc" id="L855">    }</span>
 
     void makeReadOnlyInternal()
     {
-<span class="fc" id="L771">        clearSymbolIDValues();</span>
-<span class="fc" id="L772">        _isLocked(true);</span>
-<span class="fc" id="L773">    }</span>
+<span class="fc" id="L859">        clearSymbolIDValues();</span>
+<span class="fc" id="L860">        _isLocked(true);</span>
+<span class="fc" id="L861">    }</span>
 
     /**
      * Verifies that this value is not read-only.
@@ -781,72 +869,72 @@ import software.amazon.ion.system.IonTextWriterBuilder;
     final void checkForLock()
         throws ReadOnlyValueException
     {
-<span class="fc bfc" id="L784" title="All 2 branches covered.">        if (_isLocked()) {</span>
-<span class="fc" id="L785">            throw new ReadOnlyValueException();</span>
+<span class="fc bfc" id="L872" title="All 2 branches covered.">        if (_isLocked()) {</span>
+<span class="fc" id="L873">            throw new ReadOnlyValueException();</span>
         }
-<span class="fc" id="L787">    }</span>
+<span class="fc" id="L875">    }</span>
 
 
     public boolean removeFromContainer()
     {
-<span class="fc" id="L792">        checkForLock();</span>
+<span class="fc" id="L880">        checkForLock();</span>
 
-<span class="fc" id="L794">        boolean removed = false;</span>
-<span class="fc" id="L795">        IonContainerLite parent = _context.getContextContainer();</span>
-<span class="fc bfc" id="L796" title="All 2 branches covered.">        if (parent != null) {</span>
-<span class="fc" id="L797">            removed = parent.remove(this);</span>
+<span class="fc" id="L882">        boolean removed = false;</span>
+<span class="fc" id="L883">        IonContainerLite parent = _context.getContextContainer();</span>
+<span class="fc bfc" id="L884" title="All 2 branches covered.">        if (parent != null) {</span>
+<span class="fc" id="L885">            removed = parent.remove(this);</span>
         }
-<span class="fc" id="L799">        return removed;</span>
+<span class="fc" id="L887">        return removed;</span>
     }
 
     public void removeTypeAnnotation(String annotation)
     {
-<span class="fc" id="L804">        checkForLock();</span>
+<span class="fc" id="L892">        checkForLock();</span>
 
-<span class="fc bfc" id="L806" title="All 4 branches covered.">        if (annotation != null &amp;&amp; annotation.length() &gt; 0) {</span>
-<span class="fc" id="L807">            int pos = findTypeAnnotation(annotation);</span>
-<span class="fc bfc" id="L808" title="All 2 branches covered.">            if (pos &lt; 0) {</span>
-<span class="fc" id="L809">                return;</span>
+<span class="fc bfc" id="L894" title="All 4 branches covered.">        if (annotation != null &amp;&amp; annotation.length() &gt; 0) {</span>
+<span class="fc" id="L895">            int pos = findTypeAnnotation(annotation);</span>
+<span class="fc bfc" id="L896" title="All 2 branches covered.">            if (pos &lt; 0) {</span>
+<span class="fc" id="L897">                return;</span>
             }
             int ii;
-<span class="fc bfc" id="L812" title="All 2 branches covered.">            for (ii=pos; ii&lt;_annotations.length - 1; ii++) {</span>
-<span class="fc" id="L813">                SymbolToken a = _annotations[ii+1];</span>
-<span class="fc bfc" id="L814" title="All 2 branches covered.">                if (a == null) {</span>
-<span class="fc" id="L815">                    break;</span>
+<span class="fc bfc" id="L900" title="All 2 branches covered.">            for (ii=pos; ii&lt;_annotations.length - 1; ii++) {</span>
+<span class="fc" id="L901">                SymbolToken a = _annotations[ii+1];</span>
+<span class="fc bfc" id="L902" title="All 2 branches covered.">                if (a == null) {</span>
+<span class="fc" id="L903">                    break;</span>
                 }
-<span class="fc" id="L817">                _annotations[ii] = a;</span>
+<span class="fc" id="L905">                _annotations[ii] = a;</span>
             }
-<span class="pc bpc" id="L819" title="1 of 2 branches missed.">            if (ii&lt;_annotations.length) {</span>
-<span class="fc" id="L820">                _annotations[ii] = null;</span>
+<span class="pc bpc" id="L907" title="1 of 2 branches missed.">            if (ii&lt;_annotations.length) {</span>
+<span class="fc" id="L908">                _annotations[ii] = null;</span>
             }
         }
-<span class="fc" id="L823">    }</span>
+<span class="fc" id="L911">    }</span>
 
     @Override
     public String toString()
     {
-<span class="fc" id="L828">        return toString(TO_STRING_TEXT_WRITER_BUILDER);</span>
+<span class="fc" id="L916">        return toString(TO_STRING_TEXT_WRITER_BUILDER);</span>
     }
 
     public String toString(IonTextWriterBuilder writerBuilder)
     {
-<span class="fc" id="L833">        StringBuilder buf = new StringBuilder(1024);</span>
+<span class="fc" id="L921">        StringBuilder buf = new StringBuilder(1024);</span>
         try
         {
-<span class="fc" id="L836">            IonWriter writer = writerBuilder.build(buf);</span>
-<span class="fc" id="L837">            writeTo(writer);</span>
-<span class="fc" id="L838">            writer.finish();</span>
+<span class="fc" id="L924">            IonWriter writer = writerBuilder.build(buf);</span>
+<span class="fc" id="L925">            writeTo(writer);</span>
+<span class="fc" id="L926">            writer.finish();</span>
         }
-<span class="nc" id="L840">        catch (IOException e)</span>
+<span class="nc" id="L928">        catch (IOException e)</span>
         {
-<span class="nc" id="L842">            throw new IonException(e);</span>
-<span class="fc" id="L843">        }</span>
-<span class="fc" id="L844">        return buf.toString();</span>
+<span class="nc" id="L930">            throw new IonException(e);</span>
+<span class="fc" id="L931">        }</span>
+<span class="fc" id="L932">        return buf.toString();</span>
     }
 
     public String toPrettyString()
     {
-<span class="fc" id="L849">        return toString(IonTextWriterBuilder.pretty());</span>
+<span class="fc" id="L937">        return toString(IonTextWriterBuilder.pretty());</span>
     }
 
     public void writeTo(IonWriter writer)
@@ -854,58 +942,58 @@ import software.amazon.ion.system.IonTextWriterBuilder;
         // we use a Lazy 1-time resolution of the SymbolTable in case there is no need to
         // pull the symbol table, including situations where no symbol table would logically
         // be attached
-<span class="fc" id="L857">        writeTo(writer, new LazySymbolTableProvider(this));</span>
-<span class="fc" id="L858">    }</span>
+<span class="fc" id="L945">        writeTo(writer, new LazySymbolTableProvider(this));</span>
+<span class="fc" id="L946">    }</span>
 
     final void writeChildren(IonWriter writer, Iterable&lt;IonValue&gt; container,
                              SymbolTableProvider symbolTableProvider)
     {
-<span class="fc" id="L863">        boolean isDatagram = this instanceof IonDatagram;</span>
+<span class="fc" id="L951">        boolean isDatagram = this instanceof IonDatagram;</span>
         // unfortunately JDK5 does not allow for generic co-variant returns; i.e. specifying
         // IonContainerLite#iterator() return type as Iterator&lt;IonValueLite&gt; causes a compile-time
         // error under JDK5 as it doesn't understand this is an acceptable co-variant for
         // Iterator&lt;IonValue&gt; IonContainer#iterator(). This said we know the underlying data
         // structure is IonValueLite[] - so we can conduct the cast within the loop. When ion-java is
         // moved to allow JDK6+ compile time dependency we can remove these crufty casts.
-<span class="fc bfc" id="L870" title="All 2 branches covered.">        for (IonValue iv : container) {</span>
-<span class="fc" id="L871">            IonValueLite vlite = (IonValueLite) iv;</span>
-<span class="pc bpc" id="L872" title="1 of 2 branches missed.">            if(isDatagram)</span>
+<span class="fc bfc" id="L958" title="All 2 branches covered.">        for (IonValue iv : container) {</span>
+<span class="fc" id="L959">            IonValueLite vlite = (IonValueLite) iv;</span>
+<span class="pc bpc" id="L960" title="1 of 2 branches missed.">            if(isDatagram)</span>
             {
-<span class="nc" id="L874">                vlite.writeTo(writer);</span>
+<span class="nc" id="L962">                vlite.writeTo(writer);</span>
             }
             else
             {
-<span class="fc" id="L878">                vlite.writeTo(writer, symbolTableProvider);</span>
+<span class="fc" id="L966">                vlite.writeTo(writer, symbolTableProvider);</span>
             }
-<span class="fc" id="L880">        }</span>
-<span class="fc" id="L881">    }</span>
+<span class="fc" id="L968">        }</span>
+<span class="fc" id="L969">    }</span>
 
     final void writeTo(IonWriter writer, SymbolTableProvider symbolTableProvider)
     {
-<span class="fc bfc" id="L885" title="All 2 branches covered.">        if (writer.isInStruct()</span>
-<span class="fc bfc" id="L886" title="All 2 branches covered.">            &amp;&amp; ! ((PrivateIonWriter) writer).isFieldNameSet())</span>
+<span class="fc bfc" id="L973" title="All 2 branches covered.">        if (writer.isInStruct()</span>
+<span class="fc bfc" id="L974" title="All 2 branches covered.">            &amp;&amp; ! ((PrivateIonWriter) writer).isFieldNameSet())</span>
         {
-<span class="fc" id="L888">            SymbolToken tok = getFieldNameSymbol(symbolTableProvider);</span>
-<span class="pc bpc" id="L889" title="1 of 2 branches missed.">            if (tok == null)</span>
+<span class="fc" id="L976">            SymbolToken tok = getFieldNameSymbol(symbolTableProvider);</span>
+<span class="pc bpc" id="L977" title="1 of 2 branches missed.">            if (tok == null)</span>
             {
-<span class="nc" id="L891">                throw new IllegalStateException(&quot;Field name not set&quot;);</span>
+<span class="nc" id="L979">                throw new IllegalStateException(&quot;Field name not set&quot;);</span>
             }
 
-<span class="fc" id="L894">            writer.setFieldNameSymbol(tok);</span>
+<span class="fc" id="L982">            writer.setFieldNameSymbol(tok);</span>
         }
 
-<span class="fc" id="L897">        SymbolToken[] annotations = getTypeAnnotationSymbols(symbolTableProvider);</span>
-<span class="fc" id="L898">        writer.setTypeAnnotationSymbols(annotations);</span>
+<span class="fc" id="L985">        SymbolToken[] annotations = getTypeAnnotationSymbols(symbolTableProvider);</span>
+<span class="fc" id="L986">        writer.setTypeAnnotationSymbols(annotations);</span>
 
         try
         {
-<span class="fc" id="L902">            writeBodyTo(writer, symbolTableProvider);</span>
+<span class="fc" id="L990">            writeBodyTo(writer, symbolTableProvider);</span>
         }
-<span class="nc" id="L904">        catch (IOException e)</span>
+<span class="nc" id="L992">        catch (IOException e)</span>
         {
-<span class="nc" id="L906">            throw new IonException(e);</span>
-<span class="fc" id="L907">        }</span>
-<span class="fc" id="L908">    }</span>
+<span class="nc" id="L994">            throw new IonException(e);</span>
+<span class="fc" id="L995">        }</span>
+<span class="fc" id="L996">    }</span>
 
     abstract void writeBodyTo(IonWriter writer, SymbolTableProvider symbolTableProvider)
         throws IOException;
@@ -913,15 +1001,15 @@ import software.amazon.ion.system.IonTextWriterBuilder;
 
     public void setSymbolTable(SymbolTable symbols)
     {
-<span class="pc bpc" id="L916" title="1 of 2 branches missed.">        if (getContext() instanceof TopLevelContext){</span>
-<span class="nc" id="L917">            IonDatagramLite datagram = (IonDatagramLite) getContainer();</span>
-<span class="nc" id="L918">            datagram.setSymbolTableAtIndex(_elementid(), symbols);</span>
-<span class="pc bpc" id="L919" title="1 of 2 branches missed.">        } else if (this.topLevelValue() == this) {</span>
-<span class="fc" id="L920">            setContext(ContainerlessContext.wrap(getContext().getSystem(), symbols));</span>
+<span class="pc bpc" id="L1004" title="1 of 2 branches missed.">        if (getContext() instanceof TopLevelContext){</span>
+<span class="nc" id="L1005">            IonDatagramLite datagram = (IonDatagramLite) getContainer();</span>
+<span class="nc" id="L1006">            datagram.setSymbolTableAtIndex(_elementid(), symbols);</span>
+<span class="pc bpc" id="L1007" title="1 of 2 branches missed.">        } else if (this.topLevelValue() == this) {</span>
+<span class="fc" id="L1008">            setContext(ContainerlessContext.wrap(getContext().getSystem(), symbols));</span>
         } else {
-<span class="nc" id="L922">            throw new UnsupportedOperationException(&quot;can't set the symboltable of a child value&quot;);</span>
+<span class="nc" id="L1010">            throw new UnsupportedOperationException(&quot;can't set the symboltable of a child value&quot;);</span>
         }
-<span class="fc" id="L924">    }</span>
+<span class="fc" id="L1012">    }</span>
 
     /**
      * This method is used to re-set the context of an
@@ -933,13 +1021,13 @@ import software.amazon.ion.system.IonTextWriterBuilder;
      */
     final void setContext(IonContext context)
     {
-<span class="pc bpc" id="L936" title="2 of 4 branches missed.">        assert context != null;</span>
-<span class="fc" id="L937">        checkForLock();</span>
+<span class="pc bpc" id="L1024" title="2 of 4 branches missed.">        assert context != null;</span>
+<span class="fc" id="L1025">        checkForLock();</span>
 
         //Clear all known sIDs.
-<span class="fc" id="L940">        this.clearSymbolIDValues();</span>
-<span class="fc" id="L941">        _context = context;</span>
-<span class="fc" id="L942">    }</span>
+<span class="fc" id="L1028">        this.clearSymbolIDValues();</span>
+<span class="fc" id="L1029">        _context = context;</span>
+<span class="fc" id="L1030">    }</span>
 
     /**
      * used to query the current context.
@@ -948,7 +1036,7 @@ import software.amazon.ion.system.IonTextWriterBuilder;
      */
     IonContext getContext()
     {
-<span class="fc" id="L951">        return _context;</span>
+<span class="fc" id="L1039">        return _context;</span>
     }
 
     /**
@@ -959,11 +1047,11 @@ import software.amazon.ion.system.IonTextWriterBuilder;
     final void validateThisNotNull()
         throws NullValueException
     {
-<span class="fc bfc" id="L962" title="All 2 branches covered.">        if (_isNullValue())</span>
+<span class="fc bfc" id="L1050" title="All 2 branches covered.">        if (_isNullValue())</span>
         {
-<span class="fc" id="L964">            throw new NullValueException();</span>
+<span class="fc" id="L1052">            throw new NullValueException();</span>
         }
-<span class="fc" id="L966">    }</span>
+<span class="fc" id="L1054">    }</span>
 
     /**
      * Removes this value from its container, ensuring that all data stays
@@ -971,24 +1059,24 @@ import software.amazon.ion.system.IonTextWriterBuilder;
      */
     final void detachFromContainer() // throws IOException
     {
-<span class="fc" id="L974">        checkForLock();</span>
+<span class="fc" id="L1062">        checkForLock();</span>
 
-<span class="fc" id="L976">        clearSymbolIDValues();</span>
-<span class="fc" id="L977">        _context = ContainerlessContext.wrap(getSystem());</span>
+<span class="fc" id="L1064">        clearSymbolIDValues();</span>
+<span class="fc" id="L1065">        _context = ContainerlessContext.wrap(getSystem());</span>
 
-<span class="fc" id="L979">        _fieldName = null;</span>
-<span class="fc" id="L980">        _fieldId = UNKNOWN_SYMBOL_ID;</span>
-<span class="fc" id="L981">        _elementid(0);</span>
-<span class="fc" id="L982">    }</span>
+<span class="fc" id="L1067">        _fieldName = null;</span>
+<span class="fc" id="L1068">        _fieldId = UNKNOWN_SYMBOL_ID;</span>
+<span class="fc" id="L1069">        _elementid(0);</span>
+<span class="fc" id="L1070">    }</span>
 
     public void dump(PrintWriter out)
     {
-<span class="nc" id="L986">        out.println(this);</span>
-<span class="nc" id="L987">    }</span>
+<span class="nc" id="L1074">        out.println(this);</span>
+<span class="nc" id="L1075">    }</span>
 
     public String validate()
     {
-<span class="nc" id="L991">        return null;</span>
+<span class="nc" id="L1079">        return null;</span>
     }
 }
 

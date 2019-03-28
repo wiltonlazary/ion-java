@@ -122,30 +122,44 @@ import software.amazon.ion.impl.PrivateLocalSymbolTableFactory;
 
     public IonDatagram load(byte[] ionData) throws IonException
     {
+<span class="fc" id="L125">        IonReader reader = makeReader(_catalog, ionData, 0, ionData.length, _lstFactory);</span>
         try {
-<span class="fc" id="L126">            IonReader reader = makeReader(_catalog, ionData, 0, ionData.length, _lstFactory);</span>
-<span class="fc" id="L127">            IonDatagramLite datagram = load_helper(reader);</span>
-<span class="fc" id="L128">            return datagram;</span>
+<span class="fc" id="L127">            return load(reader);</span>
         }
-<span class="nc" id="L130">        catch (IOException e) {</span>
-<span class="nc" id="L131">            throw new IonException(e);</span>
+        finally {
+            try {
+<span class="fc" id="L131">                reader.close();</span>
+            }
+<span class="nc" id="L133">            catch (IOException e) {</span>
+<span class="nc" id="L134">                throw new IonException(e);</span>
+<span class="fc" id="L135">            }</span>
         }
+
     }
 
     public IonDatagram load(InputStream ionData)
         throws IonException, IOException
     {
         try {
-<span class="fc" id="L139">            IonReader reader = makeReader(_catalog, ionData, _lstFactory);</span>
-<span class="fc" id="L140">            IonDatagramLite datagram = load_helper(reader);</span>
-<span class="fc" id="L141">            return datagram;</span>
+<span class="fc" id="L144">            IonReader reader = makeReader(_catalog, ionData, _lstFactory);</span>
+<span class="fc" id="L145">            return load(reader);</span>
         }
-<span class="fc" id="L143">        catch (IonException e) {</span>
-<span class="fc" id="L144">            IOException io = e.causeOfType(IOException.class);</span>
-<span class="fc bfc" id="L145" title="All 2 branches covered.">            if (io != null) throw io;</span>
-<span class="fc" id="L146">            throw e;</span>
+<span class="fc" id="L147">        catch (IonException e) {</span>
+<span class="fc" id="L148">            IOException io = e.causeOfType(IOException.class);</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            if (io != null) throw io;</span>
+<span class="fc" id="L150">            throw e;</span>
         }
     }
 
+    public IonDatagram load(IonReader reader) throws IonException
+    {
+        try {
+<span class="fc" id="L157">            IonDatagramLite datagram = load_helper(reader);</span>
+<span class="fc" id="L158">            return datagram;</span>
+        }
+<span class="nc" id="L160">        catch (IOException e) {</span>
+<span class="nc" id="L161">            throw new IonException(e);</span>
+        }
+    }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

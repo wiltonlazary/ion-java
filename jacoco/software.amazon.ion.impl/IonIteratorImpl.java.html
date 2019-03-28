@@ -63,7 +63,7 @@ import software.amazon.ion.ValueFactory;
     public boolean hasNext() {
 <span class="fc bfc" id="L64" title="All 2 branches covered.">        if (_at_eof) return false;</span>
 <span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (_next != null) return true;</span>
-<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        return (prefetch() != null);</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        return (prefetch() != null);</span>
     }
 
     private IonValue prefetch()
@@ -199,7 +199,7 @@ import software.amazon.ion.ValueFactory;
     public IonValue next() {
 <span class="pc bpc" id="L200" title="1 of 2 branches missed.">        if (! _at_eof) {</span>
 <span class="fc" id="L201">            _curr = null;</span>
-<span class="pc bpc" id="L202" title="1 of 2 branches missed.">            if (_next == null) {</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            if (_next == null) {</span>
 <span class="fc" id="L203">                prefetch();</span>
             }
 <span class="fc bfc" id="L205" title="All 2 branches covered.">            if (_next != null) {</span>

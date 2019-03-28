@@ -818,7 +818,7 @@
 <a class="jxr_linenumber" name="L810" href="#L810">810</a>         <strong class="jxr_keyword">throws</strong> Exception
 <a class="jxr_linenumber" name="L811" href="#L811">811</a>     {
 <a class="jxr_linenumber" name="L812" href="#L812">812</a>         byte[] data = outputByteArray();
-<a class="jxr_linenumber" name="L813" href="#L813">813</a>         Iterator&lt;IonValue&gt; it = system().systemIterate(data);
+<a class="jxr_linenumber" name="L813" href="#L813">813</a>         Iterator&lt;IonValue&gt; it = system().systemIterate(system().newSystemReader(data));
 <a class="jxr_linenumber" name="L814" href="#L814">814</a>         <strong class="jxr_keyword">return</strong> it;
 <a class="jxr_linenumber" name="L815" href="#L815">815</a>     }
 <a class="jxr_linenumber" name="L816" href="#L816">816</a> 

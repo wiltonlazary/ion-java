@@ -35,10 +35,8 @@ import software.amazon.ion.IonWriter;
 import software.amazon.ion.SymbolTable;
 import software.amazon.ion.SymbolToken;
 import software.amazon.ion.SystemSymbols;
-import software.amazon.ion.impl.bin.PrivateIonManagedBinaryWriterBuilder;
-import software.amazon.ion.impl.bin.Symbols;
-import software.amazon.ion.impl.bin.IonManagedBinaryWriter.ImportedSymbolResolverMode;
 import software.amazon.ion.impl.bin.PrivateIonManagedBinaryWriterBuilder.AllocatorMode;
+//import static software.amazon.ion.impl.bin.Symbols;
 import software.amazon.ion.junit.Injected.Inject;
 
 public class IonManagedBinaryWriterTest extends IonRawBinaryWriterTest
@@ -110,15 +108,6 @@ public class IonManagedBinaryWriterTest extends IonRawBinaryWriterTest
         return 4;
     }
 
-
-    @Inject("importedSymbolResolverMode")
-    public static final ImportedSymbolResolverMode[] RESOLVER_DIMENSIONS = ImportedSymbolResolverMode.values();
-
-    public void setImportedSymbolResolverMode(final ImportedSymbolResolverMode mode)
-    {
-        importedSymbolResolverMode = mode;
-    }
-
     @Override
     protected IonWriter createWriter(final OutputStream out) throws IOException
     {
@@ -134,7 +123,7 @@ public class IonManagedBinaryWriterTest extends IonRawBinaryWriterTest
 
         final IonWriter writer = PrivateIonManagedBinaryWriterBuilder
             .create(AllocatorMode.POOLED)
-            .withImports(importedSymbolResolverMode, symbolTables)
+            .withImports(symbolTables)
             .withPreallocationMode(preallocationMode)
             .withFloatBinary32Enabled()
             .newWriter(out);

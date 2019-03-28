@@ -80,7 +80,7 @@ final class LocalSymbolTableImports
 
         // detects and adapts local tables so they are importable
         myImports = new SymbolTable[importTablesSize];
-        for(int i = 0; i < importTables.size(); i++)
+        for(int i = 0; i < importTablesSize; i++)
         {
             SymbolTable symbolTable = importTables.get(i);
             if(symbolTable.isLocalTable())

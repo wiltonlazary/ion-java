@@ -525,6 +525,11 @@ abstract class IonWriterSystem
         _annotations[_annotation_count++] = is;
     }
 
+    public final void addTypeAnnotationSymbol(SymbolToken annotation) {
+        ensureAnnotationCapacity(_annotation_count + 1);
+        _annotations[_annotation_count++] = annotation;
+    }
+
 
     @Override
     final int[] getTypeAnnotationIds()

@@ -340,6 +340,11 @@ class IonWriterUser
         _current_writer.addTypeAnnotation(annotation);
     }
 
+    public void addTypeAnnotationSymbol(SymbolToken annotation)
+    {
+        _current_writer.addTypeAnnotationSymbol(annotation);
+    }
+
     public void setTypeAnnotations(String... annotations)
     {
         _current_writer.setTypeAnnotations(annotations);

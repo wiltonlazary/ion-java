@@ -39,6 +39,14 @@ public class LSTWriter implements PrivateIonWriter {
 
     public LSTWriter(List<SymbolTable> imports, List<String> symbols, IonCatalog inCatalog) {
         catalog = inCatalog;
+        if(imports.isEmpty()){
+            imports.add(PrivateUtils.systemSymtab(1));
+        } else if(!imports.get(0).isSystemTable()) {
+            LinkedList<SymbolTable> tempImports = new LinkedList<SymbolTable>();
+            tempImports.add(PrivateUtils.systemSymtab(1));
+            tempImports.addAll(imports);
+            imports = tempImports;
+        }
         symbolTable = new LocalSymbolTable(new LocalSymbolTableImports(imports), symbols);
         depth = 0;
     }
@@ -54,6 +62,7 @@ public class LSTWriter implements PrivateIonWriter {
                 //entering the decImports list
                 state = State.imp;
                 decImports = new LinkedList<SSTImport>();
+                seenImports = true;
                 //we need to delete all context when we step out?
                 break;
             case imp:
@@ -145,7 +154,8 @@ public class LSTWriter implements PrivateIonWriter {
     public void writeSymbol(String content){
         if(state == State.preImp && content.equals("$ion_symbol_table")) {
             //we are appending to our current context
-
+            seenImports = true;
+            state = null;
         } else {
             throw new UnsupportedOperationException("Open content unsupported via the managed binary writer");
         }

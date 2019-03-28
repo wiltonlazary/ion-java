@@ -68,7 +68,7 @@ public final class PrivateIonManagedBinaryWriterBuilder
     /*package*/ volatile int                    symbolsBlockSize;
     /*package*/ volatile int                    userBlockSize;
     /*package*/ volatile PreallocationMode      preallocationMode;
-    /*package*/ volatile List<SymbolTable>  imports;
+    /*package*/ volatile List<SymbolTable>      imports;
     /*package*/ volatile IonCatalog             catalog;
     /*package*/ volatile WriteValueOptimization optimization;
     /*package*/ volatile SymbolTable            initialSymbolTable;
@@ -137,7 +137,8 @@ public final class PrivateIonManagedBinaryWriterBuilder
 
     public PrivateIonManagedBinaryWriterBuilder withImports(final List<SymbolTable> tables)
     {
-        return withImports(tables);
+        imports = tables;
+        return this;
     }
 
     /*package*/ PrivateIonManagedBinaryWriterBuilder withPreallocationMode(final PreallocationMode preallocationMode)

@@ -85,7 +85,6 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
         currentWriter = user;
         catalog = builder.catalog;
         fallbackImports = builder.imports;
-        lstIndex = 0;
         closed = false;
         IVM = true;
         writeLST = false;
@@ -93,16 +92,21 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
 
         if (builder.initialSymbolTable != null) {
+            lstIndex = builder.initialSymbolTable.getImportedMaxId();
             ArrayList temp = new ArrayList<String>();
             final Iterator<String> symbolIter = builder.initialSymbolTable.iterateDeclaredSymbolNames();
             while (symbolIter.hasNext()) {
                 temp.add(symbolIter.next());
             }
             lstWriter = new LSTWriter(Arrays.asList(builder.initialSymbolTable.getImportedTables()), temp, catalog);
+            lst = lstWriter.getSymbolTable();
+            lstIndex = lst.getImportedMaxId();
         } else {
             lstWriter = new LSTWriter(fallbackImports, new ArrayList<String>(), catalog);
+            lst = lstWriter.getSymbolTable();
+            lstIndex = lst.getImportedMaxId();
         }
-        lst = lstWriter.getSymbolTable();
+
     }
 
     // Compatibility with Implementation Writer Interface
@@ -128,6 +132,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
     private void writeLocalSymbolTable() throws IOException {
         if (IVM) symbols.writeIonVersionMarker();
+        IVM = false;
         symbols.addTypeAnnotationSymbol(systemSymbol(ION_SYMBOL_TABLE_SID));
         symbols.stepIn(STRUCT);
         SymbolTable[] tempImports = lst.getImportedTables();
@@ -147,17 +152,16 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
             symbols.stepOut();
         }
         int maxId = this.lst.getMaxId();
-        int importMaxId = this.lst.getImportedMaxId();
-        if(importMaxId != maxId) {
-
+        if(lstIndex != maxId) {
             symbols.setFieldNameSymbol(systemSymbol(SYMBOLS_SID));
             symbols.stepIn(LIST);
-
-            for(int i = this.lstIndex; i < maxId; i++){
+            for(int i = this.lstIndex + 1; i <= maxId; i++){
                 symbols.writeString(this.lst.findKnownSymbol(i));
             }
+            lstIndex = maxId;
+            symbols.stepOut();
         }
-
+        symbols.stepOut();
     }
     //these should be inverted so that calling intern x text results in a new symboltoken if none currently exist, thus we can support repeated symboltokens
     private SymbolToken intern(final String text) {
@@ -232,9 +236,10 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
     public void stepIn(final IonType containerType) throws IOException
     {
-        if(currentWriter.getDepth() == 0 && user.hasTopLevelSymbolTableAnnotation()){
+        if(currentWriter.getDepth() == 0 && user.hasTopLevelSymbolTableAnnotation() && containerType == STRUCT){
             currentWriter = lstWriter;
             user.setTypeAnnotationSymbols();
+
         }
         currentWriter.stepIn(containerType);
     }
@@ -243,7 +248,13 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
     {
         if(currentWriter == lstWriter && currentWriter.getDepth() == 1){
             currentWriter = user;
-            lst = lstWriter.getSymbolTable();
+            SymbolTable tempLST = lstWriter.getSymbolTable();
+            if(lst != tempLST) {
+                symbols.flush();
+                user.flush();
+                lst = tempLST;
+                lstIndex = lst.getImportedMaxId();
+            }
         } else {
             currentWriter.stepOut();
         }
@@ -360,7 +371,6 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
             try {
                 finish();
             } catch (IllegalStateException e) {
-                // callers do not expect this... THIS IS A BIG RED FLAG
             } finally {
                 try {
                     symbols.close();

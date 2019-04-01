@@ -30,8 +30,9 @@ public class LSTWriter implements PrivateIonWriter {
         int maxID;
 
     }
-    //this should only accept lsts...
+
     public LSTWriter(SymbolTable currentLST, IonCatalog inCatalog) {
+        if(!currentLST.isLocalTable()) throw new Error("LSTWriter can only be instantiated with LSTs.");
         symbolTable = currentLST;
         catalog = inCatalog;
         depth = 0;

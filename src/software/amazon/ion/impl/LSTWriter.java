@@ -10,6 +10,8 @@ import software.amazon.ion.IonType;
 import software.amazon.ion.SymbolToken;
 import software.amazon.ion.SymbolTable;
 import software.amazon.ion.Timestamp;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.LinkedList;
 
@@ -28,7 +30,6 @@ public class LSTWriter implements PrivateIonWriter {
         String name;
         int version;
         int maxID;
-
     }
 
     public LSTWriter(SymbolTable currentLST, IonCatalog inCatalog) {
@@ -38,15 +39,10 @@ public class LSTWriter implements PrivateIonWriter {
         depth = 0;
     }
 
-    public LSTWriter(List<SymbolTable> imports, List<String> symbols, IonCatalog inCatalog) {
+    public LSTWriter(ArrayList<SymbolTable> imports, List<String> symbols, IonCatalog inCatalog) {
         catalog = inCatalog;
-        if(imports.isEmpty()){
-            imports.add(PrivateUtils.systemSymtab(1));
-        } else if(!imports.get(0).isSystemTable()) {
-            LinkedList<SymbolTable> tempImports = new LinkedList<SymbolTable>();
-            tempImports.add(PrivateUtils.systemSymtab(1));
-            tempImports.addAll(imports);
-            imports = tempImports;
+        if(imports.isEmpty() || !imports.get(0).isSystemTable()){
+            imports.add(0, PrivateUtils.systemSymtab(1));
         }
         symbolTable = new LocalSymbolTable(new LocalSymbolTableImports(imports), symbols);
         depth = 0;
@@ -108,7 +104,6 @@ public class LSTWriter implements PrivateIonWriter {
                     for(String sym: decSymbols) {
                         symbolTable.intern(sym);
                     }
-
                 }
             case preSym:
             case impMID:

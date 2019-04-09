@@ -34,6 +34,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.*;
 
+import software.amazon.ion.impl.PrivateUtils;
 import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamCloseMode;
 import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
@@ -43,17 +44,14 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 /*package*/ final class IonManagedBinaryWriter extends AbstractIonWriter
 {
     private final IonCatalog                    catalog;
-    private final List<SymbolTable>             fallbackImports;
-    private boolean                             closed;
-    private boolean                             flushed;
-    private boolean                             writeLST;
+    private final ArrayList<SymbolTable>        fallbackImports;
+    private boolean                             closed = false, flushed = false, newSymbols = false;
     private LSTWriter                           lstWriter;
     private IonRawBinaryWriter                  user;
     private IonRawBinaryWriter                  symbols;
     private PrivateIonWriter                    currentWriter;
     private SymbolTable                         lst;
     private int                                 lstIndex;
-    private boolean                             IVM;
 
 
     /*package*/ IonManagedBinaryWriter(final PrivateIonManagedBinaryWriterBuilder builder,
@@ -81,14 +79,14 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
             builder.preallocationMode,
             builder.isFloatBinary32Enabled
         );
-
+        symbols.writeIonVersionMarker();
         currentWriter = user;
         catalog = builder.catalog;
-        fallbackImports = builder.imports;
-        closed = false;
-        IVM = true;
-        writeLST = false;
-        flushed = false;
+        if(builder.imports == null){
+            fallbackImports = new ArrayList<SymbolTable>();
+        } else {
+            fallbackImports = new ArrayList(builder.imports);
+        }
 
 
         if (builder.initialSymbolTable != null) {
@@ -98,10 +96,11 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
             while (symbolIter.hasNext()) {
                 temp.add(symbolIter.next());
             }
-            lstWriter = new LSTWriter(Arrays.asList(builder.initialSymbolTable.getImportedTables()), temp, catalog);
+            lstWriter = new LSTWriter(new ArrayList(Arrays.asList(builder.initialSymbolTable.getImportedTables())), temp, catalog);
             lst = lstWriter.getSymbolTable();
             lstIndex = lst.getImportedMaxId();
         } else {
+
             lstWriter = new LSTWriter(fallbackImports, new ArrayList<String>(), catalog);
             lst = lstWriter.getSymbolTable();
             lstIndex = lst.getImportedMaxId();
@@ -127,60 +126,20 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
     public int getDepth()
     {
-        return user.getDepth();
+        return currentWriter.getDepth();
     }
 
-    private void writeLocalSymbolTable() throws IOException {
-        if (IVM) symbols.writeIonVersionMarker();
-        IVM = false;
-        symbols.addTypeAnnotationSymbol(systemSymbol(ION_SYMBOL_TABLE_SID));
-        symbols.stepIn(STRUCT);
-        SymbolTable[] tempImports = lst.getImportedTables();
-        if (!flushed && tempImports.length > 0) {
-            symbols.setFieldNameSymbol(systemSymbol(IMPORTS_SID));
-            symbols.stepIn(LIST);
-            for (final SymbolTable st : tempImports) {
-                symbols.stepIn(STRUCT);
-                symbols.setFieldNameSymbol(systemSymbol(NAME_SID));
-                symbols.writeString(st.getName());
-                symbols.setFieldNameSymbol(systemSymbol(VERSION_SID));
-                symbols.writeInt(st.getVersion());
-                symbols.setFieldNameSymbol(systemSymbol(MAX_ID_SID));
-                symbols.writeInt(st.getMaxId());
-                symbols.stepOut();
-            }
-            symbols.stepOut();
-        }
-        int maxId = this.lst.getMaxId();
-        if(lstIndex != maxId) {
-            symbols.setFieldNameSymbol(systemSymbol(SYMBOLS_SID));
-            symbols.stepIn(LIST);
-            for(int i = this.lstIndex + 1; i <= maxId; i++){
-                symbols.writeString(this.lst.findKnownSymbol(i));
-            }
-            lstIndex = maxId;
-            symbols.stepOut();
-        }
-        symbols.stepOut();
-    }
+
     //these should be inverted so that calling intern x text results in a new symboltoken if none currently exist, thus we can support repeated symboltokens
     private SymbolToken intern(final String text) {
-        if (text == null) return null; //maybe this should just throw...
-        writeLST = true;
+        if (text == null) return null;
+        newSymbols = true;
         return lst.intern(text);
     }
 
     private SymbolToken intern(final SymbolToken token) {
         if (token == null) return null;
-        writeLST = true;
-        final String text = token.getText();
-        if (text != null) {
-            // string content always makes us intern
-            return intern(text);
-        }
-        if (lst.getMaxId() < token.getSid()) throw new UnknownSymbolException(token.getSid());
-        // no text, we just return what we got
-        return token;
+        return intern(token.getText());
     }
 
     public SymbolTable getSymbolTable() {
@@ -236,7 +195,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
     public void stepIn(final IonType containerType) throws IOException
     {
-        if(currentWriter.getDepth() == 0 && user.hasTopLevelSymbolTableAnnotation() && containerType == STRUCT){
+        if(currentWriter.getDepth() == 0 && user.hasTopLevelSymbolTableAnnotation() && containerType == STRUCT){//only true when the user writer wrote the lst st.
             currentWriter = lstWriter;
             user.setTypeAnnotationSymbols();
 
@@ -246,12 +205,11 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
     public void stepOut() throws IOException
     {
-        if(currentWriter == lstWriter && currentWriter.getDepth() == 1){
+        if(currentWriter == lstWriter && currentWriter.getDepth() == 1) {//depth should be 1 because we havent stepped out yet.
             currentWriter = user;
             SymbolTable tempLST = lstWriter.getSymbolTable();
-            if(lst != tempLST) {
-                symbols.flush();
-                user.flush();
+            if(lst != tempLST) {//we found imported tables and created a new lst object so the references dont match.
+                flush();
                 lst = tempLST;
                 lstIndex = lst.getImportedMaxId();
             }
@@ -350,9 +308,46 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
     public void flush() throws IOException
     {
         if (getDepth() != 0) throw new IllegalStateException("IonWriter.flush() can only be called at top-level.");
-        // make sure that until the local symbol state changes we no-op the table closing routine
-        // push the data out
-        writeLocalSymbolTable();
+        int maxId = lst.getMaxId();
+        if(newSymbols) {
+            if(flushed) {//append
+                symbols.addTypeAnnotationSymbol(systemSymbol(ION_SYMBOL_TABLE_SID));
+                symbols.stepIn(STRUCT);
+                symbols.setFieldNameSymbol(systemSymbol(IMPORTS_SID));
+                symbols.writeSymbolToken(systemSymbol(ION_SYMBOL_TABLE_SID));
+            } else {//fresh lst
+                symbols.addTypeAnnotationSymbol(systemSymbol(ION_SYMBOL_TABLE_SID));
+                symbols.stepIn(STRUCT);
+                SymbolTable[] tempImports = lst.getImportedTables();
+                if (tempImports.length > 0) {
+                    symbols.setFieldNameSymbol(systemSymbol(IMPORTS_SID));
+                    symbols.stepIn(LIST);
+                    for (final SymbolTable st : tempImports) {
+                        symbols.stepIn(STRUCT);
+                        symbols.setFieldNameSymbol(systemSymbol(NAME_SID));
+                        symbols.writeString(st.getName());
+                        symbols.setFieldNameSymbol(systemSymbol(VERSION_SID));
+                        symbols.writeInt(st.getVersion());
+                        symbols.setFieldNameSymbol(systemSymbol(MAX_ID_SID));
+                        symbols.writeInt(st.getMaxId());
+                        symbols.stepOut();
+                    }
+                    symbols.stepOut();
+                }
+            }
+            if (lstIndex < maxId) {
+                symbols.setFieldNameSymbol(systemSymbol(SYMBOLS_SID));
+                symbols.stepIn(LIST);
+                for (int i = this.lstIndex + 1; i <= maxId; i++) {
+                    symbols.writeString(this.lst.findKnownSymbol(i));
+                }
+                lstIndex = maxId;
+                symbols.stepOut();
+            }
+            symbols.stepOut();
+            flushed = true;
+            newSymbols = false;
+        }
         symbols.flush();
         user.flush();
     }
@@ -362,6 +357,8 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
         flush();
         lstWriter = new LSTWriter(fallbackImports, new ArrayList<String>(), catalog);
         lst = lstWriter.getSymbolTable();
+        lstIndex = lst.getImportedMaxId();
+        symbols.writeIonVersionMarker();
         flushed = false;
     }
 

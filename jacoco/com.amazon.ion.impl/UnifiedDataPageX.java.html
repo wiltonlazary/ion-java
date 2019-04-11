@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnifiedDataPageX.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl</a> &gt; <span class="el_source">UnifiedDataPageX.java</span></div><h1>UnifiedDataPageX.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.Reader;
+
+/**
+ * this base class and it's two children (below) manage
+ *
+ */
+abstract class UnifiedDataPageX
+{
+<span class="fc" id="L28">    public enum PageType { BYTES, CHARS }</span>
+
+    protected PageType  _page_type;
+    protected int       _page_limit;  // offset of the last filled array element + 1
+    protected int       _base_offset; // reserves space for un-reading, or offset of the first valid array element
+    protected int       _unread_count;// number of chars the base has been adjusted due to unreading before the user data
+    protected long      _file_offset; // offset of the first byte of this buffer (_base_offset ignored) in the input stream
+
+    protected byte[]    _bytes;
+    protected char[]    _characters;
+
+
+    public static final UnifiedDataPageX makePage(byte[] bytes, int offset, int length) {
+<span class="nc" id="L41">        return new Bytes(bytes, offset, length);</span>
+    }
+    public static final UnifiedDataPageX makePage(char[] chars, int offset, int length) {
+<span class="nc" id="L44">        return new Chars(chars, offset, length);</span>
+    }
+    public static final UnifiedDataPageX makePage(PageType pageType, int size) {
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        if (size &lt; 1) throw new IllegalArgumentException(&quot;invalid page size must be &gt; 0&quot;);</span>
+<span class="nc bnc" id="L48" title="All 3 branches missed.">        switch (pageType) {</span>
+<span class="nc" id="L49">        case CHARS: return new Chars(size);</span>
+<span class="nc" id="L50">        case BYTES: return new Bytes(size);</span>
+<span class="nc" id="L51">        default: throw new IllegalArgumentException(&quot;invalid page type, s/b 1 or 2&quot;);</span>
+        }
+    }
+
+    // this class should only be constructed through the factory
+    // methods makePage() which will choose the right type of
+    // page to construct
+    private UnifiedDataPageX() {}
+
+    public abstract int      getValue(int pageOffset);
+    public abstract void     putValue(int pageOffset, int c);
+<span class="nc" id="L62">    public final    PageType getPageType() { return _page_type; }</span>
+<span class="fc" id="L63">    public final    char[]   getCharBuffer() { return _characters; }</span>
+<span class="fc" id="L64">    public final    byte[]   getByteBuffer() { return _bytes; }</span>
+
+    private final boolean isBytes() {
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        return (_page_type == PageType.BYTES);</span>
+    }
+
+    int load(Reader reader, int start_offset, long file_position) throws IOException
+    {
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (isBytes()) {</span>
+<span class="nc" id="L73">            throw new UnsupportedOperationException(&quot;byte pages can't load characters&quot;);</span>
+        }
+<span class="fc" id="L75">        int read = reader.read(_characters, start_offset, _characters.length - start_offset);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (read &gt; 0) {</span>
+<span class="fc" id="L77">            _page_limit = start_offset + read;</span>
+<span class="fc" id="L78">            _base_offset = start_offset;</span>
+<span class="fc" id="L79">            _unread_count = 0;</span>
+<span class="fc" id="L80">            setFilePosition(file_position, start_offset);</span>
+        }
+<span class="fc" id="L82">        return read;</span>
+    }
+
+    int load(InputStream stream, int start_offset, long file_position) throws IOException
+    {
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (!isBytes()) {</span>
+<span class="nc" id="L88">            throw new UnsupportedOperationException(&quot;character pages can't load bytes&quot;);</span>
+        }
+<span class="fc" id="L90">        int read = stream.read(_bytes, start_offset, _bytes.length - start_offset);</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (read &gt; 0) {</span>
+<span class="fc" id="L92">            _base_offset = start_offset;</span>
+<span class="fc" id="L93">            _unread_count = 0;</span>
+<span class="fc" id="L94">            _page_limit = start_offset + read;</span>
+<span class="fc" id="L95">            setFilePosition(file_position, start_offset);</span>
+        }
+<span class="fc" id="L97">        return read;</span>
+    }
+
+<span class="fc" id="L100">    public int getBufferLimit()    { return _page_limit; }</span>
+<span class="nc" id="L101">    public int getOriginalStartingOffset() { return _base_offset; }</span>
+
+    // FIXME document lower-bound of the result.  Can it be negative?
+    // If not, why not?
+<span class="fc" id="L105">    public int getStartingOffset() { return _base_offset - _unread_count; }</span>
+<span class="nc" id="L106">    public int getUnreadCount()    { return _unread_count; }</span>
+
+    public void inc_unread_count() {
+        // we need this to handle the calculation of
+        // curr_pos - offset when we're marking pages
+<span class="fc" id="L111">        _unread_count++;</span>
+<span class="fc" id="L112">    }</span>
+
+    public final void setFilePosition(long fileOffset, int pos) {
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (fileOffset &lt; 0) {</span>
+<span class="nc" id="L116">            throw new IllegalArgumentException();</span>
+        }
+<span class="fc" id="L118">        _file_offset = fileOffset - pos;</span>
+<span class="fc" id="L119">        return;</span>
+    }
+
+    public final long getFilePosition(int pos) {
+<span class="fc" id="L123">        return _file_offset + pos;</span>
+    }
+
+    public final int getOffsetOfFilePosition(long filePosition) {
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (!containsOffset(filePosition)) {</span>
+<span class="nc" id="L128">            String message = &quot;requested file position [&quot;</span>
+<span class="nc" id="L129">                           + Long.toString(filePosition)</span>
+                           + &quot;] is not in this page [&quot;
+<span class="nc" id="L131">                           + Long.toString(getStartingFileOffset())</span>
+                           + &quot;-&quot;
+<span class="nc" id="L133">                           + Long.toString(this.getFilePosition(_page_limit))</span>
+                           + &quot;]&quot;;
+<span class="nc" id="L135">            throw new IllegalArgumentException(message);</span>
+        }
+<span class="fc" id="L137">        return (int)(filePosition - _file_offset);</span>
+    }
+
+    public final long getStartingFileOffset() {
+<span class="nc" id="L141">        return _file_offset + _base_offset;</span>
+    }
+
+    public final boolean containsOffset(long filePosition) {
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        if (_file_offset + _base_offset &gt; filePosition) return false;</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (filePosition &gt;= _file_offset + _page_limit) return false;</span>
+<span class="fc" id="L147">        return true;</span>
+    }
+    protected final int getLengthFollowingFilePosition(long filePosition) {
+<span class="nc" id="L150">        int pos = getOffsetOfFilePosition(filePosition);</span>
+<span class="nc" id="L151">        return _page_limit - pos;</span>
+    }
+
+    public final void reset(int baseOffset) {
+<span class="fc" id="L155">        _base_offset = baseOffset;</span>
+<span class="fc" id="L156">        _page_limit = _base_offset;</span>
+<span class="fc" id="L157">    }</span>
+
+    public abstract int readFrom(int pageOffset, byte[] bytes, int offset, int length);
+    public abstract int readFrom(int pageOffset, char[] chars, int offset, int length);
+
+    /**
+     * Specialized versions of DataPage.  One to handle bytes the
+     * other to handle chars
+     */
+    // FIXME: remove &quot;public&quot; when UnifiedOutputBufferX is
+    //        integrated back into ion.impl
+    public static final class Bytes extends UnifiedDataPageX
+    {
+        public Bytes(int size) {
+<span class="fc" id="L171">            this(new byte[size], 0, size);</span>
+<span class="fc" id="L172">        }</span>
+<span class="fc" id="L173">        public Bytes(byte[] bytes, int offset, int len) {</span>
+<span class="fc" id="L174">            _page_type   = PageType.BYTES;</span>
+<span class="fc" id="L175">            _bytes       = bytes;</span>
+<span class="fc" id="L176">            _base_offset = offset;</span>
+<span class="fc" id="L177">            _page_limit  = offset + len;</span>
+<span class="fc" id="L178">        }</span>
+
+        @Override
+        public int getValue(int offset) {
+<span class="nc" id="L182">            return (_bytes[offset] &amp; 0xff);</span>
+        }
+
+        @Override
+        public void putValue(int offset, int b) {
+<span class="nc" id="L187">           _bytes[_base_offset] = (byte)b;</span>
+<span class="nc" id="L188">        }</span>
+
+        @Override
+        public final int readFrom(int pageOffset, byte[] bytes, int offset, int length) {
+<span class="nc" id="L192">            int bytes_read = length;</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">            if (pageOffset &gt;= _page_limit) return -1;</span>
+
+<span class="nc bnc" id="L195" title="All 2 branches missed.">            if (bytes_read &gt; _page_limit - pageOffset) {</span>
+<span class="nc" id="L196">                bytes_read = _page_limit - pageOffset;</span>
+            }
+<span class="nc" id="L198">            System.arraycopy(_bytes, pageOffset, bytes, offset, bytes_read);</span>
+
+<span class="nc" id="L200">            return bytes_read;</span>
+        }
+        @Override
+        public final int readFrom(int pageOffset, char[] chars, int offset, int length) {
+<span class="nc" id="L204">            throw new UnsupportedOperationException(&quot;byte pages can't read characters&quot;);</span>
+        }
+    }
+
+    // FIXME: remove &quot;public&quot; when UnifiedOutputBufferX is
+    //        integrated back into ion.impl
+    public static final class Chars extends UnifiedDataPageX
+    {
+        public Chars(int size) {
+<span class="fc" id="L213">            this(new char[size], 0, size);</span>
+<span class="fc" id="L214">        }</span>
+<span class="fc" id="L215">        public Chars(char[] chars, int offset, int len) {</span>
+<span class="fc" id="L216">            _page_type   = PageType.CHARS;</span>
+<span class="fc" id="L217">            _characters = chars;</span>
+<span class="fc" id="L218">            _base_offset = offset;</span>
+<span class="fc" id="L219">            _page_limit  = offset + len;</span>
+<span class="fc" id="L220">        }</span>
+
+        @Override
+        public int getValue(int pageOffset) {
+<span class="nc bnc" id="L224" title="All 4 branches missed.">            if (pageOffset &lt; 0 || pageOffset &gt; _page_limit - _base_offset) {</span>
+<span class="nc" id="L225">                throw new IllegalArgumentException(&quot;offset &quot;+pageOffset+&quot; is not contained in page, limit is &quot;+(_page_limit - _base_offset));</span>
+            }
+<span class="nc" id="L227">            return _characters[pageOffset];</span>
+        }
+
+        @Override
+        public void putValue(int pageOffset, int c) {
+<span class="nc" id="L232">            _characters[pageOffset] = (char)c;</span>
+<span class="nc" id="L233">        }</span>
+
+        @Override
+        public final int readFrom(int pageOffset, byte[] bytes, int offset, int length) {
+<span class="nc" id="L237">            throw new UnsupportedOperationException(&quot;character pages can't read bytes&quot;);</span>
+        }
+
+        @Override
+        public final int readFrom(int pageOffset, char[] chars, int offset, int length)
+        {
+<span class="nc" id="L243">            int chars_read = length;</span>
+<span class="nc bnc" id="L244" title="All 2 branches missed.">            if (pageOffset &gt;= _page_limit) return -1;</span>
+
+<span class="nc bnc" id="L246" title="All 2 branches missed.">            if (chars_read &gt; _page_limit - pageOffset) {</span>
+<span class="nc" id="L247">                chars_read = _page_limit - pageOffset;</span>
+            }
+<span class="nc" id="L249">            System.arraycopy(_characters, pageOffset, chars, offset, chars_read);</span>
+
+<span class="nc" id="L251">            return chars_read;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

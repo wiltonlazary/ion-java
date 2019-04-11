@@ -1,0 +1,536 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Equivalence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.util</a> &gt; <span class="el_source">Equivalence.java</span></div><h1>Equivalence.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.util;
+
+import static com.amazon.ion.impl._Private_IonConstants.UNKNOWN_SYMBOL_TEXT_PREFIX;
+
+import com.amazon.ion.Decimal;
+import com.amazon.ion.IonBool;
+import com.amazon.ion.IonDecimal;
+import com.amazon.ion.IonException;
+import com.amazon.ion.IonFloat;
+import com.amazon.ion.IonInt;
+import com.amazon.ion.IonLob;
+import com.amazon.ion.IonSequence;
+import com.amazon.ion.IonStruct;
+import com.amazon.ion.IonSymbol;
+import com.amazon.ion.IonText;
+import com.amazon.ion.IonTimestamp;
+import com.amazon.ion.IonType;
+import com.amazon.ion.IonValue;
+import com.amazon.ion.SymbolToken;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Provides equivalence comparisons between two {@link IonValue}s, following
+ * the contract of {@link IonValue#equals(Object)}.
+ *
+ * &lt;p&gt;
+ * Basic usage of this class is as follows:
+ *
+ *&lt;pre&gt;
+ *    IonValue v1 = ...;
+ *    IonValue v2 = ...;
+ *    com.amazon.ion.util.Equivalence.ionEquals( v1, v2 );
+ *&lt;/pre&gt;
+ *
+ * More likely, a static import would make using this class easier.
+ *
+ *&lt;pre&gt;
+ *    import static com.amazon.ion.util.Equivalence.ionEquals;
+ *    ...
+ *    boolean equivalent = ionEquals( v1, v2 );
+ *&lt;/pre&gt;
+ *
+ * &lt;p&gt;
+ * &lt;h3&gt;Ion Equivalence&lt;/h3&gt;
+ * In order to make Ion a useful model to describe data, we must first define
+ * the notion of equivalence for all values representable in Ion. Equivalence
+ * with respect to Ion values means that if two Ion values, X and Y, are
+ * equivalent, they represent the same data and can be substituted for the other
+ * without loss of information.
+ *
+ * This relationship is:
+ * &lt;ul&gt;
+ *   &lt;li&gt;
+ *     symmetric: X is equivalent to Y if and only if Y is equivalent to X.
+ *   &lt;/li&gt;
+ *   &lt;li&gt;
+ *     transitive: if X is equivalent to Y and Y is equivalent to Z, then X is
+ *     equivalent to Z.
+ *   &lt;/li&gt;
+ *   &lt;li&gt;
+ *     reflexive: X is equivalent to X.
+ *   &lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;h4&gt;Ordered Sequence Equivalence&lt;/h4&gt;
+ * When an ordered sequence (i.e. tuple) of elements is specified in this
+ * document, equivalence over such an ordered sequence is defined as follows.
+ *
+ * A tuple, A = (a1, a2, ..., an), is equivalent to another tuple, B = (b1, b2,
+ * ..., bm) if and only if the cardinality (number of elements) of A equals the
+ * cardinality of B (i.e. n == m) and ai is equivalent to bi for i = 1 ... n.
+ *
+ * &lt;h4&gt;Un-Ordered Sequence Equivalence&lt;/h4&gt;
+ * When an un-ordered sequence (i.e. bag or multi-set) is specified in this
+ * document, equivalence over such a sequence is defined as follows.
+ *
+ * A bag, A = {a1, a2, ..., an} is equivalent to B = {b1, b2, ..., bm} if and
+ * only if the cardinality of A is equal to the cardinality of B and for each
+ * element, x, in A there exists a distinct element, y, in B for which x is
+ * equivalent to y.
+ *
+ * &lt;h4&gt;Values&lt;/h4&gt;
+ * Any arbitrary, atomic value in the Ion Language can be denoted as the tuple,
+ * (A, V), where A is an ordered list of annotations, and V is an Ion Primitive
+ * Data or Ion Complex Data value. The list of annotations, A is an tuple of Ion
+ * Symbols (a specific type of Ion Primitive).
+
+ */
+public final class Equivalence {
+
+    /**
+     * TODO amzn/ion-java/issues/26 Marker for code that needs to be altered in order to
+     * support a public comparison API to determine ordering of values, not
+     * just equality.
+     */
+    private static final boolean PUBLIC_COMPARISON_API = false;
+
+    private Equivalence() {
+    }
+
+
+    private static int compareAnnotations(SymbolToken[] ann1,
+                                          SymbolToken[] ann2)
+    {
+<span class="fc" id="L125">        int len = ann1.length;</span>
+<span class="fc" id="L126">        int result = len - ann2.length;</span>
+
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (result == 0) {</span>
+<span class="fc bfc" id="L129" title="All 4 branches covered.">            for (int i=0; (result == 0) &amp;&amp; (i &lt; len); i++) {</span>
+<span class="fc" id="L130">                result = compareSymbolTokens(ann1[i], ann2[i]);</span>
+            }
+        }
+
+<span class="fc" id="L134">        return result;</span>
+    }
+
+
+    private static int compareSymbolTokens(SymbolToken tok1,
+                                           SymbolToken tok2)
+    {
+<span class="fc" id="L141">        String text1 = tok1.getText();</span>
+<span class="fc" id="L142">        String text2 = tok2.getText();</span>
+<span class="fc bfc" id="L143" title="All 4 branches covered.">        if (text1 == null || text2 == null) {</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            if (text1 != null) return  1;</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">            if (text2 != null) return -1;</span>
+
+<span class="fc" id="L147">            int sid1 = tok1.getSid();</span>
+<span class="fc" id="L148">            int sid2 = tok2.getSid();</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">            if (sid1 &lt; sid2) return -1;</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            if (sid1 &gt; sid2) return  1;</span>
+<span class="fc" id="L151">            return 0;</span>
+        }
+
+<span class="fc" id="L154">        return text1.compareTo(text2);</span>
+    }
+
+
+    /**
+     * Converts an IonStruct to a multi-set for use in IonStruct equality
+     * checks. This method returns the multi-set as a {@code Map&lt;Field, Field&gt;}.
+     * &lt;p&gt;
+     * A multi-set supports order-independent equality, and may have duplicate
+     * elements.
+     * &lt;p&gt;
+     * Take special note that {@link Set} is missing a {@code get()} API,
+     * and cannot contain duplicate elements, hence we cannot use it.
+     */
+    private static final Map&lt;Field, Field&gt;
+        convertToMultiSet(final IonStruct struct, final boolean strict) {
+
+<span class="fc" id="L171">        final Map&lt;Field, Field&gt; structMultiSet =</span>
+            new HashMap&lt;Field, Field&gt;();
+
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        for (final IonValue val : struct) {</span>
+<span class="fc" id="L175">            final Field item = new Field(val, strict);</span>
+<span class="fc" id="L176">            Field curr = structMultiSet.put(item, item);</span>
+            // curr will be non-null if the multi-set already contains the
+            // name/value pair
+<span class="fc bfc" id="L179" title="All 2 branches covered.">            if (curr != null) {</span>
+                // Set the 'occurrences' of the Field that is contained in
+                // the multi-set (i.e. item) to that of the previously mapped
+                // Field (i.e. curr)
+<span class="fc" id="L183">                item.occurrences = curr.occurrences;</span>
+            }
+            // At this point, item will be an existing
+            // name/value pair in the multi-set - increment its occurrence
+<span class="fc" id="L187">            item.occurrences++;</span>
+<span class="fc" id="L188">        }</span>
+
+<span class="fc" id="L190">        return structMultiSet;</span>
+    }
+
+
+    private static int compareStructs(final IonStruct s1,
+                                      final IonStruct s2,
+                                      boolean strict)
+    {
+<span class="fc" id="L198">        int result = s1.size() - s2.size();</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        if (result == 0) {</span>
+            // We convert IonStruct s1 to a multi-set (which is a
+            // Map&lt;Field, Field&gt;). Refer to convertToMultiSet()'s
+            // documentation for more info
+<span class="fc" id="L203">            final Map&lt;Field, Field&gt; s1MultiSet</span>
+<span class="fc" id="L204">                    = convertToMultiSet(s1, strict);</span>
+
+            // Iterates through each name/value pair in IonStruct s2 and
+            // determine if it also occurs in s1MultiSet.
+            // During each iteration:
+            //          If it does, remove an occurrence from s1MultiSet
+            //          If it doesn't, the two IonStructs aren't equal
+<span class="fc bfc" id="L211" title="All 2 branches covered.">            for (IonValue val : s2) {</span>
+<span class="fc" id="L212">                Field field = new Field(val, strict);</span>
+
+                // Find an occurrence of the name/value pair in s1MultiSet
+<span class="fc" id="L215">                Field mappedValue = s1MultiSet.get(field);</span>
+
+<span class="fc bfc" id="L217" title="All 4 branches covered.">                if (mappedValue == null || mappedValue.occurrences == 0) {</span>
+                    // No match in occurrences, the IonStructs aren't equal
+<span class="fc" id="L219">                    return -1;</span>
+                }
+
+                // Remove an occurrence by decrementing count instead of
+                // explicitly calling Map.remove(), as Map.remove() is a slower
+                // operation
+<span class="fc" id="L225">                mappedValue.occurrences--;</span>
+<span class="fc" id="L226">            }</span>
+        }
+<span class="fc" id="L228">        return result;</span>
+    }
+
+
+    private static int compareSequences(final IonSequence s1,
+                                        final IonSequence s2,
+                                        boolean strict)
+    {
+<span class="fc" id="L236">        int result = s1.size() - s2.size();</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        if (result == 0) {</span>
+<span class="fc" id="L238">            Iterator&lt;IonValue&gt; iter1 = s1.iterator();</span>
+<span class="fc" id="L239">            Iterator&lt;IonValue&gt; iter2 = s2.iterator();</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">            while (iter1.hasNext()) {</span>
+<span class="fc" id="L241">                result = ionCompareToImpl(iter1.next(),</span>
+<span class="fc" id="L242">                                          iter2.next(),</span>
+                                          strict);
+<span class="fc bfc" id="L244" title="All 2 branches covered.">                if (result != 0) {</span>
+<span class="fc" id="L245">                    break;</span>
+                }
+            }
+        }
+<span class="fc" id="L249">        return result;</span>
+    }
+
+
+    /** Compare LOB content by stream--assuming non-null. */
+    private static int compareLobContents(final IonLob lob1, final IonLob lob2)
+    {
+<span class="fc" id="L256">        int in1 = lob1.byteSize();</span>
+<span class="fc" id="L257">        int in2 = lob2.byteSize();</span>
+<span class="fc" id="L258">        int result = (in1- in2);</span>
+
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        if (result == 0) {</span>
+<span class="fc" id="L261">            final InputStream stream1 = lob1.newInputStream();</span>
+<span class="fc" id="L262">            final InputStream stream2 = lob2.newInputStream();</span>
+
+            // too bad Java doesn't do RAII with better syntax...
+            try {
+              try {
+                try {
+<span class="fc bfc" id="L268" title="All 2 branches covered.">                  while (result == 0) {</span>
+<span class="fc" id="L269">                      in1 = stream1.read();</span>
+<span class="fc" id="L270">                      in2 = stream2.read();</span>
+<span class="pc bpc" id="L271" title="1 of 4 branches missed.">                      if (in1 == -1 || in2 == -1) {</span>
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">                        if (in1 != -1) result = 1;</span>
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">                        if (in2 != -1) result = -1;</span>
+                        break;
+                      }
+<span class="fc" id="L276">                      result = (in1 - in2);</span>
+                  }
+                } finally {
+<span class="fc" id="L279">                  stream1.close();</span>
+                }
+              } finally {
+<span class="fc" id="L282">                stream2.close();</span>
+              }
+<span class="nc" id="L284">            } catch (final IOException e) {</span>
+                // XXX hopefully won't happen with LOB streams--if it does rethrow unchecked.
+                //     this would violate Object.equals() would it not?
+<span class="nc" id="L287">                throw new IonException(e);</span>
+<span class="fc" id="L288">            }</span>
+        }
+
+<span class="fc" id="L291">        return result;</span>
+    }
+
+
+    /**
+     * Class that denotes a name/value pair in Structs.
+     * &lt;p&gt;
+     * Structs are unordered collections of name/value pairs. The names are
+     * symbol tokens, and the values are unrestricted. Each name/value pair is
+     * called a &lt;em&gt;field&lt;/em&gt;.
+     * &lt;p&gt;
+     * The responsibilities of this class is to expose a
+     * {@code Map&lt;Field, Field&gt;} as a multi-set. A Field instance holds the name
+     * and value of a Struct field, and counts the number of times that
+     * name/value pair occurs within the multi-set.
+     * &lt;p&gt;
+     * For example, an IonStruct:
+     *&lt;pre&gt;
+     *  {
+     *    a : 123,
+     *    a : 123
+     *  }
+     *&lt;/pre&gt;
+     * will be converted into a multi-set {@code Map&lt;Field, Field&gt;} with
+     * a single {@code Field} -&gt; {@code Field} with {@code occurrences} of 2.
+     * &lt;p&gt;
+     * Refer to
+     * {@link Equivalence#convertToMultiSet(IonStruct, boolean)} and
+     * {@link Field#equals(Object)} for more info.
+     * &lt;p&gt;
+     * NOTE: This class should only be instantiated for the sole purpose of
+     * using it as either a &lt;em&gt;key&lt;/em&gt; or &lt;em&gt;value&lt;/em&gt; in a {@link Map}.
+     */
+    static class Field {
+        private final String    name; // aka field name
+        private final IonValue  value;
+        private final boolean   strict;
+
+        /**
+         * Number of times that this specific field (with the same name
+         * and value) occurs within the struct.
+         */
+        private int occurrences;
+
+        Field(final IonValue value, final boolean strict)
+<span class="fc" id="L336">        {</span>
+<span class="fc" id="L337">            SymbolToken tok = value.getFieldNameSymbol();</span>
+<span class="fc" id="L338">            String name = tok.getText();</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">            if (name == null) {</span>
+                // TODO amzn/ion-java/issues/23 Problematic with unknown field names.
+<span class="fc" id="L341">                name = UNKNOWN_SYMBOL_TEXT_PREFIX + tok.getSid();</span>
+            }
+<span class="fc" id="L343">            this.name = name;</span>
+<span class="fc" id="L344">            this.value = value;</span>
+<span class="fc" id="L345">            this.strict = strict;</span>
+
+            // Occurrences of this name/value pair is 0 initially
+<span class="fc" id="L348">            this.occurrences = 0;</span>
+<span class="fc" id="L349">        }</span>
+
+        @Override
+        public int hashCode() {
+<span class="fc" id="L353">            return name.hashCode();</span>
+            // TODO amzn/ion-java/issues/58 : implement hash code such that it respects
+            // 'strict'. The prevously attempted fix is commented out below but
+            // is not sufficient because value.hasCode will always include
+            // type annotations in the hash computation. Type annotations
+            // should not be part of the hash computation if strict=true.
+//            result = (31 * result) + value.hashCode();
+//            return result;
+        }
+
+        /**
+         * This method is implicitly called by {@link Map#get(Object)} to
+         * obtain a value to which {@code other} is mapped.
+         */
+        @Override
+        public boolean equals(final Object other) {
+            // We can assume other is always a Field and strict
+            // is the same - internal usage dictates it.
+<span class="fc" id="L371">            final Field sOther = (Field) other;</span>
+
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">            return name.equals(sOther.name)</span>
+<span class="fc bfc" id="L374" title="All 2 branches covered.">                &amp;&amp; ionEqualsImpl(value, ((Field) other).value, strict);</span>
+        }
+    }
+
+    private static boolean ionEqualsImpl(final IonValue v1,
+                                               final IonValue v2,
+                                               final boolean strict)
+    {
+<span class="fc bfc" id="L382" title="All 2 branches covered.">        return (ionCompareToImpl(v1, v2, strict) == 0);</span>
+    }
+
+    private static int ionCompareToImpl(final IonValue v1,
+                                        final IonValue v2,
+                                        final boolean strict)
+    {
+<span class="fc" id="L389">        int result = 0;</span>
+
+<span class="fc bfc" id="L391" title="All 4 branches covered.">        if (v1 == null || v2 == null) {</span>
+<span class="fc bfc" id="L392" title="All 2 branches covered.">            if (v1 != null) result = 1;</span>
+<span class="fc bfc" id="L393" title="All 2 branches covered.">            if (v2 != null) result = -1;</span>
+            // otherwise v1 == v2 == null and result == 0
+<span class="fc" id="L395">            return result;</span>
+        }
+
+        // check type
+<span class="fc" id="L399">        IonType ty1 = v1.getType();</span>
+<span class="fc" id="L400">        IonType ty2 = v2.getType();</span>
+<span class="fc" id="L401">        result = ty1.compareTo(ty2);</span>
+
+<span class="fc bfc" id="L403" title="All 2 branches covered.">        if (result == 0) {</span>
+<span class="fc" id="L404">            boolean bo1 = v1.isNullValue();</span>
+<span class="fc" id="L405">            boolean bo2 = v2.isNullValue();</span>
+
+<span class="fc bfc" id="L407" title="All 4 branches covered.">            if (bo1 || bo2) {</span>
+                 // null combination case--we already know they are
+                 // the same type
+<span class="fc bfc" id="L410" title="All 2 branches covered.">                if (!bo1) result = 1;</span>
+<span class="fc bfc" id="L411" title="All 2 branches covered.">                if (!bo2) result = -1;</span>
+                // othersize they're equal (and null values)
+            }
+            else {
+                // value compare only if both are not null
+<span class="pc bpc" id="L416" title="2 of 12 branches missed.">                switch (ty1)</span>
+                {
+                case NULL:
+                    // never visited, precondition is that both are not null
+<span class="nc" id="L420">                    break;</span>
+                case BOOL:
+<span class="fc bfc" id="L422" title="All 2 branches covered.">                    if (((IonBool) v1).booleanValue()) {</span>
+<span class="fc bfc" id="L423" title="All 2 branches covered.">                        result = ((IonBool) v2).booleanValue() ? 0 : 1;</span>
+                    }
+                    else {
+<span class="fc bfc" id="L426" title="All 2 branches covered.">                        result = ((IonBool) v2).booleanValue() ? -1 : 0;</span>
+                    }
+<span class="fc" id="L428">                    break;</span>
+                case INT:
+<span class="fc" id="L430">                    result = ((IonInt) v1).bigIntegerValue().compareTo(</span>
+<span class="fc" id="L431">                             ((IonInt) v2).bigIntegerValue());</span>
+<span class="fc" id="L432">                    break;</span>
+                case FLOAT:
+<span class="fc" id="L434">                    result = Double.compare(((IonFloat) v1).doubleValue(),</span>
+<span class="fc" id="L435">                                            ((IonFloat) v2).doubleValue());</span>
+<span class="fc" id="L436">                    break;</span>
+                case DECIMAL:
+                    assert !PUBLIC_COMPARISON_API; // TODO amzn/ion-java/issues/26
+<span class="fc bfc" id="L439" title="All 2 branches covered.">                    result = Decimal.equals(((IonDecimal) v1).decimalValue(),</span>
+<span class="fc" id="L440">                                            ((IonDecimal) v2).decimalValue())</span>
+<span class="fc" id="L441">                                            ? 0 : 1;</span>
+<span class="fc" id="L442">                    break;</span>
+                case TIMESTAMP:
+<span class="pc bpc" id="L444" title="1 of 2 branches missed.">                    if (strict) {</span>
+                        assert !PUBLIC_COMPARISON_API; // TODO amzn/ion-java/issues/26
+<span class="fc bfc" id="L446" title="All 2 branches covered.">                        result = (((IonTimestamp) v1).timestampValue().equals(</span>
+<span class="fc" id="L447">                                  ((IonTimestamp) v2).timestampValue())</span>
+<span class="fc" id="L448">                                  ? 0 : 1);</span>
+                    }
+                    else {
+                        // This is kind of lying here, the 'strict' boolean
+                        // (if false) denotes ONLY that annotations are not
+                        // check for equality. But what this is doing here is
+                        // that it is also ignoring IonTimesamps' precision and
+                        // local offset.
+<span class="nc" id="L456">                        result = ((IonTimestamp) v1).timestampValue().compareTo(</span>
+<span class="nc" id="L457">                                 ((IonTimestamp) v2).timestampValue());</span>
+                    }
+<span class="nc" id="L459">                    break;</span>
+                case STRING:
+<span class="fc" id="L461">                    result = (((IonText) v1).stringValue()).compareTo(</span>
+<span class="fc" id="L462">                              ((IonText) v2).stringValue());</span>
+<span class="fc" id="L463">                    break;</span>
+                case SYMBOL:
+<span class="fc" id="L465">                    result = compareSymbolTokens(((IonSymbol) v1).symbolValue(),</span>
+<span class="fc" id="L466">                                                 ((IonSymbol) v2).symbolValue());</span>
+<span class="fc" id="L467">                    break;</span>
+                case BLOB:
+                case CLOB:
+<span class="fc" id="L470">                    result = compareLobContents((IonLob) v1, (IonLob) v2);</span>
+<span class="fc" id="L471">                    break;</span>
+                case STRUCT:
+                    assert !PUBLIC_COMPARISON_API; // TODO amzn/ion-java/issues/26
+<span class="fc" id="L474">                    result = compareStructs((IonStruct) v1,</span>
+                                            (IonStruct) v2,
+                                            strict);
+<span class="fc" id="L477">                    break;</span>
+                case LIST:
+                case SEXP:
+                case DATAGRAM:
+<span class="fc" id="L481">                    result = compareSequences((IonSequence) v1,</span>
+                                              (IonSequence) v2,
+                                              strict);
+                    break;
+                }
+            }
+        }
+
+        // if the values are otherwise equal, but the caller wants strict
+        // comparison, then we check the annotations
+<span class="fc bfc" id="L491" title="All 4 branches covered.">        if ((result == 0) &amp;&amp; strict) {</span>
+            // check tuple equality over the annotations
+            // (which are symbol tokens)
+<span class="fc" id="L494">            result = compareAnnotations(v1.getTypeAnnotationSymbols(),</span>
+<span class="fc" id="L495">                                        v2.getTypeAnnotationSymbols());</span>
+        }
+
+<span class="fc" id="L498">        return result;</span>
+    }
+
+    /**
+     * Checks for strict data equivalence over two Ion Values.
+     *
+     * @param v1
+     *            The first Ion value to compare.
+     * @param v2
+     *            The second Ion value to compare.
+     *
+     * @return true if two Ion Values represent the same data.
+     */
+    public static boolean ionEquals(final IonValue v1,
+                                    final IonValue v2)
+    {
+<span class="fc" id="L514">        return ionEqualsImpl(v1, v2, true);</span>
+    }
+
+    /**
+     * Checks for structural data equivalence over two Ion Values. That is,
+     * equivalence without considering any annotations.
+     *
+     * @param v1
+     *            The first Ion value to compare.
+     * @param v2
+     *            The second Ion value to compare.
+     *
+     * @return true if two Ion Values represent the same data without regard to
+     *         annotations.
+     */
+    public static boolean ionEqualsByContent(final IonValue v1,
+                                             final IonValue v2)
+    {
+<span class="fc" id="L532">        return ionEqualsImpl(v1, v2, false);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

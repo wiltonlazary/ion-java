@@ -1,0 +1,876 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>_Private_ScalarConversions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl</a> &gt; <span class="el_source">_Private_ScalarConversions.java</span></div><h1>_Private_ScalarConversions.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl;
+
+import com.amazon.ion.Decimal;
+import com.amazon.ion.IntegerSize;
+import com.amazon.ion.IonException;
+import com.amazon.ion.IonType;
+import com.amazon.ion.Timestamp;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.Date;
+
+/**
+ * NOT FOR APPLICATION USE!
+ */
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">public class _Private_ScalarConversions</span>
+{
+<span class="nc" id="L32">    public static final class AS_TYPE {</span>
+
+        public static final int null_value         =  1;
+        public static final int boolean_value      =  2;
+        public static final int int_value          =  3;
+        public static final int long_value         =  4;
+        public static final int bigInteger_value   =  5;
+        public static final int decimal_value      =  6;
+        public static final int double_value       =  7;
+        public static final int string_value       =  8;
+        public static final int date_value         =  9;
+        public static final int timestamp_value    = 10;
+
+        static final int idx_to_bit_mask(int idx) {
+<span class="fc" id="L46">            return 1 &lt;&lt; (idx - 1);</span>
+        }
+
+<span class="fc" id="L49">        public static final int numeric_types      = idx_to_bit_mask(int_value)</span>
+<span class="fc" id="L50">                                                   | idx_to_bit_mask(long_value)</span>
+<span class="fc" id="L51">                                                   | idx_to_bit_mask(bigInteger_value)</span>
+<span class="fc" id="L52">                                                   | idx_to_bit_mask(decimal_value)</span>
+<span class="fc" id="L53">                                                   | idx_to_bit_mask(double_value);</span>
+
+<span class="fc" id="L55">        public static final int datetime_types     = idx_to_bit_mask(date_value)</span>
+<span class="fc" id="L56">                                                   | idx_to_bit_mask(timestamp_value);</span>
+
+<span class="fc" id="L58">        public static final int convertable_type   = idx_to_bit_mask(numeric_types)</span>
+<span class="fc" id="L59">                                                   | idx_to_bit_mask(datetime_types)</span>
+<span class="fc" id="L60">                                                   | idx_to_bit_mask(boolean_value)</span>
+<span class="fc" id="L61">                                                   | idx_to_bit_mask(string_value);</span>
+    }
+
+    public static IntegerSize getIntegerSize(int authoritative_type) {
+<span class="pc bpc" id="L65" title="1 of 4 branches missed.">        switch (authoritative_type)</span>
+        {
+            case AS_TYPE.int_value:
+<span class="fc" id="L68">                return IntegerSize.INT;</span>
+            case AS_TYPE.long_value:
+<span class="fc" id="L70">                return IntegerSize.LONG;</span>
+            case AS_TYPE.bigInteger_value:
+<span class="fc" id="L72">                return IntegerSize.BIG_INTEGER;</span>
+            default:
+<span class="nc" id="L74">                return null;</span>
+        }
+    }
+
+    public static String getValueTypeName(int value_type) {
+<span class="nc bnc" id="L79" title="All 11 branches missed.">        switch (value_type) {</span>
+<span class="nc" id="L80">        case AS_TYPE.null_value:       return &quot;null&quot;;</span>
+<span class="nc" id="L81">        case AS_TYPE.boolean_value:    return &quot;boolean&quot;;</span>
+<span class="nc" id="L82">        case AS_TYPE.int_value:        return &quot;int&quot;;</span>
+<span class="nc" id="L83">        case AS_TYPE.long_value:       return &quot;long&quot;;</span>
+<span class="nc" id="L84">        case AS_TYPE.bigInteger_value: return &quot;bigInteger&quot;;</span>
+<span class="nc" id="L85">        case AS_TYPE.decimal_value:    return &quot;decimal&quot;;</span>
+<span class="nc" id="L86">        case AS_TYPE.double_value:     return &quot;double&quot;;</span>
+<span class="nc" id="L87">        case AS_TYPE.string_value:     return &quot;string&quot;;</span>
+<span class="nc" id="L88">        case AS_TYPE.date_value:       return &quot;date&quot;;</span>
+<span class="nc" id="L89">        case AS_TYPE.timestamp_value:  return &quot;timestamp&quot;;</span>
+<span class="nc" id="L90">        default:                       return &quot;&lt;unrecognized conversion value type: &quot;+Integer.toString(value_type)+&quot;&gt;&quot;;</span>
+        }
+    }
+    public static String get_value_type_name(int value_type) {
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        switch (value_type) {</span>
+        case AS_TYPE.null_value:
+        case AS_TYPE.boolean_value:
+        case AS_TYPE.int_value:
+        case AS_TYPE.long_value:
+        case AS_TYPE.bigInteger_value:
+        case AS_TYPE.decimal_value:
+        case AS_TYPE.double_value:
+        case AS_TYPE.string_value:
+        case AS_TYPE.date_value:
+        case AS_TYPE.timestamp_value:
+<span class="nc" id="L105">            return getValueTypeName(value_type)+&quot;_value&quot;;</span>
+        default:
+<span class="nc" id="L107">            return &quot;&lt;unrecognized conversion value type: &quot;</span>
+<span class="nc" id="L108">                   +Integer.toString(value_type)</span>
+                   + &quot;&gt;&quot;;
+        }
+    }
+
+<span class="fc" id="L113">    protected static int FNID_no_conversion               = -1;</span>
+<span class="fc" id="L114">    protected static int FNID_identity                    =  0;</span>
+
+    //from_string_conversion
+    protected final static int FNID_FROM_STRING_TO_NULL         =  1;
+    protected final static int FNID_FROM_STRING_TO_BOOLEAN      =  2;
+    protected final static int FNID_FROM_STRING_TO_INT          =  3;
+    protected final static int FNID_FROM_STRING_TO_LONG         =  4;
+    protected final static int FNID_FROM_STRING_TO_BIGINTEGER   =  5;
+    protected final static int FNID_FROM_STRING_TO_DECIMAL      =  6;
+    protected final static int FNID_FROM_STRING_TO_DOUBLE       =  7;
+    protected final static int FNID_FROM_STRING_TO_DATE         =  8;
+    protected final static int FNID_FROM_STRING_TO_TIMESTAMP    =  9;
+<span class="fc" id="L126">    static int [] from_string_conversion = {</span>
+                        FNID_no_conversion,  // fake entry to switch from 0 based to 1 based
+                        FNID_FROM_STRING_TO_NULL,
+                        FNID_FROM_STRING_TO_BOOLEAN,
+                        FNID_FROM_STRING_TO_INT,
+                        FNID_FROM_STRING_TO_LONG,
+                        FNID_FROM_STRING_TO_BIGINTEGER,
+                        FNID_FROM_STRING_TO_DECIMAL,
+                        FNID_FROM_STRING_TO_DOUBLE,
+                        FNID_identity,
+                        FNID_FROM_STRING_TO_DATE,
+                        FNID_FROM_STRING_TO_TIMESTAMP,
+                        FNID_no_conversion,
+                        FNID_no_conversion
+                    };
+
+    //to_string_conversions;
+    protected final static int FNID_FROM_NULL_TO_STRING         = 10;
+    protected final static int FNID_FROM_BOOLEAN_TO_STRING      = 11;
+    protected final static int FNID_FROM_INT_TO_STRING          = 12;
+    protected final static int FNID_FROM_LONG_TO_STRING         = 13;
+    protected final static int FNID_FROM_BIGINTEGER_TO_STRING   = 14;
+    protected final static int FNID_FROM_DECIMAL_TO_STRING      = 15;
+    protected final static int FNID_FROM_DOUBLE_TO_STRING       = 16;
+    protected final static int FNID_FROM_DATE_TO_STRING         = 17;
+    protected final static int FNID_FROM_TIMESTAMP_TO_STRING    = 18;
+<span class="fc" id="L152">    static int [] to_string_conversions = {</span>
+                        FNID_no_conversion,  // fake entry to switch from 0 based to 1 based
+                        FNID_FROM_NULL_TO_STRING,
+                        FNID_FROM_BOOLEAN_TO_STRING,
+                        FNID_FROM_INT_TO_STRING,
+                        FNID_FROM_LONG_TO_STRING,
+                        FNID_FROM_BIGINTEGER_TO_STRING,
+                        FNID_FROM_DECIMAL_TO_STRING,
+                        FNID_FROM_DOUBLE_TO_STRING,
+                        FNID_identity,
+                        FNID_FROM_DATE_TO_STRING,
+                        FNID_FROM_TIMESTAMP_TO_STRING,
+                        FNID_no_conversion,
+                        FNID_no_conversion
+                    };
+
+
+    //to_int_conversion;
+    protected final static int FNID_FROM_LONG_TO_INT         = 19;
+    protected final static int FNID_FROM_BIGINTEGER_TO_INT   = 20;
+    protected final static int FNID_FROM_DECIMAL_TO_INT      = 21;
+    protected final static int FNID_FROM_DOUBLE_TO_INT       = 22;
+<span class="fc" id="L174">    static int [] to_int_conversion = {</span>
+                        FNID_no_conversion,  // fake entry to switch from 0 based to 1 based
+                        FNID_no_conversion,
+                        FNID_no_conversion,
+                        FNID_identity,
+                        FNID_FROM_LONG_TO_INT,
+                        FNID_FROM_BIGINTEGER_TO_INT,
+                        FNID_FROM_DECIMAL_TO_INT,
+                        FNID_FROM_DOUBLE_TO_INT,
+                        FNID_FROM_STRING_TO_INT,
+                        FNID_no_conversion,
+                        FNID_no_conversion,
+                        FNID_no_conversion,
+                        FNID_no_conversion
+                };
+
+    //to_long_conversion;
+    protected final static int FNID_FROM_INT_TO_LONG          = 23;
+    protected final static int FNID_FROM_BIGINTEGER_TO_LONG   = 24;
+    protected final static int FNID_FROM_DECIMAL_TO_LONG      = 25;
+    protected final static int FNID_FROM_DOUBLE_TO_LONG       = 26;
+<span class="fc" id="L195">    static int [] to_long_conversion = {</span>
+                        FNID_no_conversion,  // fake entry to switch from 0 based to 1 based
+                        FNID_no_conversion,
+                        FNID_no_conversion,
+                        FNID_FROM_INT_TO_LONG,
+                        FNID_identity,
+                        FNID_FROM_BIGINTEGER_TO_LONG,
+                        FNID_FROM_DECIMAL_TO_LONG,
+                        FNID_FROM_DOUBLE_TO_LONG,
+                        FNID_FROM_STRING_TO_LONG,
+                        FNID_no_conversion,
+                        FNID_no_conversion,
+                        FNID_no_conversion,
+                        FNID_no_conversion
+                    };
+
+
+    //to_bigInteger_conversion;
+    protected final static int FNID_FROM_INT_TO_BIGINTEGER          = 27;
+    protected final static int FNID_FROM_LONG_TO_BIGINTEGER         = 28;
+    protected final static int FNID_FROM_DECIMAL_TO_BIGINTEGER      = 29;
+    protected final static int FNID_FROM_DOUBLE_TO_BIGINTEGER       = 30;
+<span class="fc" id="L217">    static int [] to_bigInteger_conversion = {</span>
+                        FNID_no_conversion,  // fake entry to switch from 0 based to 1 based
+                        FNID_no_conversion,
+                        FNID_no_conversion,
+                        FNID_FROM_INT_TO_BIGINTEGER,
+                        FNID_FROM_LONG_TO_BIGINTEGER,
+                        FNID_identity,
+                        FNID_FROM_DECIMAL_TO_BIGINTEGER,
+                        FNID_FROM_DOUBLE_TO_BIGINTEGER,
+                        FNID_FROM_STRING_TO_BIGINTEGER,
+                        FNID_no_conversion,
+                        FNID_no_conversion,
+                        FNID_no_conversion,
+                        FNID_no_conversion
+                    };
+
+    //to_decimal_conversion;
+    protected final static int FNID_FROM_INT_TO_DECIMAL          = 31;
+    protected final static int FNID_FROM_LONG_TO_DECIMAL         = 32;
+    protected final static int FNID_FROM_BIGINTEGER_TO_DECIMAL   = 33;
+    protected final static int FNID_FROM_DOUBLE_TO_DECIMAL       = 34;
+<span class="fc" id="L238">    static int [] to_decimal_conversion = {</span>
+                        FNID_no_conversion,  // fake entry to switch from 0 based to 1 based
+                        FNID_no_conversion,
+                        FNID_no_conversion,
+                        FNID_FROM_INT_TO_DECIMAL,
+                        FNID_FROM_LONG_TO_DECIMAL,
+                        FNID_FROM_BIGINTEGER_TO_DECIMAL,
+                        FNID_identity,
+                        FNID_FROM_DOUBLE_TO_DECIMAL,
+                        FNID_FROM_STRING_TO_DECIMAL,
+                        FNID_no_conversion,
+                        FNID_no_conversion,
+                        FNID_no_conversion,
+                        FNID_no_conversion
+                    };
+
+    //to_double_conversion;
+    protected final static int FNID_FROM_INT_TO_DOUBLE          = 35;
+    protected final static int FNID_FROM_LONG_TO_DOUBLE         = 36;
+    protected final static int FNID_FROM_BIGINTEGER_TO_DOUBLE   = 37;
+    protected final static int FNID_FROM_DECIMAL_TO_DOUBLE      = 38;
+<span class="fc" id="L259">    static int [] to_double_conversion = {</span>
+                        FNID_no_conversion,  // fake entry to switch from 0 based to 1 based
+                        FNID_no_conversion,
+                        FNID_no_conversion,
+                        FNID_FROM_INT_TO_DOUBLE,
+                        FNID_FROM_LONG_TO_DOUBLE,
+                        FNID_FROM_BIGINTEGER_TO_DOUBLE,
+                        FNID_FROM_DECIMAL_TO_DOUBLE,
+                        FNID_identity,
+                        FNID_FROM_STRING_TO_DOUBLE,
+                        FNID_no_conversion,
+                        FNID_no_conversion,
+                        FNID_no_conversion,
+                        FNID_no_conversion
+                    };
+    protected final static int FNID_FROM_TIMESTAMP_TO_DATE      = 39;
+    protected final static int FNID_FROM_DATE_TO_TIMESTAMP      = 40;
+
+    public final static String getAllValueTypeNames(int value_type) {
+<span class="nc" id="L278">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L279">        sb.append('(');</span>
+<span class="nc" id="L280">        int bit = 1;</span>
+<span class="nc bnc" id="L281" title="All 2 branches missed.">        for (int ii=0; ii&lt;Integer.SIZE; ii++) {</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">            if ((value_type &amp; bit) != 0) {</span>
+<span class="nc" id="L283">                sb.append(getValueTypeName(bit));</span>
+<span class="nc" id="L284">                sb.append(' ');</span>
+            }
+<span class="nc" id="L286">            bit &lt;&lt;= 1;</span>
+        }
+<span class="nc" id="L288">        sb.append(')');</span>
+<span class="nc" id="L289">        return sb.toString();</span>
+    }
+
+    /**
+     * from a values authoritative type (the type of the original data
+     * for the value) and the desired type this returns the conversion
+     * functions id, or throws a CantConvertException in the event the
+     * authoritative type cannot be cast to the desired type.
+     * @param authoritative_type
+     * @param new_type
+     * @return id of the conversion function required
+     */
+    protected final static int getConversionFnid(int authoritative_type, int new_type) {
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">        if (new_type == authoritative_type) return 0;</span>
+<span class="pc bpc" id="L303" title="7 of 11 branches missed.">        switch (new_type) {</span>
+            case AS_TYPE.null_value:
+<span class="nc bnc" id="L305" title="All 4 branches missed.">                assert( authoritative_type == AS_TYPE.string_value );</span>
+<span class="nc" id="L306">                return from_string_conversion[AS_TYPE.null_value];</span>
+            case AS_TYPE.boolean_value:
+<span class="nc bnc" id="L308" title="All 4 branches missed.">                assert( authoritative_type == AS_TYPE.string_value );</span>
+<span class="nc" id="L309">                return from_string_conversion[AS_TYPE.boolean_value];</span>
+            case AS_TYPE.int_value:
+<span class="nc" id="L311">                return to_int_conversion[authoritative_type];</span>
+            case AS_TYPE.long_value:
+<span class="fc" id="L313">                return to_long_conversion[authoritative_type];</span>
+            case AS_TYPE.bigInteger_value:
+<span class="fc" id="L315">                return to_bigInteger_conversion[authoritative_type];</span>
+            case AS_TYPE.decimal_value:
+<span class="nc" id="L317">                return to_decimal_conversion[authoritative_type];</span>
+            case AS_TYPE.double_value:
+<span class="fc" id="L319">                return to_double_conversion[authoritative_type];</span>
+            case AS_TYPE.string_value:
+<span class="nc" id="L321">                return to_string_conversions[authoritative_type];</span>
+            case AS_TYPE.date_value:
+<span class="pc bpc" id="L323" title="2 of 4 branches missed.">                assert( authoritative_type == AS_TYPE.timestamp_value );</span>
+<span class="fc" id="L324">                return FNID_FROM_TIMESTAMP_TO_DATE;</span>
+            case AS_TYPE.timestamp_value:
+<span class="nc bnc" id="L326" title="All 4 branches missed.">                assert( authoritative_type == AS_TYPE.date_value );</span>
+<span class="nc" id="L327">                return FNID_FROM_DATE_TO_TIMESTAMP;</span>
+        }
+<span class="nc" id="L329">        String message = &quot;can't convert from &quot;</span>
+<span class="nc" id="L330">                       + getValueTypeName(authoritative_type)</span>
+                       + &quot; to &quot;
+<span class="nc" id="L332">                       + getValueTypeName(new_type);</span>
+<span class="nc" id="L333">        throw new CantConvertException(message);</span>
+    }
+
+    public static class ConversionException extends IonException {
+        private static final long serialVersionUID = 1L;
+        ConversionException(String msg) {
+<span class="nc" id="L339">            super(msg);</span>
+<span class="nc" id="L340">        }</span>
+        ConversionException(Exception e) {
+<span class="nc" id="L342">            super(e);</span>
+<span class="nc" id="L343">        }</span>
+        ConversionException(String msg, Exception e) {
+<span class="nc" id="L345">            super(msg, e);</span>
+<span class="nc" id="L346">        }</span>
+    }
+    static public class CantConvertException extends ConversionException {
+        private static final long serialVersionUID = 1L;
+        CantConvertException(String msg) {
+<span class="nc" id="L351">            super(msg);</span>
+<span class="nc" id="L352">        }</span>
+        CantConvertException(Exception e) {
+<span class="nc" id="L354">            super(e);</span>
+<span class="nc" id="L355">        }</span>
+        CantConvertException(String msg, Exception e) {
+<span class="nc" id="L357">            super(msg, e);</span>
+<span class="nc" id="L358">        }</span>
+    }
+    static public class ValueNotSetException extends ConversionException {
+        private static final long serialVersionUID = 1L;
+        ValueNotSetException(String msg) {
+<span class="nc" id="L363">            super(msg);</span>
+<span class="nc" id="L364">        }</span>
+        ValueNotSetException(Exception e) {
+<span class="nc" id="L366">            super(e);</span>
+<span class="nc" id="L367">        }</span>
+        ValueNotSetException(String msg, Exception e) {
+<span class="nc" id="L369">            super(msg, e);</span>
+<span class="nc" id="L370">        }</span>
+    }
+
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">    public static final class ValueVariant</span>
+    {
+<span class="fc" id="L375">        private static final BigInteger min_int_value = BigInteger.valueOf(Integer.MIN_VALUE);</span>
+<span class="fc" id="L376">        private static final BigInteger max_int_value = BigInteger.valueOf(Integer.MAX_VALUE);</span>
+<span class="fc" id="L377">        private static final BigInteger min_long_value = BigInteger.valueOf(Long.MIN_VALUE);</span>
+<span class="fc" id="L378">        private static final BigInteger max_long_value = BigInteger.valueOf(Long.MAX_VALUE);</span>
+<span class="fc" id="L379">        private static final BigDecimal min_int_decimal_value = BigDecimal.valueOf(Integer.MIN_VALUE);</span>
+<span class="fc" id="L380">        private static final BigDecimal max_int_decimal_value = BigDecimal.valueOf(Integer.MAX_VALUE);</span>
+<span class="fc" id="L381">        private static final BigDecimal min_long_decimal_value = BigDecimal.valueOf(Long.MIN_VALUE);</span>
+<span class="fc" id="L382">        private static final BigDecimal max_long_decimal_value = BigDecimal.valueOf(Long.MAX_VALUE);</span>
+
+        // member variables for the variant
+        int         _authoritative_type_idx;             // the original type - this not the bit mask
+        int         _types_set;                          // all the various type it's been cast to (includes the original)
+        boolean     _is_null;
+        IonType     _null_type;
+        boolean     _boolean_value;
+        int         _int_value;
+        long        _long_value;
+        double      _double_value;
+        String      _string_value;
+        BigInteger  _bigInteger_value;
+        Decimal     _decimal_value;
+        Date        _date_value;
+        Timestamp   _timestamp_value;
+
+        //
+        // public accessors
+        //
+        public final boolean isEmpty() {
+<span class="fc bfc" id="L403" title="All 2 branches covered.">            return (_authoritative_type_idx == 0);</span>
+        }
+        public final void clear() {
+<span class="fc" id="L406">            _authoritative_type_idx = 0;</span>
+<span class="fc" id="L407">            _types_set = 0;</span>
+<span class="fc" id="L408">        }</span>
+        public final boolean hasValueOfType(int value_type) {
+<span class="fc bfc" id="L410" title="All 2 branches covered.">            return ((_types_set &amp; AS_TYPE.idx_to_bit_mask(value_type)) != 0);</span>
+        }
+        public final boolean hasNumericType() {
+<span class="nc bnc" id="L413" title="All 2 branches missed.">            return ((AS_TYPE.numeric_types &amp; _types_set) != 0);</span>
+        }
+        public static final boolean isNumericType(int type_idx) {
+<span class="nc" id="L416">            int type_flag = AS_TYPE.idx_to_bit_mask(type_idx);</span>
+<span class="nc bnc" id="L417" title="All 2 branches missed.">            return ((AS_TYPE.numeric_types &amp; type_flag) != 0);</span>
+        }
+        public final boolean hasDatetimeType() {
+<span class="nc bnc" id="L420" title="All 2 branches missed.">            return ((AS_TYPE.datetime_types &amp; _types_set) != 0);</span>
+        }
+        public final void setAuthoritativeType(int value_type) {
+<span class="fc bfc" id="L423" title="All 2 branches covered.">            if (_authoritative_type_idx == value_type) return;</span>
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">            if (!hasValueOfType(value_type)) {</span>
+<span class="nc" id="L425">                String message = &quot;you must set the &quot;</span>
+<span class="nc" id="L426">                               + getValueTypeName(value_type)</span>
+                               + &quot; value before you can set the authoritative type to &quot;
+<span class="nc" id="L428">                               + getValueTypeName(value_type);</span>
+<span class="nc" id="L429">                throw new IllegalStateException(message);</span>
+            }
+<span class="fc" id="L431">            _authoritative_type_idx = value_type;</span>
+<span class="fc" id="L432">        }</span>
+        public final void setValueToNull(IonType t) {
+<span class="fc" id="L434">            _is_null = true;</span>
+<span class="fc" id="L435">            _null_type = t;</span>
+<span class="fc" id="L436">            set_value_type(AS_TYPE.null_value);</span>
+<span class="fc" id="L437">        }</span>
+        public final void setValue(boolean value) {
+<span class="fc" id="L439">            _boolean_value = value;</span>
+<span class="fc" id="L440">            set_value_type(AS_TYPE.boolean_value);</span>
+<span class="fc" id="L441">        }</span>
+        public final void setValue(int value) {
+<span class="fc" id="L443">            _int_value = value;</span>
+<span class="fc" id="L444">            set_value_type(AS_TYPE.int_value);</span>
+<span class="fc" id="L445">        }</span>
+        public final void setValue(long value) {
+<span class="fc" id="L447">            _long_value = value;</span>
+<span class="fc" id="L448">            set_value_type(AS_TYPE.long_value);</span>
+<span class="fc" id="L449">        }</span>
+        public final void setValue(double value) {
+<span class="fc" id="L451">            _double_value = value;</span>
+<span class="fc" id="L452">            set_value_type(AS_TYPE.double_value);</span>
+<span class="fc" id="L453">        }</span>
+        public final void setValue(String value) {
+<span class="fc" id="L455">            _string_value = value;</span>
+<span class="fc" id="L456">            set_value_type(AS_TYPE.string_value);</span>
+<span class="fc" id="L457">        }</span>
+        public final void setValue(BigInteger value) {
+<span class="fc" id="L459">            _bigInteger_value = value;</span>
+<span class="fc" id="L460">            set_value_type(AS_TYPE.bigInteger_value);</span>
+<span class="fc" id="L461">        }</span>
+        public final void setValue(Decimal value) {
+<span class="fc" id="L463">            _decimal_value = value;</span>
+<span class="fc" id="L464">            set_value_type(AS_TYPE.decimal_value);</span>
+<span class="fc" id="L465">        }</span>
+        public final void setValue(Date value) {
+<span class="nc" id="L467">            _date_value = value;</span>
+<span class="nc" id="L468">            set_value_type(AS_TYPE.date_value);</span>
+<span class="nc" id="L469">        }</span>
+        public final void setValue(Timestamp value) {
+<span class="fc" id="L471">            _timestamp_value = value;</span>
+<span class="fc" id="L472">            set_value_type(AS_TYPE.timestamp_value);</span>
+<span class="fc" id="L473">        }</span>
+
+        public final void addValueToNull(IonType t) {
+<span class="nc" id="L476">            _is_null = true;</span>
+<span class="nc" id="L477">            _null_type = t;</span>
+<span class="nc" id="L478">            add_value_type(AS_TYPE.null_value);</span>
+<span class="nc" id="L479">        }</span>
+        public final void addValue(boolean value) {
+<span class="nc" id="L481">            _boolean_value = value;</span>
+<span class="nc" id="L482">            add_value_type(AS_TYPE.boolean_value);</span>
+<span class="nc" id="L483">        }</span>
+        public final void addValue(int value) {
+<span class="fc" id="L485">            _int_value = value;</span>
+<span class="fc" id="L486">            add_value_type(AS_TYPE.int_value);</span>
+<span class="fc" id="L487">        }</span>
+        public final void addValue(long value) {
+<span class="fc" id="L489">            _long_value = value;</span>
+<span class="fc" id="L490">            add_value_type(AS_TYPE.long_value);</span>
+<span class="fc" id="L491">        }</span>
+        public final void addValue(double value) {
+<span class="nc" id="L493">            _double_value = value;</span>
+<span class="nc" id="L494">            add_value_type(AS_TYPE.double_value);</span>
+<span class="nc" id="L495">        }</span>
+        public final void addValue(String value) {
+<span class="fc" id="L497">            _string_value = value;</span>
+<span class="fc" id="L498">            add_value_type(AS_TYPE.string_value);</span>
+<span class="fc" id="L499">        }</span>
+        public final void addValue(BigInteger value) {
+<span class="nc" id="L501">            _bigInteger_value = value;</span>
+<span class="nc" id="L502">            add_value_type(AS_TYPE.bigInteger_value);</span>
+<span class="nc" id="L503">        }</span>
+        public final void addValue(BigDecimal value) {
+<span class="nc" id="L505">            _decimal_value = (Decimal)value;</span>
+<span class="nc" id="L506">            add_value_type(AS_TYPE.decimal_value);</span>
+<span class="nc" id="L507">        }</span>
+        public final void addValue(Decimal value) {
+<span class="nc" id="L509">            _decimal_value = value;</span>
+<span class="nc" id="L510">            add_value_type(AS_TYPE.decimal_value);</span>
+<span class="nc" id="L511">        }</span>
+        public final void addValue(Date value) {
+<span class="nc" id="L513">            _date_value = value;</span>
+<span class="nc" id="L514">            add_value_type(AS_TYPE.date_value);</span>
+<span class="nc" id="L515">        }</span>
+        public final void addValue(Timestamp value) {
+<span class="nc" id="L517">            _timestamp_value = value;</span>
+<span class="nc" id="L518">            add_value_type(AS_TYPE.timestamp_value);</span>
+<span class="nc" id="L519">        }</span>
+
+
+        public final int getAuthoritativeType() {
+<span class="fc" id="L523">            return _authoritative_type_idx;</span>
+        }
+        public final boolean isNull() {
+<span class="fc" id="L526">            return (hasValueOfType(AS_TYPE.null_value));</span>
+        }
+        public final IonType getNullType() {
+<span class="nc bnc" id="L529" title="All 2 branches missed.">            if (!hasValueOfType(AS_TYPE.null_value)) throw new ValueNotSetException(&quot;null value not set&quot;);</span>
+<span class="nc" id="L530">            return _null_type;</span>
+        }
+        public final boolean getBoolean() {
+<span class="pc bpc" id="L533" title="1 of 2 branches missed.">            if (!hasValueOfType(AS_TYPE.boolean_value)) throw new ValueNotSetException(&quot;boolean not set&quot;);</span>
+<span class="fc" id="L534">            return _boolean_value;</span>
+        }
+        public final int getInt() {
+<span class="pc bpc" id="L537" title="1 of 2 branches missed.">            if (!hasValueOfType(AS_TYPE.int_value)) throw new ValueNotSetException(&quot;int value not set&quot;);</span>
+<span class="fc" id="L538">            return _int_value;</span>
+        }
+        public final long getLong() {
+<span class="pc bpc" id="L541" title="1 of 2 branches missed.">            if (!hasValueOfType(AS_TYPE.long_value)) throw new ValueNotSetException(&quot;long value not set&quot;);</span>
+<span class="fc" id="L542">            return _long_value;</span>
+        }
+        public final double getDouble() {
+<span class="pc bpc" id="L545" title="1 of 2 branches missed.">            if (!hasValueOfType(AS_TYPE.double_value)) throw new ValueNotSetException(&quot;double value not set&quot;);</span>
+<span class="fc" id="L546">            return _double_value;</span>
+        }
+        public final String getString() {
+<span class="pc bpc" id="L549" title="1 of 2 branches missed.">            if (!hasValueOfType(AS_TYPE.string_value)) throw new ValueNotSetException(&quot;String value not set&quot;);</span>
+<span class="fc" id="L550">            return _string_value;</span>
+        }
+        public final BigInteger getBigInteger() {
+<span class="pc bpc" id="L553" title="1 of 2 branches missed.">            if (!hasValueOfType(AS_TYPE.bigInteger_value)) throw new ValueNotSetException(&quot;BigInteger value not set&quot;);</span>
+<span class="fc" id="L554">            return _bigInteger_value;</span>
+        }
+        public final BigDecimal getBigDecimal() {
+<span class="pc bpc" id="L557" title="1 of 2 branches missed.">            if (!hasValueOfType(AS_TYPE.decimal_value)) throw new ValueNotSetException(&quot;BigDecimal value not set&quot;);</span>
+<span class="fc" id="L558">            return Decimal.bigDecimalValue(_decimal_value);</span>
+        }
+        public final Decimal getDecimal() {
+<span class="pc bpc" id="L561" title="1 of 2 branches missed.">            if (!hasValueOfType(AS_TYPE.decimal_value)) throw new ValueNotSetException(&quot;BigDecimal value not set&quot;);</span>
+<span class="fc" id="L562">            return _decimal_value;</span>
+        }
+        public final Date getDate() {
+<span class="pc bpc" id="L565" title="1 of 2 branches missed.">            if (!hasValueOfType(AS_TYPE.date_value)) throw new ValueNotSetException(&quot;Date value not set&quot;);</span>
+<span class="fc" id="L566">            return _date_value;</span>
+        }
+        public final Timestamp getTimestamp() {
+<span class="pc bpc" id="L569" title="1 of 2 branches missed.">            if (!hasValueOfType(AS_TYPE.timestamp_value)) throw new ValueNotSetException(&quot;timestamp value not set&quot;);</span>
+<span class="fc" id="L570">            return _timestamp_value;</span>
+        }
+
+        public final boolean can_convert(int new_type) {
+<span class="fc" id="L574">            boolean can = false;</span>
+
+<span class="pc bpc" id="L576" title="3 of 5 branches missed.">            switch (new_type) {</span>
+                case AS_TYPE.null_value:
+                case AS_TYPE.boolean_value:
+<span class="nc bnc" id="L579" title="All 2 branches missed.">                    can = (_authoritative_type_idx == AS_TYPE.string_value);</span>
+<span class="nc" id="L580">                    break;</span>
+
+                case AS_TYPE.int_value:
+                case AS_TYPE.long_value:
+                case AS_TYPE.bigInteger_value:
+                case AS_TYPE.decimal_value:
+                case AS_TYPE.double_value:
+<span class="pc bpc" id="L587" title="3 of 4 branches missed.">                    can = (is_numeric_type(_authoritative_type_idx) || (_authoritative_type_idx == AS_TYPE.string_value));</span>
+<span class="fc" id="L588">                    break;</span>
+
+                case AS_TYPE.string_value:
+<span class="nc" id="L591">                    can = true;</span>
+<span class="nc" id="L592">                    break;</span>
+
+                case AS_TYPE.date_value:
+                case AS_TYPE.timestamp_value:
+<span class="pc bpc" id="L596" title="3 of 4 branches missed.">                    can = (is_datetime_type(_authoritative_type_idx) || (_authoritative_type_idx == AS_TYPE.string_value));</span>
+<span class="fc" id="L597">                    break;</span>
+
+                default:
+<span class="nc" id="L600">                    can = false;</span>
+                    break;
+            }
+<span class="pc bpc" id="L603" title="5 of 8 branches missed.">            assert( can ? (get_conversion_fnid(new_type) != -1) : (get_conversion_fnid(new_type) == -1));</span>
+<span class="fc" id="L604">            return can;</span>
+        }
+
+        public final int get_conversion_fnid(int new_type) {
+<span class="fc" id="L608">            return _Private_ScalarConversions.getConversionFnid(_authoritative_type_idx, new_type);</span>
+        }
+
+        public final void cast(int castfnid) {
+<span class="pc bpc" id="L612" title="33 of 41 branches missed.">            switch(castfnid) {</span>
+<span class="nc" id="L613">            case FNID_FROM_STRING_TO_NULL:           fn_from_string_to_null();                break;</span>
+<span class="nc" id="L614">            case FNID_FROM_STRING_TO_BOOLEAN:        fn_from_string_to_boolean();             break;</span>
+<span class="nc" id="L615">            case FNID_FROM_STRING_TO_INT:            fn_from_string_to_int();                 break;</span>
+<span class="nc" id="L616">            case FNID_FROM_STRING_TO_LONG:           fn_from_string_to_long();                break;</span>
+<span class="nc" id="L617">            case FNID_FROM_STRING_TO_BIGINTEGER:     fn_from_string_to_biginteger();          break;</span>
+<span class="nc" id="L618">            case FNID_FROM_STRING_TO_DECIMAL:        fn_from_string_to_decimal();             break;</span>
+<span class="nc" id="L619">            case FNID_FROM_STRING_TO_DOUBLE:         fn_from_string_to_double();              break;</span>
+<span class="nc" id="L620">            case FNID_FROM_STRING_TO_DATE:           fn_from_string_to_date();                break;</span>
+<span class="nc" id="L621">            case FNID_FROM_STRING_TO_TIMESTAMP:      fn_from_string_to_timestamp();           break;</span>
+<span class="nc" id="L622">            case FNID_FROM_NULL_TO_STRING:           fn_from_null_to_string();                break;</span>
+<span class="nc" id="L623">            case FNID_FROM_BOOLEAN_TO_STRING:        fn_from_boolean_to_string();             break;</span>
+<span class="nc" id="L624">            case FNID_FROM_INT_TO_STRING:            fn_from_int_to_string();                 break;</span>
+<span class="nc" id="L625">            case FNID_FROM_LONG_TO_STRING:           fn_from_long_to_string();                break;</span>
+<span class="nc" id="L626">            case FNID_FROM_BIGINTEGER_TO_STRING:     fn_from_biginteger_to_string();          break;</span>
+<span class="nc" id="L627">            case FNID_FROM_DECIMAL_TO_STRING:        fn_from_decimal_to_string();             break;</span>
+<span class="nc" id="L628">            case FNID_FROM_DOUBLE_TO_STRING:         fn_from_double_to_string();              break;</span>
+<span class="nc" id="L629">            case FNID_FROM_DATE_TO_STRING:           fn_from_date_to_string();                break;</span>
+<span class="nc" id="L630">            case FNID_FROM_TIMESTAMP_TO_STRING:      fn_from_timestamp_to_string();           break;</span>
+<span class="nc" id="L631">            case FNID_FROM_LONG_TO_INT:              fn_from_long_to_int();                   break;</span>
+<span class="nc" id="L632">            case FNID_FROM_BIGINTEGER_TO_INT:        fn_from_biginteger_to_int();             break;</span>
+<span class="nc" id="L633">            case FNID_FROM_DECIMAL_TO_INT:           fn_from_decimal_to_int();                break;</span>
+<span class="nc" id="L634">            case FNID_FROM_DOUBLE_TO_INT:            fn_from_double_to_int();                 break;</span>
+<span class="fc" id="L635">            case FNID_FROM_INT_TO_LONG:              fn_from_int_to_long();                   break;</span>
+<span class="nc" id="L636">            case FNID_FROM_BIGINTEGER_TO_LONG:       fn_from_biginteger_to_long();            break;</span>
+<span class="fc" id="L637">            case FNID_FROM_DECIMAL_TO_LONG:          fn_from_decimal_to_long();               break;</span>
+<span class="nc" id="L638">            case FNID_FROM_DOUBLE_TO_LONG:           fn_from_double_to_long();                break;</span>
+<span class="fc" id="L639">            case FNID_FROM_INT_TO_BIGINTEGER:        fn_from_int_to_biginteger();             break;</span>
+<span class="fc" id="L640">            case FNID_FROM_LONG_TO_BIGINTEGER:       fn_from_long_to_biginteger();            break;</span>
+<span class="fc" id="L641">            case FNID_FROM_DECIMAL_TO_BIGINTEGER:    fn_from_decimal_to_biginteger();         break;</span>
+<span class="fc" id="L642">            case FNID_FROM_DOUBLE_TO_BIGINTEGER:     fn_from_double_to_biginteger();          break;</span>
+<span class="nc" id="L643">            case FNID_FROM_INT_TO_DECIMAL:           fn_from_int_to_decimal();                break;</span>
+<span class="nc" id="L644">            case FNID_FROM_LONG_TO_DECIMAL:          fn_from_long_to_decimal();               break;</span>
+<span class="nc" id="L645">            case FNID_FROM_BIGINTEGER_TO_DECIMAL:    fn_from_biginteger_to_decimal();         break;</span>
+<span class="nc" id="L646">            case FNID_FROM_DOUBLE_TO_DECIMAL:        fn_from_double_to_decimal();             break;</span>
+<span class="nc" id="L647">            case FNID_FROM_INT_TO_DOUBLE:            fn_from_int_to_double();                 break;</span>
+<span class="nc" id="L648">            case FNID_FROM_LONG_TO_DOUBLE:           fn_from_long_to_double();                break;</span>
+<span class="nc" id="L649">            case FNID_FROM_BIGINTEGER_TO_DOUBLE:     fn_from_biginteger_to_double();          break;</span>
+<span class="fc" id="L650">            case FNID_FROM_DECIMAL_TO_DOUBLE:        fn_from_decimal_to_double();             break;</span>
+<span class="fc" id="L651">            case FNID_FROM_TIMESTAMP_TO_DATE:        fn_from_timestamp_to_date();             break;</span>
+<span class="nc" id="L652">            case FNID_FROM_DATE_TO_TIMESTAMP:        fn_from_date_to_timestamp();             break;</span>
+<span class="nc" id="L653">            default: throw new ConversionException(&quot;unrecognized conversion fnid [&quot;+castfnid+&quot;]invoked&quot;);</span>
+            }
+<span class="fc" id="L655">        }</span>
+
+        private final void set_value_type(int type_idx) {
+<span class="fc" id="L658">            _types_set = AS_TYPE.idx_to_bit_mask(type_idx);</span>
+<span class="fc" id="L659">            _authoritative_type_idx = type_idx;</span>
+<span class="fc" id="L660">        }</span>
+        private final void add_value_type(int type_idx) {
+<span class="fc" id="L662">            _types_set |= AS_TYPE.idx_to_bit_mask(type_idx);</span>
+<span class="fc" id="L663">        }</span>
+        private final boolean is_numeric_type(int type_idx) {
+<span class="pc bpc" id="L665" title="1 of 2 branches missed.">            return (AS_TYPE.numeric_types &amp; AS_TYPE.idx_to_bit_mask(type_idx)) != 0;</span>
+        }
+        private final boolean is_datetime_type(int type_idx) {
+<span class="pc bpc" id="L668" title="1 of 2 branches missed.">            return (AS_TYPE.datetime_types &amp; AS_TYPE.idx_to_bit_mask(type_idx)) != 0;</span>
+        }
+
+        private final void fn_from_string_to_null() {
+<span class="nc" id="L672">            _null_type = IonTokenConstsX.getNullType(_string_value);</span>
+<span class="nc" id="L673">            _is_null = true;</span>
+<span class="nc" id="L674">            add_value_type(AS_TYPE.null_value);</span>
+<span class="nc" id="L675">        }</span>
+        private final void fn_from_string_to_boolean() {
+<span class="nc" id="L677">            _boolean_value = Boolean.parseBoolean(_string_value);</span>
+<span class="nc" id="L678">            add_value_type(AS_TYPE.boolean_value);</span>
+<span class="nc" id="L679">        }</span>
+        private final void fn_from_string_to_int() {
+<span class="nc" id="L681">            _int_value = Integer.parseInt(_string_value);</span>
+<span class="nc" id="L682">            add_value_type(AS_TYPE.int_value);</span>
+<span class="nc" id="L683">        }</span>
+        private final void fn_from_string_to_long() {
+<span class="nc" id="L685">            _long_value = Long.parseLong(_string_value);</span>
+<span class="nc" id="L686">            add_value_type(AS_TYPE.long_value);</span>
+<span class="nc" id="L687">        }</span>
+        private final void fn_from_string_to_biginteger() {
+<span class="nc" id="L689">            _bigInteger_value = new BigInteger(_string_value);</span>
+<span class="nc" id="L690">            add_value_type(AS_TYPE.bigInteger_value);</span>
+<span class="nc" id="L691">        }</span>
+        private final void fn_from_string_to_decimal() {
+<span class="nc" id="L693">            _decimal_value = Decimal.valueOf(_string_value);</span>
+<span class="nc" id="L694">            add_value_type(AS_TYPE.decimal_value);</span>
+<span class="nc" id="L695">        }</span>
+        private final void fn_from_string_to_double() {
+<span class="nc" id="L697">            _double_value = Double.parseDouble(_string_value);</span>
+<span class="nc" id="L698">            add_value_type(AS_TYPE.double_value);</span>
+<span class="nc" id="L699">        }</span>
+        private final void fn_from_string_to_date() {
+<span class="nc bnc" id="L701" title="All 2 branches missed.">            if (!hasValueOfType(AS_TYPE.timestamp_value)) {</span>
+<span class="nc" id="L702">                fn_from_string_to_timestamp();</span>
+            }
+<span class="nc" id="L704">            _date_value = new Date(_timestamp_value.getMillis());</span>
+<span class="nc" id="L705">            add_value_type(AS_TYPE.date_value);</span>
+<span class="nc" id="L706">        }</span>
+        private final void fn_from_string_to_timestamp() {
+<span class="nc" id="L708">            _timestamp_value = Timestamp.valueOf(_string_value);</span>
+<span class="nc" id="L709">            add_value_type(AS_TYPE.timestamp_value);</span>
+<span class="nc" id="L710">            add_value_type(AS_TYPE.timestamp_value);</span>
+<span class="nc" id="L711">        }</span>
+        private final void fn_from_null_to_string() {
+<span class="nc" id="L713">            _string_value = IonTokenConstsX.getNullImage(_null_type);</span>
+<span class="nc" id="L714">            add_value_type(AS_TYPE.string_value);</span>
+<span class="nc" id="L715">        }</span>
+        private final void fn_from_boolean_to_string() {
+<span class="nc bnc" id="L717" title="All 2 branches missed.">            _string_value = _boolean_value ? &quot;true&quot; : &quot;false&quot;;</span>
+<span class="nc" id="L718">            add_value_type(AS_TYPE.string_value);</span>
+<span class="nc" id="L719">        }</span>
+        private final void fn_from_int_to_string() {
+<span class="nc" id="L721">            _string_value = Integer.toString(_int_value);</span>
+<span class="nc" id="L722">            add_value_type(AS_TYPE.string_value);</span>
+<span class="nc" id="L723">        }</span>
+        private final void fn_from_long_to_string() {
+<span class="nc" id="L725">            _string_value = Long.toString(_long_value);</span>
+<span class="nc" id="L726">            add_value_type(AS_TYPE.string_value);</span>
+<span class="nc" id="L727">        }</span>
+        private final void fn_from_biginteger_to_string() {
+<span class="nc" id="L729">            _string_value = _bigInteger_value.toString();</span>
+<span class="nc" id="L730">            add_value_type(AS_TYPE.string_value);</span>
+<span class="nc" id="L731">        }</span>
+        private final void fn_from_decimal_to_string() {
+<span class="nc" id="L733">            _string_value = _decimal_value.toString();</span>
+<span class="nc" id="L734">            add_value_type(AS_TYPE.string_value);</span>
+<span class="nc" id="L735">        }</span>
+        private final void fn_from_double_to_string() {
+<span class="nc" id="L737">            _string_value = Double.toString(_double_value);</span>
+<span class="nc" id="L738">            add_value_type(AS_TYPE.string_value);</span>
+<span class="nc" id="L739">        }</span>
+        private final void fn_from_date_to_string() {
+<span class="nc bnc" id="L741" title="All 2 branches missed.">            if (!hasValueOfType(AS_TYPE.timestamp_value)) {</span>
+<span class="nc" id="L742">                fn_from_date_to_timestamp();</span>
+            }
+<span class="nc" id="L744">            fn_from_timestamp_to_string();</span>
+<span class="nc" id="L745">        }</span>
+        private final void fn_from_timestamp_to_string() {
+<span class="nc" id="L747">            _string_value = _timestamp_value.toString();</span>
+<span class="nc" id="L748">            add_value_type(AS_TYPE.string_value);</span>
+<span class="nc" id="L749">        }</span>
+        private final void fn_from_long_to_int() {
+<span class="nc bnc" id="L751" title="All 4 branches missed.">            if (_long_value &lt; Integer.MIN_VALUE || _long_value &gt; Integer.MAX_VALUE) {</span>
+<span class="nc" id="L752">                throw new CantConvertException(&quot;long is too large to fit in an int&quot;);</span>
+            }
+<span class="nc" id="L754">            _int_value = (int)_long_value;</span>
+<span class="nc" id="L755">            add_value_type(AS_TYPE.int_value);</span>
+<span class="nc" id="L756">        }</span>
+        private final void fn_from_biginteger_to_int() {
+<span class="nc bnc" id="L758" title="All 2 branches missed.">            if (min_int_value.compareTo(_bigInteger_value) &gt; 0</span>
+<span class="nc bnc" id="L759" title="All 2 branches missed.">             || max_int_value.compareTo(_bigInteger_value) &lt; 0</span>
+            ) {
+<span class="nc" id="L761">                throw new CantConvertException(&quot;bigInteger value is too large to fit in an int&quot;);</span>
+            }
+<span class="nc" id="L763">            _int_value = _bigInteger_value.intValue();</span>
+<span class="nc" id="L764">            add_value_type(AS_TYPE.int_value);</span>
+<span class="nc" id="L765">        }</span>
+        private final void fn_from_decimal_to_int() {
+<span class="nc bnc" id="L767" title="All 2 branches missed.">            if (min_int_decimal_value.compareTo(_decimal_value) &gt; 0</span>
+<span class="nc bnc" id="L768" title="All 2 branches missed.">             || max_int_decimal_value.compareTo(_decimal_value) &lt; 0</span>
+             ) {
+<span class="nc" id="L770">                throw new CantConvertException(&quot;BigDecimal value is too large to fit in an int&quot;);</span>
+            }
+<span class="nc" id="L772">            _int_value = _decimal_value.intValue();</span>
+<span class="nc" id="L773">            add_value_type(AS_TYPE.int_value);</span>
+<span class="nc" id="L774">        }</span>
+        private final void fn_from_double_to_int() {
+<span class="nc bnc" id="L776" title="All 4 branches missed.">            if (_double_value &lt; Integer.MIN_VALUE</span>
+             || _double_value &gt; Integer.MAX_VALUE
+            ) {
+<span class="nc" id="L779">                throw new CantConvertException(&quot;double is too large to fit in an int&quot;);</span>
+            }
+<span class="nc" id="L781">            _int_value = (int)_double_value;</span>
+<span class="nc" id="L782">            add_value_type(AS_TYPE.int_value);</span>
+<span class="nc" id="L783">        }</span>
+        private final void fn_from_int_to_long() {
+<span class="fc" id="L785">            _long_value = _int_value;</span>
+<span class="fc" id="L786">            add_value_type(AS_TYPE.long_value);</span>
+<span class="fc" id="L787">        }</span>
+        private final void fn_from_biginteger_to_long() {
+<span class="nc bnc" id="L789" title="All 2 branches missed.">            if (min_long_value.compareTo(_bigInteger_value) &gt; 0</span>
+<span class="nc bnc" id="L790" title="All 2 branches missed.">             || max_long_value.compareTo(_bigInteger_value) &lt; 0</span>
+            ) {
+<span class="nc" id="L792">                throw new CantConvertException(&quot;BigInteger is too large to fit in a long&quot;);</span>
+            }
+<span class="nc" id="L794">            _long_value = _bigInteger_value.longValue();</span>
+<span class="nc" id="L795">            add_value_type(AS_TYPE.long_value);</span>
+<span class="nc" id="L796">        }</span>
+        private final void fn_from_decimal_to_long() {
+<span class="pc bpc" id="L798" title="1 of 2 branches missed.">            if (min_long_decimal_value.compareTo(_decimal_value) &gt; 0</span>
+<span class="pc bpc" id="L799" title="1 of 2 branches missed.">             || max_long_decimal_value.compareTo(_decimal_value) &lt; 0</span>
+            ) {
+<span class="nc" id="L801">                throw new CantConvertException(&quot;BigDecimal value is too large to fit in a long&quot;);</span>
+            }
+<span class="fc" id="L803">            _long_value = _decimal_value.longValue();</span>
+<span class="fc" id="L804">            add_value_type(AS_TYPE.long_value);</span>
+<span class="fc" id="L805">        }</span>
+        private final void fn_from_double_to_long() {
+<span class="nc bnc" id="L807" title="All 4 branches missed.">            if (_double_value &lt; Long.MIN_VALUE</span>
+             || _double_value &gt; Long.MAX_VALUE
+            ) {
+<span class="nc" id="L810">                throw new CantConvertException(&quot;double is too large to fit in a long&quot;);</span>
+            }
+<span class="nc" id="L812">            _long_value = (long)_double_value;</span>
+<span class="nc" id="L813">            add_value_type(AS_TYPE.long_value);</span>
+<span class="nc" id="L814">        }</span>
+        private final void fn_from_int_to_biginteger() {
+<span class="fc" id="L816">            _bigInteger_value = BigInteger.valueOf(_int_value);</span>
+<span class="fc" id="L817">            add_value_type(AS_TYPE.bigInteger_value);</span>
+<span class="fc" id="L818">        }</span>
+        private final void fn_from_long_to_biginteger() {
+<span class="fc" id="L820">            _bigInteger_value = BigInteger.valueOf(_long_value);</span>
+<span class="fc" id="L821">            add_value_type(AS_TYPE.bigInteger_value);</span>
+<span class="fc" id="L822">        }</span>
+        private final void fn_from_decimal_to_biginteger() {
+<span class="fc" id="L824">            _bigInteger_value = _decimal_value.toBigInteger();</span>
+<span class="fc" id="L825">            add_value_type(AS_TYPE.bigInteger_value);</span>
+<span class="fc" id="L826">        }</span>
+        private final void fn_from_double_to_biginteger() {
+            // To avoid decapitating values that are &gt; Long.MAX_VALUE, we must
+            // convert to BigDecimal first.
+<span class="fc" id="L830">            _bigInteger_value =</span>
+<span class="fc" id="L831">                Decimal.valueOf(_double_value).toBigInteger();</span>
+<span class="fc" id="L832">            add_value_type(AS_TYPE.bigInteger_value);</span>
+<span class="fc" id="L833">        }</span>
+        private final void fn_from_int_to_decimal() {
+<span class="nc" id="L835">            _decimal_value = Decimal.valueOf(_int_value);</span>
+<span class="nc" id="L836">            add_value_type(AS_TYPE.decimal_value);</span>
+<span class="nc" id="L837">        }</span>
+        private final void fn_from_long_to_decimal() {
+<span class="nc" id="L839">            _decimal_value = Decimal.valueOf(_long_value);</span>
+<span class="nc" id="L840">            add_value_type(AS_TYPE.decimal_value);</span>
+<span class="nc" id="L841">        }</span>
+        private final void fn_from_biginteger_to_decimal() {
+<span class="nc" id="L843">            _decimal_value = Decimal.valueOf(_bigInteger_value);</span>
+<span class="nc" id="L844">            add_value_type(AS_TYPE.decimal_value);</span>
+<span class="nc" id="L845">        }</span>
+        private final void fn_from_double_to_decimal() {
+<span class="nc" id="L847">            _decimal_value = Decimal.valueOf(_double_value);</span>
+<span class="nc" id="L848">            add_value_type(AS_TYPE.decimal_value);</span>
+<span class="nc" id="L849">        }</span>
+        private final void fn_from_int_to_double() {
+<span class="nc" id="L851">            _double_value = _int_value;</span>
+<span class="nc" id="L852">            add_value_type(AS_TYPE.double_value);</span>
+<span class="nc" id="L853">        }</span>
+        private final void fn_from_long_to_double() {
+<span class="nc" id="L855">            _double_value = _long_value;</span>
+<span class="nc" id="L856">            add_value_type(AS_TYPE.double_value);</span>
+<span class="nc" id="L857">        }</span>
+        private final void fn_from_biginteger_to_double() {
+<span class="nc" id="L859">            _double_value = _bigInteger_value.doubleValue();</span>
+<span class="nc" id="L860">            add_value_type(AS_TYPE.double_value);</span>
+<span class="nc" id="L861">        }</span>
+        private final void fn_from_decimal_to_double() {
+<span class="fc" id="L863">            _double_value = _decimal_value.doubleValue();</span>
+<span class="fc" id="L864">            add_value_type(AS_TYPE.double_value);</span>
+<span class="fc" id="L865">        }</span>
+        private final void fn_from_timestamp_to_date() {
+<span class="fc" id="L867">            _date_value = _timestamp_value.dateValue();</span>
+<span class="fc" id="L868">            add_value_type(AS_TYPE.date_value);</span>
+<span class="fc" id="L869">        }</span>
+        private final void fn_from_date_to_timestamp() {
+<span class="nc" id="L871">            _timestamp_value = new Timestamp(_date_value.getTime(), null);</span>
+<span class="nc" id="L872">            add_value_type(AS_TYPE.timestamp_value);</span>
+<span class="nc" id="L873">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

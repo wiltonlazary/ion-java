@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonType.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion</a> &gt; <span class="el_source">IonType.java</span></div><h1>IonType.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion;
+
+
+/**
+ * Enumeration identifying the core Ion data types.
+ * &lt;p&gt;
+ * Note that {@link #DATAGRAM} is a pseudo-type used only by
+ * {@link IonDatagram}, and it is not a legal value in most places where
+ * {@code IonType} is used.
+ */
+<span class="fc" id="L26">public enum IonType</span>
+{
+<span class="fc" id="L28">    NULL,</span>
+<span class="fc" id="L29">    BOOL,</span>
+<span class="fc" id="L30">    INT,</span>
+<span class="fc" id="L31">    FLOAT,</span>
+<span class="fc" id="L32">    DECIMAL,</span>
+<span class="fc" id="L33">    TIMESTAMP,</span>
+<span class="fc" id="L34">    SYMBOL,</span>
+<span class="fc" id="L35">    STRING,</span>
+<span class="fc" id="L36">    CLOB,</span>
+<span class="fc" id="L37">    BLOB,</span>
+<span class="fc" id="L38">    LIST,</span>
+<span class="fc" id="L39">    SEXP,</span>
+<span class="fc" id="L40">    STRUCT,</span>
+<span class="fc" id="L41">    DATAGRAM;</span>
+
+
+    /**
+     * Determines whether a type represents an Ion container.
+     * This includes {@link #DATAGRAM}.
+     *
+     * @param t may be null.
+     *
+     * @return true when {@code t} is {@link #LIST}, {@link #SEXP},
+     * {@link #STRUCT}, or {@link #DATAGRAM}.
+     *
+     */
+    public static boolean isContainer(IonType t)
+    {
+<span class="pc bpc" id="L56" title="1 of 4 branches missed.">        return (t != null &amp;&amp; (t.ordinal() &gt;= LIST.ordinal()));</span>
+    }
+
+    /**
+     * Determines whether a type represents an Ion text scalar, namely
+     * {@link #STRING} or {@link #SYMBOL} (but not {@link #CLOB}).
+     *
+     * @param t may be null.
+     *
+     * @return true when {@code t} is {@link #STRING} or {@link #SYMBOL}.
+     *
+
+     */
+    public static boolean isText(IonType t)
+    {
+<span class="fc bfc" id="L71" title="All 4 branches covered.">        return (t == STRING) || (t == SYMBOL);</span>
+    }
+
+    /**
+     * Determines whether a type represents an Ion LOB scalar, namely
+     * {@link #BLOB} or {@link #CLOB}.
+     *
+     * @param t may be null.
+     *
+     * @return true when {@code t} is {@link #BLOB} or {@link #CLOB}.
+     *
+
+     */
+    public static boolean isLob(IonType t)
+    {
+<span class="nc bnc" id="L86" title="All 4 branches missed.">        return (t == BLOB) || (t == CLOB);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

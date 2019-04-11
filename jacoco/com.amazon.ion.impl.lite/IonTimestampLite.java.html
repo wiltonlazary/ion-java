@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonTimestampLite.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl.lite</a> &gt; <span class="el_source">IonTimestampLite.java</span></div><h1>IonTimestampLite.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl.lite;
+
+import com.amazon.ion.IonTimestamp;
+import com.amazon.ion.IonType;
+import com.amazon.ion.IonWriter;
+import com.amazon.ion.NullValueException;
+import com.amazon.ion.Timestamp;
+import com.amazon.ion.ValueVisitor;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.util.Date;
+
+
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">final class IonTimestampLite</span>
+    extends IonValueLite
+    implements IonTimestamp
+{
+<span class="fc" id="L33">    public final static Integer UTC_OFFSET = Timestamp.UTC_OFFSET;</span>
+
+    private static final int BIT_FLAG_YEAR      = 0x01;
+    private static final int BIT_FLAG_MONTH     = 0x02;
+    private static final int BIT_FLAG_DAY       = 0x04;
+    private static final int BIT_FLAG_MINUTE    = 0x08;
+    private static final int BIT_FLAG_SECOND    = 0x10;
+    private static final int BIT_FLAG_FRACTION  = 0x20;
+<span class="fc" id="L41">    private static final int HASH_SIGNATURE =</span>
+<span class="fc" id="L42">        IonType.TIMESTAMP.toString().hashCode();</span>
+
+
+    private Timestamp _timestamp_value;
+
+    /**
+     * Constructs a &lt;code&gt;null.timestamp&lt;/code&gt; value.
+     */
+    IonTimestampLite(ContainerlessContext context, boolean isNull)
+    {
+<span class="fc" id="L52">        super(context, isNull);</span>
+<span class="fc" id="L53">    }</span>
+
+    IonTimestampLite(IonTimestampLite existing, IonContext context)
+    {
+<span class="fc" id="L57">        super(existing, context);</span>
+        // Timestamp contract is immutable; so can simply pass the reference
+<span class="fc" id="L59">        this._timestamp_value = existing._timestamp_value;</span>
+<span class="fc" id="L60">    }</span>
+
+    @Override
+    IonTimestampLite clone(IonContext context)
+    {
+<span class="fc" id="L65">        return new IonTimestampLite(this, context);</span>
+    }
+
+    @Override
+    public IonTimestampLite clone()
+    {
+<span class="fc" id="L71">        return clone(ContainerlessContext.wrap(getSystem()));</span>
+    }
+
+    @Override
+    int hashCode(SymbolTableProvider symbolTableProvider) {
+<span class="fc" id="L76">        int result = HASH_SIGNATURE;</span>
+
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (!isNullValue())  {</span>
+<span class="fc" id="L79">            result ^= timestampValue().hashCode();</span>
+        }
+
+<span class="fc" id="L82">        return hashTypeAnnotations(result, symbolTableProvider);</span>
+    }
+
+    @Override
+    public IonType getType()
+    {
+<span class="fc" id="L88">        return IonType.TIMESTAMP;</span>
+    }
+
+    public Timestamp timestampValue()
+    {
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (isNullValue()) {</span>
+<span class="fc" id="L94">            return null;</span>
+        }
+<span class="fc" id="L96">        return _timestamp_value;</span>
+    }
+
+    public Date dateValue()
+    {
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (_isNullValue()) {</span>
+<span class="fc" id="L102">            return null;</span>
+        }
+<span class="fc" id="L104">        return _timestamp_value.dateValue();</span>
+    }
+
+
+    public Integer getLocalOffset() throws NullValueException
+    {
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (_isNullValue()) {</span>
+<span class="fc" id="L111">            throw new NullValueException();</span>
+        }
+<span class="fc" id="L113">        return _timestamp_value.getLocalOffset();</span>
+    }
+
+
+    /**
+     * Returns null if this is null.timestamp.
+     */
+    private Integer getInternalLocalOffset()
+    {
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (_isNullValue()) {</span>
+<span class="fc" id="L123">            return null;</span>
+        }
+<span class="fc" id="L125">        return _timestamp_value.getLocalOffset();</span>
+    }
+
+    public void setValue(Timestamp timestamp)
+    {
+<span class="fc" id="L130">        checkForLock();</span>
+<span class="fc" id="L131">        _timestamp_value = timestamp;</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        _isNullValue(timestamp == null);</span>
+<span class="fc" id="L133">    }</span>
+
+    public void setValue(BigDecimal millis, Integer localOffset)
+    {
+<span class="fc" id="L137">        setValue(new Timestamp(millis, localOffset));</span>
+<span class="fc" id="L138">    }</span>
+
+    public void setValue(long millis, Integer localOffset)
+    {
+<span class="fc" id="L142">        setValue(new Timestamp(millis, localOffset));</span>
+<span class="fc" id="L143">    }</span>
+
+    public void setTime(Date value)
+    {
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        if (value == null)</span>
+        {
+<span class="fc" id="L149">            makeNull();</span>
+        }
+        else
+        {
+            // setMillis(long) will check for the lock
+<span class="fc" id="L154">            setMillis(value.getTime());</span>
+        }
+<span class="fc" id="L156">    }</span>
+
+
+    public BigDecimal getDecimalMillis()
+    {
+<span class="nc bnc" id="L161" title="All 2 branches missed.">        if (_isNullValue()) {</span>
+<span class="nc" id="L162">            return null;</span>
+        }
+<span class="nc" id="L164">        return _timestamp_value.getDecimalMillis();</span>
+    }
+
+    public void setDecimalMillis(BigDecimal millis)
+    {
+        // setValue() calls checkForLock()
+<span class="nc" id="L170">        Integer offset = getInternalLocalOffset();</span>
+<span class="nc" id="L171">        setValue(millis, offset);</span>
+<span class="nc" id="L172">    }</span>
+
+
+    public long getMillis()
+    {
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (_isNullValue()) {</span>
+<span class="nc" id="L178">            throw new NullValueException();</span>
+        }
+<span class="fc" id="L180">        return _timestamp_value.getMillis();</span>
+    }
+
+
+    public void setMillis(long millis)
+    {
+        // setValue() calls checkForLock()
+<span class="fc" id="L187">        Integer offset = getInternalLocalOffset();</span>
+<span class="fc" id="L188">        setValue(millis, offset);</span>
+<span class="fc" id="L189">    }</span>
+
+
+    public void setMillisUtc(long millis)
+    {
+        // setValue() calls checkForLock()
+<span class="nc" id="L195">        setValue(millis, UTC_OFFSET);</span>
+<span class="nc" id="L196">    }</span>
+
+
+    public void setCurrentTime()
+    {
+<span class="nc" id="L201">        long millis = System.currentTimeMillis();</span>
+<span class="nc" id="L202">        setMillis(millis);</span>
+<span class="nc" id="L203">    }</span>
+
+    public void setCurrentTimeUtc()
+    {
+<span class="nc" id="L207">        long millis = System.currentTimeMillis();</span>
+<span class="nc" id="L208">        setMillisUtc(millis);</span>
+<span class="nc" id="L209">    }</span>
+
+    public void setLocalOffset(int minutes)
+        throws NullValueException
+    {
+        // setLocalOffset(Integer) will check for the lock
+<span class="fc" id="L215">        setLocalOffset(new Integer(minutes));</span>
+<span class="fc" id="L216">    }</span>
+
+
+    public void setLocalOffset(Integer minutes)
+        throws NullValueException
+    {
+<span class="fc" id="L222">        validateThisNotNull();</span>
+<span class="pc bpc" id="L223" title="2 of 4 branches missed.">        assert (_timestamp_value != null);</span>
+
+<span class="fc" id="L225">        setValue(_timestamp_value.getDecimalMillis(), minutes);</span>
+<span class="fc" id="L226">    }</span>
+
+    public void makeNull()
+    {
+<span class="fc" id="L230">        checkForLock();</span>
+<span class="fc" id="L231">        _timestamp_value = null;</span>
+<span class="fc" id="L232">        _isNullValue(true);</span>
+<span class="fc" id="L233">    }</span>
+
+    @Override
+    final void writeBodyTo(IonWriter writer, SymbolTableProvider symbolTableProvider)
+        throws IOException
+    {
+<span class="fc" id="L239">        writer.writeTimestamp(_timestamp_value);</span>
+<span class="fc" id="L240">    }</span>
+
+    @Override
+    public void accept(ValueVisitor visitor) throws Exception
+    {
+<span class="fc" id="L245">        visitor.visit(this);</span>
+<span class="fc" id="L246">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

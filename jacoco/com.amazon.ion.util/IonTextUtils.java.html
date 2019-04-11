@@ -1,0 +1,971 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonTextUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.util</a> &gt; <span class="el_source">IonTextUtils.java</span></div><h1>IonTextUtils.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.util;
+
+import static com.amazon.ion.impl._Private_IonConstants.isHighSurrogate;
+import static com.amazon.ion.impl._Private_IonConstants.isLowSurrogate;
+import static com.amazon.ion.impl._Private_IonConstants.makeUnicodeScalar;
+import static com.amazon.ion.impl._Private_IonTextAppender.ZERO_PADDING;
+import static com.amazon.ion.impl._Private_IonTextAppender.isIdentifierKeyword;
+import static com.amazon.ion.impl._Private_IonTextAppender.symbolNeedsQuoting;
+import static com.amazon.ion.impl._Private_IonTextWriterBuilder.STANDARD;
+
+import com.amazon.ion.SymbolToken;
+import com.amazon.ion.impl._Private_IonTextAppender;
+import java.io.IOException;
+import java.math.BigDecimal;
+
+
+/**
+ * Utility methods for working with Ion's text-oriented data types.
+ */
+<span class="nc" id="L35">public class IonTextUtils</span>
+{
+
+<span class="fc" id="L38">    public enum SymbolVariant { IDENTIFIER, OPERATOR, QUOTED }</span>
+
+<span class="fc" id="L40">    private enum EscapeMode { JSON, ION_SYMBOL, ION_STRING, ION_LONG_STRING }</span>
+
+
+    /**
+     * Ion whitespace is defined as one of the characters space, tab, newline,
+     * and carriage-return.  This matches the definition of whitespace used by
+     * JSON.
+     *
+     * @param codePoint the character to test.
+     * @return &lt;code&gt;true&lt;/code&gt; if &lt;code&gt;c&lt;/code&gt; is one of the four legal
+     * Ion whitespace characters.
+     *
+     * @see &lt;a href=&quot;http://tools.ietf.org/html/rfc4627&quot;&gt;RFC 4627&lt;/a&gt;
+     */
+    public static boolean isWhitespace(int codePoint)
+    {
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        switch (codePoint)</span>
+        {
+            // FIXME look for BOM
+            case ' ':  case '\t':  case '\n':  case '\r':
+            {
+<span class="nc" id="L61">                return true;</span>
+            }
+            default:
+            {
+<span class="nc" id="L65">                return false;</span>
+            }
+        }
+    }
+
+    /**
+     * Determines whether a given code point is one of the valid Ion numeric
+     * terminators.
+     * &lt;p&gt;
+     * The slash character {@code '/'} is not itself a valid terminator, but
+     * if the next character is {@code '/'} or {@code '*'} then the number is
+     * followed by a comment.  Since this method cannot perform the look-ahead
+     * necessary to make that determination, it returns {@code false} for the
+     * slash.
+     *
+     * @param codePoint the Unicode scalar to test.
+     *
+     * @return true when the scalar can legally follow an Ion number.
+     * Returns false for the slash character {@code '/'}.
+     */
+    public static boolean isNumericStop(int codePoint)
+    {
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        switch (codePoint) {</span>
+        case -1:
+        case '{':  case '}':
+        case '[':  case ']':
+        case '(':  case ')':
+        case ',':
+        case '\&quot;': case '\'':
+        case ' ':  case '\t':  case '\n':  case '\r':  // Whitespace
+        // case '/': // we check start of comment in the caller where we
+        //              can peek ahead for the following slash or asterisk
+<span class="fc" id="L97">            return true;</span>
+
+        default:
+<span class="fc" id="L100">            return false;</span>
+        }
+    }
+
+
+    public static boolean isDigit(int codePoint, int radix)
+    {
+<span class="nc bnc" id="L107" title="All 4 branches missed.">        switch (codePoint) {</span>
+        case '0': case '1': case '2': case '3': case '4':
+        case '5': case '6': case '7':
+<span class="nc bnc" id="L110" title="All 6 branches missed.">            return (radix == 8 || radix == 10 || radix == 16);</span>
+        case '8': case '9':
+<span class="nc bnc" id="L112" title="All 4 branches missed.">            return (radix == 10 || radix == 16);</span>
+        case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
+        case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
+<span class="nc bnc" id="L115" title="All 2 branches missed.">            return (radix == 16);</span>
+        }
+<span class="nc" id="L117">        return false;</span>
+    }
+
+    public static boolean isIdentifierStart(int codePoint) {
+<span class="fc" id="L121">        return _Private_IonTextAppender.isIdentifierStart(codePoint);</span>
+    }
+
+    public static boolean isIdentifierPart(int codePoint) {
+<span class="fc" id="L125">        return _Private_IonTextAppender.isIdentifierPart(codePoint);</span>
+    }
+
+    public static boolean isOperatorPart(int codePoint) {
+<span class="fc" id="L129">        return _Private_IonTextAppender.isOperatorPart(codePoint);</span>
+    }
+
+
+
+    /**
+     * Determines whether the text of a symbol represents an identifier, an
+     * operator, or a symbol that always requires (single) quotes.
+     *
+     * @param symbol must be a non-empty string.
+     *
+     * @return the variant of the symbol.
+     *
+     * @throws NullPointerException
+     *         if &lt;code&gt;symbol&lt;/code&gt; is &lt;code&gt;null&lt;/code&gt;.
+     */
+    public static SymbolVariant symbolVariant(CharSequence symbol)
+    {
+<span class="fc" id="L147">        int length = symbol.length(); // acts as null check</span>
+
+        // If the symbol's text matches an Ion keyword or it's an empty symbol, we must quote it.
+        // Eg, the symbol 'false' and '' must be rendered quoted.
+<span class="fc bfc" id="L151" title="All 4 branches covered.">        if(length == 0 || isIdentifierKeyword(symbol))</span>
+        {
+<span class="fc" id="L153">            return SymbolVariant.QUOTED;</span>
+        }
+
+<span class="fc" id="L156">        char c = symbol.charAt(0);</span>
+        // Surrogates are neither identifierStart nor operatorPart, so the
+        // first one we hit will fall through and return QUOTED.
+        // TODO test that
+
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (isIdentifierStart(c))</span>
+        {
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            for (int ii = 0; ii &lt; length; ii++) {</span>
+<span class="fc" id="L164">                c = symbol.charAt(ii);</span>
+<span class="pc bpc" id="L165" title="2 of 6 branches missed.">                if ((c == '\'' || c &lt; 32 || c &gt; 126)</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">                    || !isIdentifierPart(c))</span>
+                {
+<span class="fc" id="L168">                    return SymbolVariant.QUOTED;</span>
+                }
+            }
+<span class="fc" id="L171">            return SymbolVariant.IDENTIFIER;</span>
+        }
+
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        if (isOperatorPart(c))</span>
+        {
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            for (int ii = 0; ii &lt; length; ii++) {</span>
+<span class="fc" id="L177">                c = symbol.charAt(ii);</span>
+                // We don't need to look for escapes since all
+                // operator characters are ASCII.
+<span class="fc bfc" id="L180" title="All 2 branches covered.">                if (!isOperatorPart(c)) {</span>
+<span class="fc" id="L181">                    return SymbolVariant.QUOTED;</span>
+                }
+            }
+<span class="fc" id="L184">            return SymbolVariant.OPERATOR;</span>
+        }
+
+<span class="fc" id="L187">        return SymbolVariant.QUOTED;</span>
+    }
+
+
+    //=========================================================================
+
+
+    /**
+     * Prints a single Unicode code point for use in an ASCII-safe Ion string.
+     *
+     * @param out the stream to receive the data.
+     * @param codePoint a Unicode code point.
+     */
+    public static void printStringCodePoint(Appendable out, int codePoint)
+        throws IOException
+    {
+<span class="fc" id="L203">        printCodePoint(out, codePoint, EscapeMode.ION_STRING);</span>
+<span class="fc" id="L204">    }</span>
+
+    /**
+     * Prints a single Unicode code point for use in an ASCII-safe Ion symbol.
+     *
+     * @param out the stream to receive the data.
+     * @param codePoint a Unicode code point.
+     */
+    public static void printSymbolCodePoint(Appendable out, int codePoint)
+        throws IOException
+    {
+<span class="nc" id="L215">        printCodePoint(out, codePoint, EscapeMode.ION_SYMBOL);</span>
+<span class="nc" id="L216">    }</span>
+
+    /**
+     * Prints a single Unicode code point for use in an ASCII-safe JSON string.
+     *
+     * @param out the stream to receive the data.
+     * @param codePoint a Unicode code point.
+     */
+    public static void printJsonCodePoint(Appendable out, int codePoint)
+        throws IOException
+    {
+        // JSON only allows double-quote strings.
+<span class="fc" id="L228">        printCodePoint(out, codePoint, EscapeMode.JSON);</span>
+<span class="fc" id="L229">    }</span>
+
+
+    /**
+     * Prints a single code point, ASCII safe.
+     */
+    private static void printCodePoint(Appendable out, int c, EscapeMode mode)
+        throws IOException
+    {
+        // JSON only allows uHHHH numeric escapes.
+<span class="fc bfc" id="L239" title="All 12 branches covered.">        switch (c) {</span>
+            case 0:
+<span class="fc bfc" id="L241" title="All 2 branches covered.">                out.append(mode == EscapeMode.JSON ? &quot;\\u0000&quot; : &quot;\\0&quot;);</span>
+<span class="fc" id="L242">                return;</span>
+            case '\t':
+<span class="fc" id="L244">                out.append(&quot;\\t&quot;);</span>
+<span class="fc" id="L245">                return;</span>
+            case '\n':
+<span class="fc bfc" id="L247" title="All 2 branches covered.">                if (mode == EscapeMode.ION_LONG_STRING) {</span>
+<span class="fc" id="L248">                    out.append('\n');</span>
+                }
+                else {
+<span class="fc" id="L251">                    out.append(&quot;\\n&quot;);</span>
+                }
+<span class="fc" id="L253">                return;</span>
+            case '\r':
+<span class="fc" id="L255">                out.append(&quot;\\r&quot;);</span>
+<span class="fc" id="L256">                return;</span>
+            case '\f':
+<span class="fc" id="L258">                out.append(&quot;\\f&quot;);</span>
+<span class="fc" id="L259">                return;</span>
+            case '\u0008':
+<span class="fc" id="L261">                out.append(&quot;\\b&quot;);</span>
+<span class="fc" id="L262">                return;</span>
+            case '\u0007':
+<span class="fc bfc" id="L264" title="All 2 branches covered.">                out.append(mode == EscapeMode.JSON ? &quot;\\u0007&quot; : &quot;\\a&quot;);</span>
+<span class="fc" id="L265">                return;</span>
+            case '\u000B':
+<span class="fc bfc" id="L267" title="All 2 branches covered.">                out.append(mode == EscapeMode.JSON ? &quot;\\u000b&quot; : &quot;\\v&quot;);</span>
+<span class="fc" id="L268">                return;</span>
+            case '\&quot;':
+<span class="fc bfc" id="L270" title="All 4 branches covered.">                if (mode == EscapeMode.JSON || mode == EscapeMode.ION_STRING) {</span>
+<span class="fc" id="L271">                    out.append(&quot;\\\&quot;&quot;);</span>
+<span class="fc" id="L272">                    return;</span>
+                }
+                break; // Treat as normal code point for long string or symbol.
+            case '\'':
+<span class="fc bfc" id="L276" title="All 4 branches covered.">                if (mode == EscapeMode.ION_SYMBOL ||</span>
+                    mode == EscapeMode.ION_LONG_STRING)
+                {
+<span class="fc" id="L279">                    out.append(&quot;\\\'&quot;);</span>
+<span class="fc" id="L280">                    return;</span>
+                }
+                break;
+            case '\\':
+<span class="fc" id="L284">                out.append(&quot;\\\\&quot;);</span>
+<span class="fc" id="L285">                return;</span>
+            default:
+                break;
+        }
+
+<span class="fc bfc" id="L290" title="All 2 branches covered.">        if (c &lt; 32) {</span>
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">            if (mode == EscapeMode.JSON) {</span>
+<span class="nc" id="L292">                printCodePointAsFourHexDigits(out, c);</span>
+            }
+            else {
+<span class="fc" id="L295">                printCodePointAsTwoHexDigits(out, c);</span>
+            }
+        }
+<span class="fc bfc" id="L298" title="All 2 branches covered.">        else if (c &lt; 0x7F) {  // Printable ASCII</span>
+<span class="fc" id="L299">            out.append((char)c);</span>
+        }
+<span class="fc bfc" id="L301" title="All 2 branches covered.">        else if (c &lt;= 0xFF) {</span>
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">            if (mode == EscapeMode.JSON) {</span>
+<span class="nc" id="L303">                printCodePointAsFourHexDigits(out, c);</span>
+            }
+            else {
+<span class="fc" id="L306">                printCodePointAsTwoHexDigits(out, c);</span>
+            }
+        }
+<span class="fc bfc" id="L309" title="All 2 branches covered.">        else if (c &lt;= 0xFFFF) {</span>
+<span class="fc" id="L310">            printCodePointAsFourHexDigits(out, c);</span>
+        }
+        else {
+<span class="fc bfc" id="L313" title="All 2 branches covered.">            if (mode == EscapeMode.JSON) {</span>
+                // JSON does not have a \Uxxxxyyyy escape, surrogates
+                // must be used as per RFC-4627
+                //
+                // http://www.ietf.org/rfc/rfc4627.txt
+                // [...]
+                //   To escape an extended character that is not in the Basic Multilingual
+                //   Plane, the character is represented as a twelve-character sequence,
+                //   encoding the UTF-16 surrogate pair.  So, for example, a string
+                //   containing only the G clef character (U+1D11E) may be represented as
+                //   &quot;\uD834\uDD1E&quot;.
+                // [...]
+<span class="fc" id="L325">                printCodePointAsSurrogatePairHexDigits(out, c);</span>
+            }
+            else {
+<span class="fc" id="L328">                printCodePointAsEightHexDigits(out, c);</span>
+            }
+        }
+<span class="fc" id="L331">    }</span>
+
+
+    /**
+     * Generates a two-digit hex escape sequence,
+     * {@code &quot;\x}&lt;i&gt;{@code HH}&lt;/i&gt;{@code &quot;},
+     * using lower-case for alphabetics.
+     */
+    private static void printCodePointAsTwoHexDigits(Appendable out, int c)
+        throws IOException
+    {
+<span class="fc" id="L342">        String s = Integer.toHexString(c);</span>
+<span class="fc" id="L343">        out.append(&quot;\\x&quot;);</span>
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        if (s.length() &lt; 2) {</span>
+<span class="fc" id="L345">            out.append(ZERO_PADDING[2-s.length()]);</span>
+        }
+<span class="fc" id="L347">        out.append(s);</span>
+<span class="fc" id="L348">    }</span>
+
+    /**
+     * Generates a four-digit hex escape sequence,
+     * {@code &quot;\}{@code u}&lt;i&gt;{@code HHHH}&lt;/i&gt;{@code &quot;},
+     * using lower-case for alphabetics.
+     */
+    private static void printCodePointAsFourHexDigits(Appendable out, int c)
+        throws IOException
+    {
+<span class="fc" id="L358">        String s = Integer.toHexString(c);</span>
+<span class="fc" id="L359">        out.append(&quot;\\u&quot;);</span>
+<span class="fc" id="L360">        out.append(ZERO_PADDING[4-s.length()]);</span>
+<span class="fc" id="L361">        out.append(s);</span>
+<span class="fc" id="L362">    }</span>
+
+    /**
+     * Prints an eight-digit hex escape sequence,
+     * {@code &quot;\}{@code U}&lt;i&gt;{@code HHHHHHHH}&lt;/i&gt;{@code &quot;},
+     * using lower-case for alphabetics.
+     */
+    private static void printCodePointAsEightHexDigits(Appendable out, int c)
+        throws IOException
+    {
+<span class="fc" id="L372">        String s = Integer.toHexString(c);</span>
+<span class="fc" id="L373">        out.append(&quot;\\U&quot;);</span>
+<span class="fc" id="L374">        out.append(ZERO_PADDING[8-s.length()]);</span>
+<span class="fc" id="L375">        out.append(s);</span>
+<span class="fc" id="L376">    }</span>
+
+    /**
+     * Generates a surrogate pair as two four-digit hex escape sequences,
+     * {@code &quot;\}{@code u}&lt;i&gt;{@code HHHH}&lt;/i&gt;{@code \}{@code u}&lt;i&gt;{@code HHHH}&lt;/i&gt;{@code &quot;},
+     * using lower-case for alphabetics.
+     * This for necessary for JSON when the code point is outside the BMP.
+     */
+    private static void printCodePointAsSurrogatePairHexDigits(Appendable out, int c)
+        throws IOException
+    {
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        for (final char unit : Character.toChars(c)) {</span>
+<span class="fc" id="L388">            printCodePointAsFourHexDigits(out, unit);</span>
+        }
+<span class="fc" id="L390">    }</span>
+
+
+    /**
+     * Prints characters as an ASCII-encoded Ion string, including surrounding
+     * double-quotes.
+     * If the {@code text} is null, this prints {@code null.string}.
+     *
+     * @param out the stream to receive the data.
+     * @param text the text to print; may be {@code null}.
+     *
+     * @throws IOException if the {@link Appendable} throws an exception.
+     * @throws IllegalArgumentException
+     *     if the text contains invalid UTF-16 surrogates.
+     */
+    public static void printString(Appendable out, CharSequence text)
+        throws IOException
+    {
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">        if (text == null)</span>
+        {
+<span class="nc" id="L410">            out.append(&quot;null.string&quot;);</span>
+        }
+        else
+        {
+<span class="fc" id="L414">            out.append('&quot;');</span>
+<span class="fc" id="L415">            printCodePoints(out, text, EscapeMode.ION_STRING);</span>
+<span class="fc" id="L416">            out.append('&quot;');</span>
+        }
+<span class="fc" id="L418">    }</span>
+
+    /**
+     * Prints characters as an ASCII-encoded JSON string, including surrounding
+     * double-quotes.
+     * If the {@code text} is null, this prints {@code null}.
+     *
+     * @param out the stream to receive the JSON data.
+     * @param text the text to print; may be {@code null}.
+     *
+     * @throws IOException if the {@link Appendable} throws an exception.
+     * @throws IllegalArgumentException
+     *     if the text contains invalid UTF-16 surrogates.
+     */
+    public static void printJsonString(Appendable out, CharSequence text)
+        throws IOException
+    {
+<span class="pc bpc" id="L435" title="1 of 2 branches missed.">        if (text == null)</span>
+        {
+<span class="nc" id="L437">            out.append(&quot;null&quot;);</span>
+        }
+        else
+        {
+<span class="fc" id="L441">            out.append('&quot;');</span>
+<span class="fc" id="L442">            printCodePoints(out, text, EscapeMode.JSON);</span>
+<span class="fc" id="L443">            out.append('&quot;');</span>
+        }
+<span class="fc" id="L445">    }</span>
+
+
+    /**
+     * Builds a String denoting an ASCII-encoded Ion string,
+     * including surrounding double-quotes.
+     * If the {@code text} is null, this returns {@code &quot;null.string&quot;}.
+     *
+     * @param text the text to print; may be {@code null}.
+     *
+     * @throws IllegalArgumentException
+     *     if the text contains invalid UTF-16 surrogates.
+     */
+    public static String printString(CharSequence text)
+    {
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">        if (text == null)</span>
+        {
+<span class="nc" id="L462">            return &quot;null.string&quot;;</span>
+        }
+<span class="pc bpc" id="L464" title="1 of 2 branches missed.">        if (text.length() == 0)</span>
+        {
+<span class="nc" id="L466">            return &quot;\&quot;\&quot;&quot;;</span>
+        }
+
+<span class="fc" id="L469">        StringBuilder builder = new StringBuilder(text.length() + 2);</span>
+        try
+        {
+<span class="fc" id="L472">            printString(builder, text);</span>
+        }
+<span class="nc" id="L474">        catch (IOException e)</span>
+        {
+            // Shouldn't happen
+<span class="nc" id="L477">            throw new Error(e);</span>
+<span class="fc" id="L478">        }</span>
+<span class="fc" id="L479">        return builder.toString();</span>
+    }
+
+
+    /**
+     * Builds a String denoting an ASCII-encoded Ion &quot;long string&quot;,
+     * including surrounding triple-quotes.
+     * If the {@code text} is null, this returns {@code &quot;null.string&quot;}.
+     *
+     * @param text the text to print; may be {@code null}.
+     *
+     * @throws IllegalArgumentException
+     *     if the text contains invalid UTF-16 surrogates.
+     */
+    public static String printLongString(CharSequence text)
+    {
+<span class="fc bfc" id="L495" title="All 2 branches covered.">        if (text == null) return &quot;null.string&quot;;</span>
+
+<span class="fc bfc" id="L497" title="All 2 branches covered.">        if (text.length() == 0) return &quot;''''''&quot;;</span>
+
+<span class="fc" id="L499">        StringBuilder builder = new StringBuilder(text.length() + 6);</span>
+        try
+        {
+<span class="fc" id="L502">            printLongString(builder, text);</span>
+        }
+<span class="nc" id="L504">        catch (IOException e)</span>
+        {
+            // Shouldn't happen
+<span class="nc" id="L507">            throw new Error(e);</span>
+<span class="fc" id="L508">        }</span>
+<span class="fc" id="L509">        return builder.toString();</span>
+    }
+
+
+    /**
+     * Prints characters as an ASCII-encoded Ion &quot;long string&quot;,
+     * including surrounding triple-quotes.
+     * If the {@code text} is null, this prints {@code null.string}.
+     *
+     * @param out the stream to receive the data.
+     * @param text the text to print; may be {@code null}.
+     *
+     * @throws IOException if the {@link Appendable} throws an exception.
+     * @throws IllegalArgumentException
+     *     if the text contains invalid UTF-16 surrogates.
+     */
+    public static void printLongString(Appendable out, CharSequence text)
+        throws IOException
+    {
+<span class="fc bfc" id="L528" title="All 2 branches covered.">        if (text == null)</span>
+        {
+<span class="fc" id="L530">            out.append(&quot;null.string&quot;);</span>
+        }
+        else
+        {
+<span class="fc" id="L534">            out.append(&quot;'''&quot;);</span>
+<span class="fc" id="L535">            printCodePoints(out, text, EscapeMode.ION_LONG_STRING);</span>
+<span class="fc" id="L536">            out.append(&quot;'''&quot;);</span>
+        }
+<span class="fc" id="L538">    }</span>
+
+
+    /**
+     * Builds a String denoting an ASCII-encoded Ion string,
+     * with double-quotes surrounding a single Unicode code point.
+     *
+     * @param codePoint a Unicode code point.
+     */
+    public static String printCodePointAsString(int codePoint)
+    {
+<span class="fc" id="L549">        StringBuilder builder = new StringBuilder(12);</span>
+<span class="fc" id="L550">        builder.append('&quot;');</span>
+        try
+        {
+<span class="fc" id="L553">            printStringCodePoint(builder, codePoint);</span>
+        }
+<span class="nc" id="L555">        catch (IOException e)</span>
+        {
+            // Shouldn't happen
+<span class="nc" id="L558">            throw new Error(e);</span>
+<span class="fc" id="L559">        }</span>
+<span class="fc" id="L560">        builder.append('&quot;');</span>
+<span class="fc" id="L561">        return builder.toString();</span>
+    }
+
+
+    /**
+     * Prints the text as an Ion symbol, including surrounding single-quotes if
+     * they are necessary.  Operator symbols such as {@code '+'} are quoted.
+     * If the {@code text} is null, this prints {@code null.symbol}.
+     *
+     * @param out the stream to receive the Ion data.
+     * @param text the symbol text; may be {@code null}.
+     *
+     * @throws IOException if the {@link Appendable} throws an exception.
+     *
+     * @see #printSymbol(CharSequence)
+     */
+    public static void printSymbol(Appendable out, CharSequence text)
+        throws IOException
+    {
+<span class="pc bpc" id="L580" title="1 of 2 branches missed.">        if (text == null)</span>
+        {
+<span class="nc" id="L582">            out.append(&quot;null.symbol&quot;);</span>
+        }
+<span class="fc bfc" id="L584" title="All 2 branches covered.">        else if (symbolNeedsQuoting(text, true))</span>
+        {
+<span class="fc" id="L586">            printQuotedSymbol(out, text);</span>
+        }
+        else
+        {
+<span class="fc" id="L590">            out.append(text);</span>
+        }
+<span class="fc" id="L592">    }</span>
+
+
+    /**
+     * Prints the text as an Ion symbol, including surrounding single-quotes if
+     * they are necessary.  Operator symbols such as {@code '+'} are quoted.
+     * If the {@code text} is null, this returns {@code &quot;null.symbol&quot;}.
+     *
+     * @param text the symbol text; may be {@code null}.
+     *
+     * @return a string containing the resulting Ion data.
+     *
+     * @see #printSymbol(Appendable, CharSequence)
+     */
+    public static String printSymbol(CharSequence text)
+    {
+<span class="nc bnc" id="L608" title="All 2 branches missed.">        if (text == null)</span>
+        {
+<span class="nc" id="L610">            return &quot;null.symbol&quot;;</span>
+        }
+
+<span class="nc" id="L613">        StringBuilder builder = new StringBuilder(text.length() + 2);</span>
+        try
+        {
+<span class="nc" id="L616">            printSymbol(builder, text);</span>
+        }
+<span class="nc" id="L618">        catch (IOException e)</span>
+        {
+            // Shouldn't happen
+<span class="nc" id="L621">            throw new Error(e);</span>
+<span class="nc" id="L622">        }</span>
+<span class="nc" id="L623">        return builder.toString();</span>
+    }
+
+
+    /**
+     * @param token the symbolToken to be printed.
+     *
+     * @return a string representing the symboltoken.
+     */
+    public static String printSymbol(SymbolToken token){
+<span class="fc" id="L633">        return String.format(&quot;{$%s:%s}&quot;,  token.getText(), token.getSid());</span>
+    }
+
+
+    /**
+     * Prints text as a single-quoted Ion symbol.
+     * If the {@code text} is null, this prints {@code null.symbol}.
+     *
+     * @param out the stream to receive the data.
+     * @param text the symbol text; may be {@code null}.
+     *
+     * @throws IOException if the {@link Appendable} throws an exception.
+     * @throws IllegalArgumentException
+     *     if the text contains invalid UTF-16 surrogates.
+     */
+    public static void printQuotedSymbol(Appendable out, CharSequence text)
+        throws IOException
+    {
+<span class="pc bpc" id="L651" title="1 of 2 branches missed.">        if (text == null)</span>
+        {
+<span class="nc" id="L653">            out.append(&quot;null.symbol&quot;);</span>
+        }
+        else
+        {
+<span class="fc" id="L657">            out.append('\'');</span>
+<span class="fc" id="L658">            printCodePoints(out, text, EscapeMode.ION_SYMBOL);</span>
+<span class="fc" id="L659">            out.append('\'');</span>
+        }
+<span class="fc" id="L661">    }</span>
+
+
+    /**
+     * Builds a String containing a single-quoted Ion symbol.
+     * If the {@code text} is null, this returns {@code &quot;null.symbol&quot;}.
+     *
+     * @param text the symbol text; may be {@code null}.
+     *
+     * @throws IllegalArgumentException
+     *     if the text contains invalid UTF-16 surrogates.
+     */
+    public static String printQuotedSymbol(CharSequence text)
+    {
+<span class="nc bnc" id="L675" title="All 2 branches missed.">        if (text == null)</span>
+        {
+<span class="nc" id="L677">            return &quot;null.symbol&quot;;</span>
+        }
+
+<span class="nc" id="L680">        StringBuilder builder = new StringBuilder(text.length() + 2);</span>
+        try
+        {
+<span class="nc" id="L683">            printQuotedSymbol(builder, text);</span>
+        }
+<span class="nc" id="L685">        catch (IOException e)</span>
+        {
+            // Shouldn't happen
+<span class="nc" id="L688">            throw new Error(e);</span>
+<span class="nc" id="L689">        }</span>
+<span class="nc" id="L690">        return builder.toString();</span>
+    }
+
+
+    /**
+     * @throws IllegalArgumentException
+     *     if the text contains invalid UTF-16 surrogates.
+     */
+    private static void printCodePoints(Appendable out, CharSequence text,
+                                        EscapeMode mode)
+        throws IOException
+    {
+<span class="fc" id="L702">        int len = text.length();</span>
+<span class="fc bfc" id="L703" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++)</span>
+        {
+<span class="fc" id="L705">            int c = text.charAt(i);</span>
+
+<span class="fc bfc" id="L707" title="All 2 branches covered.">            if (isHighSurrogate(c))</span>
+            {
+<span class="fc" id="L709">                i++;</span>
+                char c2;
+                // I apologize for the embedded assignment, but the alternative
+                // was worse.
+<span class="fc bfc" id="L713" title="All 4 branches covered.">                if (i &gt;= len || !isLowSurrogate(c2 = text.charAt(i)))</span>
+                {
+<span class="fc" id="L715">                    String message =</span>
+                        &quot;text is invalid UTF-16. It contains an unmatched &quot; +
+<span class="fc" id="L717">                        &quot;high surrogate 0x&quot; + Integer.toHexString(c) +</span>
+                        &quot; at index &quot; + i;
+<span class="fc" id="L719">                    throw new IllegalArgumentException(message);</span>
+                }
+<span class="fc" id="L721">                c = makeUnicodeScalar(c, c2);</span>
+<span class="fc" id="L722">            }</span>
+<span class="fc bfc" id="L723" title="All 2 branches covered.">            else if (isLowSurrogate(c))</span>
+            {
+<span class="fc" id="L725">                String message =</span>
+                    &quot;text is invalid UTF-16. It contains an unmatched &quot; +
+<span class="fc" id="L727">                    &quot;low surrogate 0x&quot; + Integer.toHexString(c) +</span>
+                    &quot; at index &quot; + i;
+<span class="fc" id="L729">                throw new IllegalArgumentException(message);</span>
+            }
+
+<span class="fc" id="L732">            printCodePoint(out, c, mode);</span>
+        }
+<span class="fc" id="L734">    }</span>
+
+
+    ////////////////////////////////////
+
+    // from the Java 1.5 spec at (with extra spacing to keep the parser happy):
+    // http://java.sun.com/docs/books/jls/second_edition/html/lexical.doc.html#101089
+    //
+    //    EscapeSequence:
+    //        \ b            = \ u 0008: backspace BS
+    //        \ t            = \ u 0009: horizontal tab HT
+    //        \ n            = \ u 000a: linefeed LF
+    //        \ f            = \ u 000c: form feed FF
+    //        \ r            = \ u 000d: carriage return CR
+    //        \ &quot;            = \ u 0022: double quote &quot;
+    //        \ '            = \ u 0027: single quote '
+    //        \ \            = \ u 005c: backslash \
+    //        \ 0            = \ u 0000: NUL
+
+    // from the JSON RFC4627 at:
+    // http://www.faqs.org/rfcs/rfc4627.html
+    //    escape (
+    //        %x22 /          ; &quot;    quotation mark  U+0022
+    //        %x5C /          ; \    reverse solidus U+005C
+    //        %x2F /          ; /    solidus         U+002F
+    //        %x62 /          ; b    backspace       U+0008
+    //        %x66 /          ; f    form feed       U+000C
+    //        %x6E /          ; n    line feed       U+000A
+    //        %x72 /          ; r    carriage return U+000D
+    //        %x74 /          ; t    tab             U+0009
+    //        %x75 4HEXDIG )  ; uXXXX                U+XXXX
+    //
+    // escape = %x5C              ;
+
+    // c++ character escapes from:
+    //    http://www.cplusplus.com/doc/tutorial/constants.html
+    //    \n newline
+    //    \r carriage return
+    //    \t tab
+    //    \v vertical tab
+    //    \b backspace
+    //    \f form feed (page feed)
+    //    \a alert (beep)
+    //    \' single quote (')
+    //    \&quot; double quote (&quot;)
+    //    \? question mark (?)
+    //    \\ backslash (\)
+
+    // from http://msdn2.microsoft.com/en-us/library/ms860944.aspx
+    //    Table 1.4   Escape Sequences
+    //    Escape Sequence Represents
+    //    \a Bell (alert)
+    //    \b Backspace
+    //    \f Formfeed
+    //    \n New line
+    //    \r Carriage return
+    //    \t Horizontal tab
+    //    \v Vertical tab
+    //    \' Single quotation mark
+    //    \&quot;  Double quotation mark
+    //    \\ Backslash
+    //    \? Literal question mark
+    //    \ooo ASCII character in octal notation
+    //    \xhhh ASCII character in hexadecimal notation
+
+    //    Ion escapes, actual set:
+    //     \a Bell (alert)
+    //     \b Backspace
+    //     \f Formfeed
+    //     \n New line
+    //     \r Carriage return
+    //     \t Horizontal tab
+    //     \v Vertical tab
+    //     \' Single quotation mark
+    //     xx not included: \` Accent grave
+    //     \&quot;  Double quotation mark
+    //     \\ Backslash (solidus)
+    //     \/ Slash (reverse solidus) U+005C
+    //     \? Literal question mark
+    //     \0 nul character
+    //
+    //     \xhh ASCII character in hexadecimal notation (1-2 digits)
+    //    \\uhhhh Unicode character in hexadecimal
+    //     \Uhhhhhhhh Unicode character in hexadecimal
+
+
+    //=========================================================================
+    // Numeric scalars
+
+
+    public static void printDecimal(Appendable out, BigDecimal decimal)
+        throws IOException
+    {
+<span class="fc" id="L827">        _Private_IonTextAppender appender =</span>
+<span class="fc" id="L828">            _Private_IonTextAppender.forAppendable(out);</span>
+<span class="fc" id="L829">        appender.printDecimal(STANDARD, decimal);</span>
+<span class="fc" id="L830">    }</span>
+
+    public static String printDecimal(BigDecimal decimal)
+    {
+<span class="fc bfc" id="L834" title="All 2 branches covered.">        if (decimal == null)</span>
+        {
+<span class="fc" id="L836">            return &quot;null.decimal&quot;;</span>
+        }
+
+<span class="fc" id="L839">        StringBuilder builder = new StringBuilder(64);</span>
+        try
+        {
+<span class="fc" id="L842">            printDecimal(builder, decimal);</span>
+        }
+<span class="nc" id="L844">        catch (IOException e)</span>
+        {
+            // Shouldn't happen
+<span class="nc" id="L847">            throw new Error(e);</span>
+<span class="fc" id="L848">        }</span>
+<span class="fc" id="L849">        return builder.toString();</span>
+    }
+
+
+    public static void printFloat(Appendable out, double value)
+        throws IOException
+    {
+<span class="fc" id="L856">        _Private_IonTextAppender appender =</span>
+<span class="fc" id="L857">            _Private_IonTextAppender.forAppendable(out);</span>
+<span class="fc" id="L858">        appender.printFloat(value);</span>
+<span class="fc" id="L859">    }</span>
+
+    public static String printFloat(double value)
+    {
+<span class="fc" id="L863">        StringBuilder builder = new StringBuilder(64);</span>
+        try
+        {
+<span class="fc" id="L866">            printFloat(builder, value);</span>
+        }
+<span class="nc" id="L868">        catch (IOException e)</span>
+        {
+            // Shouldn't happen
+<span class="nc" id="L871">            throw new Error(e);</span>
+<span class="fc" id="L872">        }</span>
+<span class="fc" id="L873">        return builder.toString();</span>
+    }
+
+
+    public static void printFloat(Appendable out, Double value)
+        throws IOException
+    {
+<span class="fc" id="L880">        _Private_IonTextAppender appender =</span>
+<span class="fc" id="L881">            _Private_IonTextAppender.forAppendable(out);</span>
+<span class="fc" id="L882">        appender.printFloat(value);</span>
+<span class="fc" id="L883">    }</span>
+
+    public static String printFloat(Double value)
+    {
+<span class="fc bfc" id="L887" title="All 2 branches covered.">        if (value == null)</span>
+        {
+<span class="fc" id="L889">            return &quot;null.float&quot;;</span>
+        }
+
+<span class="fc" id="L892">        return printFloat(value.doubleValue());</span>
+    }
+
+
+    //=========================================================================
+    // LOBs
+
+
+    public static void printBlob(Appendable out, byte[] value)
+        throws IOException
+    {
+<span class="fc bfc" id="L903" title="All 2 branches covered.">        if (value == null)</span>
+        {
+<span class="fc" id="L905">            out.append(&quot;null.blob&quot;);</span>
+        }
+        else
+        {
+<span class="fc" id="L909">            _Private_IonTextAppender appender =</span>
+<span class="fc" id="L910">                _Private_IonTextAppender.forAppendable(out);</span>
+<span class="fc" id="L911">            appender.printBlob(STANDARD, value, 0, value.length);</span>
+        }
+<span class="fc" id="L913">    }</span>
+
+    public static String printBlob(byte[] value)
+    {
+<span class="fc bfc" id="L917" title="All 2 branches covered.">        if (value == null)</span>
+        {
+<span class="fc" id="L919">            return &quot;null.blob&quot;;</span>
+        }
+
+<span class="fc" id="L922">        StringBuilder builder = new StringBuilder(64);</span>
+        try
+        {
+<span class="fc" id="L925">            printBlob(builder, value);</span>
+        }
+<span class="nc" id="L927">        catch (IOException e)</span>
+        {
+            // Shouldn't happen
+<span class="nc" id="L930">            throw new Error(e);</span>
+<span class="fc" id="L931">        }</span>
+<span class="fc" id="L932">        return builder.toString();</span>
+    }
+
+
+    public static void printClob(Appendable out, byte[] value)
+        throws IOException
+    {
+<span class="fc bfc" id="L939" title="All 2 branches covered.">        if (value == null)</span>
+        {
+<span class="fc" id="L941">            out.append(&quot;null.clob&quot;);</span>
+        }
+        else
+        {
+<span class="fc" id="L945">            _Private_IonTextAppender appender =</span>
+<span class="fc" id="L946">                _Private_IonTextAppender.forAppendable(out);</span>
+<span class="fc" id="L947">            appender.printClob(STANDARD, value, 0, value.length);</span>
+        }
+<span class="fc" id="L949">    }</span>
+
+    public static String printClob(byte[] value)
+    {
+<span class="fc bfc" id="L953" title="All 2 branches covered.">        if (value == null)</span>
+        {
+<span class="fc" id="L955">            return &quot;null.clob&quot;;</span>
+        }
+
+<span class="fc" id="L958">        StringBuilder builder = new StringBuilder(64);</span>
+        try
+        {
+<span class="fc" id="L961">            printClob(builder, value);</span>
+        }
+<span class="nc" id="L963">        catch (IOException e)</span>
+        {
+            // Shouldn't happen
+<span class="nc" id="L966">            throw new Error(e);</span>
+<span class="fc" id="L967">        }</span>
+<span class="fc" id="L968">        return builder.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

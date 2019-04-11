@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PooledBlockAllocatorProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl.bin</a> &gt; <span class="el_source">PooledBlockAllocatorProvider.java</span></div><h1>PooledBlockAllocatorProvider.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl.bin;
+
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentMap;
+
+/**
+ * A simple pooling implementation of {@link BlockAllocatorProvider} with a global thread-safe free block list
+ * for each block size.
+ * &lt;p&gt;
+ * This implementation is thread-safe.
+ */
+/*package*/ final class PooledBlockAllocatorProvider extends BlockAllocatorProvider
+{
+    /**
+     * A {@link BlockAllocator} of for a particular size that has a single thread-safe free list.
+     * &lt;p&gt;
+     * This implementation is thread-safe.
+     */
+    private final class PooledBlockAllocator extends BlockAllocator
+    {
+        private final int blockSize;
+        private final ConcurrentLinkedQueue&lt;Block&gt; freeBlocks;
+
+        public PooledBlockAllocator(final int blockSize)
+<span class="fc" id="L41">        {</span>
+<span class="fc" id="L42">            this.blockSize = blockSize;</span>
+<span class="fc" id="L43">            this.freeBlocks = new ConcurrentLinkedQueue&lt;Block&gt;();</span>
+<span class="fc" id="L44">        }</span>
+
+        @Override
+        public Block allocateBlock()
+        {
+<span class="fc" id="L49">            Block block = freeBlocks.poll();</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            if (block == null)</span>
+            {
+<span class="fc" id="L52">                block = new Block(new byte[blockSize])</span>
+<span class="fc" id="L53">                {</span>
+                    @Override
+                    public void close()
+                    {
+<span class="fc" id="L57">                        reset();</span>
+<span class="fc" id="L58">                        freeBlocks.add(this);</span>
+<span class="fc" id="L59">                    }</span>
+                };
+            }
+<span class="fc" id="L62">            return block;</span>
+        }
+
+        @Override
+        public int getBlockSize()
+        {
+<span class="fc" id="L68">            return blockSize;</span>
+        }
+
+        @Override
+<span class="fc" id="L72">        public void close() {}</span>
+    }
+
+    private final ConcurrentMap&lt;Integer, BlockAllocator&gt; allocators;
+
+    public PooledBlockAllocatorProvider()
+<span class="fc" id="L78">    {</span>
+<span class="fc" id="L79">        allocators = new ConcurrentHashMap&lt;Integer, BlockAllocator&gt;();</span>
+<span class="fc" id="L80">    }</span>
+
+    @Override
+    public BlockAllocator vendAllocator(final int blockSize)
+    {
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        if (blockSize &lt;= 0)</span>
+        {
+<span class="nc" id="L87">            throw new IllegalArgumentException(&quot;Invalid block size: &quot; + blockSize);</span>
+        }
+
+<span class="fc" id="L90">        BlockAllocator allocator = allocators.get(blockSize);</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (allocator == null)</span>
+        {
+<span class="fc" id="L93">            allocator = new PooledBlockAllocator(blockSize);</span>
+<span class="fc" id="L94">            final BlockAllocator existingAllocator = allocators.putIfAbsent(blockSize, allocator);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">            if (existingAllocator != null)</span>
+            {
+<span class="nc" id="L97">                allocator = existingAllocator;</span>
+            }
+        }
+<span class="fc" id="L100">        return allocator;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

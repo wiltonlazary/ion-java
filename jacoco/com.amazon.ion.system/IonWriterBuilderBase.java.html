@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonWriterBuilderBase.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.system</a> &gt; <span class="el_source">IonWriterBuilderBase.java</span></div><h1>IonWriterBuilderBase.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.system;
+
+import com.amazon.ion.IonCatalog;
+import com.amazon.ion.IonWriter;
+import com.amazon.ion.SymbolTable;
+
+
+
+abstract class IonWriterBuilderBase&lt;T extends IonWriterBuilderBase&gt;
+    extends IonWriterBuilder
+{
+    // TODO reuseInitialSymtabAfterFinish property
+    //      Causes the same local symbol table to be installed when more data
+    //      is written after finish().  The &quot;reused&quot; LST will only contain
+    //      those symbols that were interned when setInitialSymbolTable() was
+    //      called.
+
+    private IonCatalog    myCatalog;
+    private SymbolTable[] myImports;
+
+
+    /** NOT FOR APPLICATION USE! */
+    protected IonWriterBuilderBase()
+<span class="fc" id="L39">    {</span>
+<span class="fc" id="L40">    }</span>
+
+    /** NOT FOR APPLICATION USE! */
+    protected IonWriterBuilderBase(IonWriterBuilderBase that)
+<span class="fc" id="L44">    {</span>
+<span class="fc" id="L45">        this.myCatalog = that.myCatalog;</span>
+<span class="fc" id="L46">        this.myImports = that.myImports;</span>
+<span class="fc" id="L47">    }</span>
+
+
+    //=========================================================================
+
+    /**
+     * Creates a mutable copy of this builder.
+     *
+     * @return a new builder with the same configuration as {@code this}.
+     */
+    abstract T copy();
+
+
+    /**
+     * Returns an immutable builder configured exactly like this one.
+     *
+     * @return this instance, if immutable;
+     * otherwise an immutable copy of this instance.
+     */
+    abstract T immutable();
+
+
+    /**
+     * Returns a mutable builder configured exactly like this one.
+     *
+     * @return this instance, if mutable;
+     * otherwise a mutable copy of this instance.
+     */
+    abstract T mutable();
+
+
+    /** NOT FOR APPLICATION USE! */
+    protected void mutationCheck()
+    {
+<span class="fc" id="L81">        throw new UnsupportedOperationException(&quot;This builder is immutable&quot;);</span>
+    }
+
+
+    //=========================================================================
+
+    /**
+     * Gets the catalog to use when building an {@link IonWriter}.
+     * The catalog is needed to resolve manually-written imports (not common).
+     * By default, this property is null.
+     *
+     * @see #setCatalog(IonCatalog)
+     * @see #withCatalog(IonCatalog)
+     */
+    public final IonCatalog getCatalog()
+    {
+<span class="fc" id="L97">        return myCatalog;</span>
+    }
+
+    /**
+     * Sets the catalog to use when building an {@link IonWriter}.
+     *
+     * @param catalog the catalog to use in built writers.
+     *  If null, the writer will be unable to resolve manually-written imports
+     *  and may throw an exception.
+     *
+     * @see #getCatalog()
+     * @see #withCatalog(IonCatalog)
+     *
+     * @throws UnsupportedOperationException if this is immutable.
+     */
+    public void setCatalog(IonCatalog catalog)
+    {
+<span class="fc" id="L114">        mutationCheck();</span>
+<span class="fc" id="L115">        myCatalog = catalog;</span>
+<span class="fc" id="L116">    }</span>
+
+    /**
+     * Declares the catalog to use when building an {@link IonWriter},
+     * returning a new mutable builder if this is immutable.
+     *
+     * @param catalog the catalog to use in built writers.
+     *  If null, the writer will be unable to resolve manually-written imports
+     *  and may throw an exception.
+     *
+     * @return this instance, if mutable;
+     * otherwise a mutable copy of this instance.
+     *
+     * @see #getCatalog()
+     * @see #setCatalog(IonCatalog)
+     */
+    public T withCatalog(IonCatalog catalog)
+    {
+<span class="fc" id="L134">        T b = mutable();</span>
+<span class="fc" id="L135">        b.setCatalog(catalog);</span>
+<span class="fc" id="L136">        return b;</span>
+    }
+
+    //-------------------------------------------------------------------------
+
+
+    private static SymbolTable[] safeCopy(SymbolTable[] imports)
+    {
+<span class="fc bfc" id="L144" title="All 4 branches covered.">        if (imports != null &amp;&amp; imports.length != 0)</span>
+        {
+<span class="fc" id="L146">            imports = imports.clone();</span>
+        }
+<span class="fc" id="L148">        return imports;</span>
+    }
+
+
+    /**
+     * Gets the imports that will be used to construct the initial local
+     * symbol table.
+     *
+     * @return may be null or empty.
+     *
+     * @see #setImports(SymbolTable...)
+     * @see #withImports(SymbolTable...)
+     */
+    public final SymbolTable[] getImports()
+    {
+<span class="fc" id="L163">        return safeCopy(myImports);</span>
+    }
+
+    /**
+     * Sets the shared symbol tables that will be used to construct the
+     * initial local symbol table.
+     * &lt;p&gt;
+     * If the imports sequence is not null and not empty, the output stream
+     * will be bootstrapped with a local symbol table that uses the given
+     * {@code imports}.
+     *
+     * @param imports a sequence of shared symbol tables.
+     * The first (and only the first) may be a system table.
+     *
+     * @see #getImports()
+     * @see #withImports(SymbolTable...)
+     *
+     * @throws UnsupportedOperationException if this is immutable.
+     */
+    public void setImports(SymbolTable... imports)
+    {
+<span class="fc" id="L184">        mutationCheck();</span>
+<span class="fc" id="L185">        myImports = safeCopy(imports);</span>
+<span class="fc" id="L186">    }</span>
+
+    /**
+     * Declares the imports to use when building an {@link IonWriter},
+     * returning a new mutable builder if this is immutable.
+     * &lt;p&gt;
+     * If the imports sequence is not null and not empty, the output stream
+     * will be bootstrapped with a local symbol table that uses the given
+     * {@code imports}.
+     *
+     * @param imports a sequence of shared symbol tables.
+     * The first (and only the first) may be a system table.
+     *
+     * @return this instance, if mutable;
+     * otherwise a mutable copy of this instance.
+     *
+     * @see #getImports()
+     * @see #setImports(SymbolTable...)
+     */
+    public T withImports(SymbolTable... imports)
+    {
+<span class="fc" id="L207">        T b = mutable();</span>
+<span class="fc" id="L208">        b.setImports(imports);</span>
+<span class="fc" id="L209">        return b;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

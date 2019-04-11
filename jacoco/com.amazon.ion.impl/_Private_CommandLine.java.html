@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>_Private_CommandLine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl</a> &gt; <span class="el_source">_Private_CommandLine.java</span></div><h1>_Private_CommandLine.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl;
+
+import com.amazon.ion.IonType;
+import com.amazon.ion.IonWriter;
+import com.amazon.ion.system.IonTextWriterBuilder;
+import com.amazon.ion.util.JarInfo;
+import java.io.IOException;
+
+/**
+ * NOT FOR APPLICATION USE!
+ */
+<span class="nc" id="L27">public final class _Private_CommandLine</span>
+{
+    static final int argid_VERSION = 2;
+    static final int argid_HELP    = 3;
+    static final int argid_INVALID = -1;
+
+<span class="nc" id="L33">    static JarInfo info = null;</span>
+<span class="nc" id="L34">    static boolean printHelp    = false;</span>
+<span class="nc" id="L35">    static boolean printVersion = false;</span>
+<span class="nc" id="L36">    static String  errorMessage = null;</span>
+
+
+    /**
+     * This main simply prints the version information to
+     * allow users to identify the build version of the Jar.
+     *
+     * @param args user command line flags
+     */
+    public static void main(String[] args) throws IOException
+    {
+<span class="nc" id="L47">        process_command_line(args);</span>
+
+<span class="nc" id="L49">        info = new JarInfo();</span>
+
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        if (printVersion) {</span>
+<span class="nc" id="L52">            doPrintVersion();</span>
+        }
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        if (printHelp) {</span>
+<span class="nc" id="L55">            doPrintHelp();</span>
+        }
+<span class="nc" id="L57">    }</span>
+
+    private static void process_command_line(String[] args)
+    {
+<span class="nc bnc" id="L61" title="All 2 branches missed.">        if (args.length == 0) printHelp = true;</span>
+
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        for (int ii=0; ii&lt;args.length; ii++) {</span>
+<span class="nc" id="L64">            String arg = args[ii];</span>
+<span class="nc bnc" id="L65" title="All 4 branches missed.">            if (arg == null || arg.length() &lt; 1) continue;</span>
+<span class="nc" id="L66">            int argid = getArgumentId(arg);</span>
+<span class="nc bnc" id="L67" title="All 3 branches missed.">            switch (argid) {</span>
+            case argid_VERSION:
+<span class="nc" id="L69">                printVersion = true;</span>
+<span class="nc" id="L70">                break;</span>
+            case argid_HELP:
+<span class="nc" id="L72">                printHelp = true;</span>
+<span class="nc" id="L73">                break;</span>
+            default:
+<span class="nc" id="L75">                invalid_arg(ii, arg);</span>
+                break;
+            }
+        }
+<span class="nc" id="L79">        return;</span>
+    }
+    private static int getArgumentId(String arg)
+    {
+<span class="nc bnc" id="L83" title="All 4 branches missed.">        if (arg.startsWith(&quot;-&quot;) &amp;&amp; arg.length() == 2) {</span>
+<span class="nc bnc" id="L84" title="All 3 branches missed.">            switch (arg.charAt(1)) {</span>
+            case 'h': case '?':
+<span class="nc" id="L86">                return argid_HELP;</span>
+            case 'v':
+<span class="nc" id="L88">                return argid_VERSION;</span>
+            default:
+<span class="nc" id="L90">                return argid_INVALID;</span>
+            }
+        }
+<span class="nc bnc" id="L93" title="All 4 branches missed.">        if (arg.startsWith(&quot;--&quot;) &amp;&amp; arg.length() &gt; 2) {</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">            if (arg.equals(&quot;help&quot;)) {</span>
+<span class="nc" id="L95">                return argid_HELP;</span>
+            }
+<span class="nc bnc" id="L97" title="All 2 branches missed.">            if (arg.equals(&quot;version&quot;)) {</span>
+<span class="nc" id="L98">                return argid_VERSION;</span>
+            }
+        }
+<span class="nc" id="L101">        return argid_INVALID;</span>
+    }
+    private static void invalid_arg(int ii, String arg)
+    {
+<span class="nc" id="L105">        errorMessage += &quot;\narg[&quot;+ii+&quot;] \&quot;&quot;+arg+&quot;\&quot; is unrecognized or invalid.&quot;;</span>
+<span class="nc" id="L106">        printHelp = true;</span>
+<span class="nc" id="L107">    }</span>
+
+    private static void doPrintHelp() {
+<span class="nc" id="L110">        System.out.println(&quot;ion-java -- Copyright (c) 2007-&quot; + info.getBuildTime().getYear() + &quot; Amazon.com&quot;);</span>
+<span class="nc" id="L111">        System.out.println(&quot;usage: java -jar &lt;jar&gt; &lt;options&gt;&quot;);</span>
+<span class="nc" id="L112">        System.out.println(&quot;options:&quot;);</span>
+<span class="nc" id="L113">        System.out.println(&quot;version\t\tprints current version entry&quot;);</span>
+<span class="nc" id="L114">        System.out.println(&quot;help\t\tprints this helpful message&quot;);</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        if (errorMessage != null) {</span>
+<span class="nc" id="L116">            System.out.println();</span>
+<span class="nc" id="L117">            System.out.println(errorMessage);</span>
+        }
+<span class="nc" id="L119">    }</span>
+
+
+    private static void doPrintVersion() throws IOException
+    {
+<span class="nc" id="L124">        IonTextWriterBuilder b = IonTextWriterBuilder.pretty();</span>
+<span class="nc" id="L125">        b.setCharset(IonTextWriterBuilder.ASCII);</span>
+
+<span class="nc" id="L127">        IonWriter w = b.build((Appendable)System.out);</span>
+<span class="nc" id="L128">        w.stepIn(IonType.STRUCT);</span>
+        {
+<span class="nc" id="L130">            w.setFieldName(&quot;version&quot;);</span>
+<span class="nc" id="L131">            w.writeString(info.getProjectVersion());</span>
+
+<span class="nc" id="L133">            w.setFieldName(&quot;build_time&quot;);</span>
+<span class="nc" id="L134">            w.writeTimestamp(info.getBuildTime());</span>
+        }
+<span class="nc" id="L136">        w.stepOut();</span>
+<span class="nc" id="L137">        w.finish();</span>
+
+<span class="nc" id="L139">        System.out.println();</span>
+<span class="nc" id="L140">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

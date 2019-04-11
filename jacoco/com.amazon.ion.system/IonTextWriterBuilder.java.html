@@ -1,0 +1,645 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonTextWriterBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.system</a> &gt; <span class="el_source">IonTextWriterBuilder.java</span></div><h1>IonTextWriterBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.system;
+
+import static com.amazon.ion.system.IonWriterBuilder.InitialIvmHandling.SUPPRESS;
+
+import com.amazon.ion.IonCatalog;
+import com.amazon.ion.IonWriter;
+import com.amazon.ion.SymbolTable;
+import com.amazon.ion.impl._Private_IonTextWriterBuilder;
+import com.amazon.ion.impl._Private_Utils;
+import java.io.OutputStream;
+import java.nio.charset.Charset;
+
+/**
+ * The builder for creating {@link IonWriter}s emitting the Ion text syntax.
+ * &lt;p&gt;
+ * &lt;b&gt;WARNING:&lt;/b&gt; This class should not be extended by code outside of
+ * this library.
+ * &lt;p&gt;
+ * Builders may be configured once and reused to construct multiple
+ * objects.
+ * &lt;p&gt;
+ * &lt;b&gt;Instances of this class are not not safe for use by multiple threads
+ * unless they are {@linkplain #immutable() immutable}.&lt;/b&gt;
+ * &lt;p&gt;
+ * The most general and correct approach is to use the {@link #standard()}
+ * builder:
+ *&lt;pre&gt;
+ *    IonWriter w = IonTextWriterBuilder.standard().build(outputStream);
+ *&lt;/pre&gt;
+ * The standard configuration gives a direct representation of what's written,
+ * including version markers and local symbol tables. That's good for
+ * diagnostics but it may be more than you want in many situations.
+ * In such cases the {@link #minimal()} or {@link #pretty()} builders (or a
+ * combination) may give more satisfying output:
+ *&lt;pre&gt;
+ *    IonWriter w = IonTextWriterBuilder.minimal()
+ *                                      .withPrettyPrinting()
+ *                                      .build(outputStream);
+ *&lt;/pre&gt;
+ *
+ * &lt;p&gt;
+ * Configuration properties follow the standard JavaBeans idiom in order to be
+ * friendly to dependency injection systems.  They also provide alternative
+ * {@code with...()} mutation methods that enable a more fluid style.
+ *
+ * &lt;h2&gt;Auto-flushing&lt;/h2&gt;
+ *
+ * {@link IonWriter}s created by this builder &lt;em&gt;auto-flush&lt;/em&gt; to the
+ * underlying data sink after writing each top-level value in the context of
+ * the writer.
+ * &lt;p&gt;
+ * Currently, there is no configuration point available to disable the
+ * auto-flushing mechanism. Please vote on
+ * &lt;a href=&quot;https://github.com/amzn/ion-java/issues/32&quot;&gt;issue amzn/ion-java/issues/32&lt;/a&gt;
+ * if you require it.
+ *
+ */
+public abstract class IonTextWriterBuilder
+    extends IonWriterBuilderBase&lt;IonTextWriterBuilder&gt;
+{
+    /**
+     * A strategy for minimizing the output of local symbol tables.
+     * By default, no minimization takes place and the writer outputs all data
+     * as-is.
+     *
+
+     */
+<span class="fc" id="L83">    public enum LstMinimizing</span>
+    {
+        /**
+         * Discards local symbols, retains imports&lt;!-- and open content--&gt;.
+         */
+<span class="fc" id="L88">        LOCALS,</span>
+
+        /* TODO Discards local symbols and imports, retains open content.
+         * This isn't implemented yet, because our symtab implmentations don't
+         * support open content (so it would work the same as EVERYTHING).
+         */
+//      IMPORTS,
+
+        /**
+         * Discards everything, collapsing the LST to an IVM.
+         * If {@link com.amazon.ion.system.IonWriterBuilder.IvmMinimizing}
+         * is also in effect, then even that IVM may be suppressed.
+         *
+         * @see IonTextWriterBuilder#setIvmMinimizing(IonWriterBuilder.IvmMinimizing)
+         */
+<span class="fc" id="L103">        EVERYTHING</span>
+    }
+
+    /**
+     * The {@code &quot;US-ASCII&quot;} charset.
+     */
+<span class="fc" id="L109">    public static final Charset ASCII = _Private_Utils.ASCII_CHARSET;</span>
+
+    /**
+     * The {@code &quot;UTF-8&quot;} charset.
+     */
+<span class="fc" id="L114">    public static final Charset UTF8 = _Private_Utils.UTF8_CHARSET;</span>
+
+
+    /**
+     * The standard builder of text {@link IonWriter}s, with all configuration
+     * properties having their default values. The resulting output is a
+     * direct representation of what's written to the writer, including
+     * version markers and local symbol tables.
+     *
+     * @return a new, mutable builder instance.
+     *
+     * @see #minimal()
+     * @see #pretty()
+     * @see #json()
+     */
+    public static IonTextWriterBuilder standard()
+    {
+<span class="fc" id="L131">        return _Private_IonTextWriterBuilder.standard();</span>
+    }
+
+    /**
+     * Creates a builder configured to minimize system data, eliminating local
+     * symbol tables and minimizing version markers.
+     *
+     * @return a new, mutable builder instance.
+     *
+     * @see #withMinimalSystemData()
+     *
+
+     */
+    public static IonTextWriterBuilder minimal()
+    {
+<span class="nc" id="L146">        return standard().withMinimalSystemData();</span>
+    }
+
+    /**
+     * Creates a builder preconfigured for basic pretty-printing.
+     * &lt;p&gt;
+     * The specifics of this configuration may change between releases of this
+     * library, so automated processes should not depend on the exact output
+     * formatting. In particular, there's currently no promise regarding
+     * handling of system data.
+     *
+     * @return a new, mutable builder instance.
+     *
+     * @see #withPrettyPrinting()
+     */
+    public static IonTextWriterBuilder pretty()
+    {
+<span class="fc" id="L163">        return standard().withPrettyPrinting();</span>
+    }
+
+    /**
+     * Creates a builder preconfigured for JSON compatibility.
+     *
+     * @return a new, mutable builder instance.
+     *
+     * @see #withJsonDowngrade()
+     */
+    public static IonTextWriterBuilder json()
+    {
+<span class="fc" id="L175">        return standard().withJsonDowngrade();</span>
+    }
+
+    //=========================================================================
+
+    // Config points:
+    //   * Default IVM
+    //   * Re-use same imports after a finish
+    //   * Indentation CharSeq
+
+    private Charset myCharset;
+    private InitialIvmHandling myInitialIvmHandling;
+    private IvmMinimizing myIvmMinimizing;
+    private LstMinimizing myLstMinimizing;
+    private int myLongStringThreshold;
+
+
+    /** NOT FOR APPLICATION USE! */
+    protected IonTextWriterBuilder()
+<span class="fc" id="L194">    {</span>
+<span class="fc" id="L195">    }</span>
+
+    /** NOT FOR APPLICATION USE! */
+    protected IonTextWriterBuilder(IonTextWriterBuilder that)
+    {
+<span class="fc" id="L200">        super(that);</span>
+
+<span class="fc" id="L202">        this.myCharset              = that.myCharset;</span>
+<span class="fc" id="L203">        this.myInitialIvmHandling   = that.myInitialIvmHandling;</span>
+<span class="fc" id="L204">        this.myIvmMinimizing        = that.myIvmMinimizing;</span>
+<span class="fc" id="L205">        this.myLstMinimizing        = that.myLstMinimizing;</span>
+<span class="fc" id="L206">        this.myLongStringThreshold  = that.myLongStringThreshold;</span>
+<span class="fc" id="L207">    }</span>
+
+
+    //=========================================================================
+    // Overrides to fix the return type in JavaDocs
+
+
+    @Override
+    public abstract IonTextWriterBuilder copy();
+
+    @Override
+    public abstract IonTextWriterBuilder immutable();
+
+    @Override
+    public abstract IonTextWriterBuilder mutable();
+
+
+    @Override
+    public final IonTextWriterBuilder withCatalog(IonCatalog catalog)
+    {
+<span class="fc" id="L227">        return super.withCatalog(catalog);</span>
+    }
+
+    @Override
+    public final IonTextWriterBuilder withImports(SymbolTable... imports)
+    {
+<span class="fc" id="L233">        return super.withImports(imports);</span>
+    }
+
+
+    //-------------------------------------------------------------------------
+
+    /**
+     * Gets the charset denoting the output encoding.
+     * Only ASCII and UTF-8 are supported.
+     *
+     * @return may be null, denoting the default of UTF-8.
+     *
+     * @see #setCharset(Charset)
+     * @see #withCharset(Charset)
+     */
+    public final Charset getCharset()
+    {
+<span class="fc" id="L250">        return myCharset;</span>
+    }
+
+    /**
+     * Sets the charset denoting the output encoding.
+     * Only ASCII and UTF-8 are supported; applications can use the helper
+     * constants {@link #ASCII} and {@link #UTF8}.
+     *
+     * @param charset may be null, denoting the default of UTF-8.
+     *
+     * @see #getCharset()
+     * @see #withCharset(Charset)
+     *
+     * @throws UnsupportedOperationException if this is immutable.
+     */
+    public void setCharset(Charset charset)
+    {
+<span class="fc" id="L267">        mutationCheck();</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">        if (charset == null</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">            || charset.equals(ASCII)</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">            || charset.equals(UTF8))</span>
+        {
+<span class="fc" id="L272">            myCharset = charset;</span>
+        }
+        else
+        {
+<span class="fc" id="L276">            throw new IllegalArgumentException(&quot;Unsupported Charset &quot;</span>
+                                               + charset);
+        }
+<span class="fc" id="L279">    }</span>
+
+    /**
+     * Declares the charset denoting the output encoding,
+     * returning a new mutable builder if this is immutable.
+     * Only ASCII and UTF-8 are supported; applications can use the helper
+     * constants {@link #ASCII} and {@link #UTF8}.
+     *
+     * @param charset may be null, denoting the default of UTF-8.
+     *
+     * @return this instance, if mutable;
+     * otherwise a mutable copy of this instance.
+     *
+     * @see #getCharset()
+     * @see #setCharset(Charset)
+     */
+    public final IonTextWriterBuilder withCharset(Charset charset)
+    {
+<span class="fc" id="L297">        IonTextWriterBuilder b = mutable();</span>
+<span class="fc" id="L298">        b.setCharset(charset);</span>
+<span class="fc" id="L299">        return b;</span>
+    }
+
+    /**
+     * Declares the output encoding to be {@code US-ASCII}.
+     *
+     * @return this instance, if mutable;
+     * otherwise a mutable copy of this instance.
+     */
+    public final IonTextWriterBuilder withCharsetAscii()
+    {
+<span class="fc" id="L310">        return withCharset(ASCII);</span>
+    }
+
+    //-------------------------------------------------------------------------
+
+    /**
+     * Declares that this builder should minimize system-level output
+     * (Ion version markers and local symbol tables).
+     * &lt;p&gt;
+     * This is equivalent to:
+     * &lt;ul&gt;
+     *   &lt;li&gt;{@link #setInitialIvmHandling(IonWriterBuilder.InitialIvmHandling)
+     *   setInitialIvmHandling}{@code (}{@link IonWriterBuilder.InitialIvmHandling#SUPPRESS SUPPRESS}{@code )}
+     *   &lt;li&gt;{@link #setIvmMinimizing(IonWriterBuilder.IvmMinimizing)
+     *   setIvmMinimizing}{@code (}{@link IonWriterBuilder.IvmMinimizing#DISTANT DISTANT}{@code )}
+     *   &lt;li&gt;{@link #setLstMinimizing(LstMinimizing)
+     *   setLstMinimizing}{@code (}{@link LstMinimizing#EVERYTHING EVERYTHING}{@code )}
+     * &lt;/ul&gt;
+     *
+     * @return this instance, if mutable;
+     * otherwise a mutable copy of this instance.
+     *
+
+     */
+    public final IonTextWriterBuilder withMinimalSystemData()
+    {
+<span class="fc" id="L336">        IonTextWriterBuilder b = mutable();</span>
+<span class="fc" id="L337">        b.setInitialIvmHandling(SUPPRESS);</span>
+<span class="fc" id="L338">        b.setIvmMinimizing(IvmMinimizing.DISTANT);</span>
+<span class="fc" id="L339">        b.setLstMinimizing(LstMinimizing.EVERYTHING);</span>
+<span class="fc" id="L340">        return b;</span>
+    }
+
+
+    /**
+     * Declares that this builder should use basic pretty-printing.
+     * Does not alter the handling of system data.
+     * Calling this method alters several other configuration properties,
+     * so code should call it first, then make any necessary overrides.
+     * &lt;p&gt;
+     * The specifics of this configuration may change between releases of this
+     * library, so automated processes should not depend on the exact output
+     * formatting.
+     *
+     * @return this instance, if mutable;
+     * otherwise a mutable copy of this instance.
+     */
+    public abstract IonTextWriterBuilder withPrettyPrinting();
+
+
+    /**
+     * Declares that this builder should downgrade the writers' output to
+     * JSON compatibility. This format cannot round-trip back to Ion with full
+     * fidelity.
+     * &lt;p&gt;
+     * The specific conversions are as follows:
+     * &lt;ul&gt;
+     *   &lt;li&gt;System data is suppressed per {@link #withMinimalSystemData()}.
+     *   &lt;li&gt;All annotations are suppressed.
+     *   &lt;li&gt;Nulls of any type are printed as JSON {@code null}.
+     *   &lt;li&gt;Blobs are printed as strings, containing Base64.
+     *   &lt;li&gt;Clobs are printed as strings, containing only Unicode code points
+     *       U+00 through U+FF.
+     *   &lt;li&gt;Sexps are printed as lists.
+     *   &lt;li&gt;Symbols are printed as strings.
+     *   &lt;li&gt;Timestamps are printed as strings, using Ion timestamp format.
+     * &lt;/ul&gt;
+     *
+     * @return this instance, if mutable;
+     * otherwise a mutable copy of this instance.
+     */
+    public abstract IonTextWriterBuilder withJsonDowngrade();
+
+
+    //-------------------------------------------------------------------------
+
+    /**
+     * {@inheritDoc}
+     *
+     * @return the initial IVM strategy.
+     * The default value ({@code null}) indicates that an initial IVM is
+     * emitted if and only if it is received by the writer.
+     *
+     * @see #setInitialIvmHandling(IonWriterBuilder.InitialIvmHandling)
+     * @see #withInitialIvmHandling(IonWriterBuilder.InitialIvmHandling)
+     */
+    @Override
+    public final InitialIvmHandling getInitialIvmHandling()
+    {
+<span class="fc" id="L399">        return myInitialIvmHandling;</span>
+    }
+
+    /**
+     * Sets the strategy for emitting Ion version markers at the start
+     * of the stream. By default, IVMs are emitted only when explicitly
+     * written or when necessary (for example, before data that's not Ion 1.0).
+     *
+     * @param handling the initial IVM strategy.
+     * Null indicates that explicitly-written IVMs will be emitted.
+     *
+     * @see #getInitialIvmHandling()
+     * @see #withInitialIvmHandling(IonWriterBuilder.InitialIvmHandling)
+     *
+     * @throws UnsupportedOperationException if this is immutable.
+     */
+    public void setInitialIvmHandling(InitialIvmHandling handling)
+    {
+<span class="fc" id="L417">        mutationCheck();</span>
+<span class="fc" id="L418">        myInitialIvmHandling = handling;</span>
+<span class="fc" id="L419">    }</span>
+
+    /**
+     * Declares the strategy for emitting Ion version markers at the start
+     * of the stream, returning a new mutable builder if this is immutable.
+     * By default, IVMs are emitted only when explicitly
+     * written or when necessary (for example, before data that's not Ion 1.0).
+     *
+     * @param handling the initial IVM strategy.
+     * Null indicates that explicitly-written IVMs will be emitted.
+     *
+     * @return this instance, if mutable;
+     * otherwise a mutable copy of this instance.
+     *
+     * @see #setInitialIvmHandling(IonWriterBuilder.InitialIvmHandling)
+     * @see #withInitialIvmHandling(IonWriterBuilder.InitialIvmHandling)
+     */
+    public final IonTextWriterBuilder
+    withInitialIvmHandling(InitialIvmHandling handling)
+    {
+<span class="fc" id="L439">        IonTextWriterBuilder b = mutable();</span>
+<span class="fc" id="L440">        b.setInitialIvmHandling(handling);</span>
+<span class="fc" id="L441">        return b;</span>
+    }
+
+    //-------------------------------------------------------------------------
+
+    /**
+     * {@inheritDoc}
+     *
+     * @return the IVM minimizing strategy.
+     * The default value ({@code null}) indicates that no minimization occurs
+     * and IVMs are emitted as received by the writer.
+     *
+     * @see #setIvmMinimizing(IonWriterBuilder.IvmMinimizing)
+     * @see #withIvmMinimizing(IonWriterBuilder.IvmMinimizing)
+     *
+
+     */
+    @Override
+    public final IvmMinimizing getIvmMinimizing()
+    {
+<span class="fc" id="L461">        return myIvmMinimizing;</span>
+    }
+
+    /**
+     * Sets the strategy for reducing or eliminating non-initial Ion version
+     * markers. When null, IVMs are emitted as they are written.
+     *
+     * @param minimizing the IVM minimization strategy.
+     * Null indicates that all explicitly-written IVMs will be emitted.
+     *
+     * @see #getIvmMinimizing()
+     * @see #withIvmMinimizing(IonWriterBuilder.IvmMinimizing)
+     *
+     * @throws UnsupportedOperationException if this is immutable.
+     *
+
+     */
+    public void setIvmMinimizing(IvmMinimizing minimizing)
+    {
+<span class="fc" id="L480">        mutationCheck();</span>
+<span class="fc" id="L481">        myIvmMinimizing = minimizing;</span>
+<span class="fc" id="L482">    }</span>
+
+    /**
+     * Declares the strategy for reducing or eliminating non-initial Ion version
+     * markers, returning a new mutable builder if this is immutable.
+     * When null, IVMs are emitted as they are written.
+     *
+     * @param minimizing the IVM minimization strategy.
+     * Null indicates that all explicitly-written IVMs will be emitted.
+     *
+     * @return this instance, if mutable;
+     * otherwise a mutable copy of this instance.
+     *
+     * @see #setIvmMinimizing(IonWriterBuilder.IvmMinimizing)
+     * @see #getIvmMinimizing()
+     *
+
+     */
+    public final IonTextWriterBuilder
+    withIvmMinimizing(IvmMinimizing minimizing)
+    {
+<span class="fc" id="L503">        IonTextWriterBuilder b = mutable();</span>
+<span class="fc" id="L504">        b.setIvmMinimizing(minimizing);</span>
+<span class="fc" id="L505">        return b;</span>
+    }
+
+    //-------------------------------------------------------------------------
+
+    /**
+     * Gets the strategy for reducing or eliminating local symbol tables.
+     * By default, LST data is emitted as received or when necessary
+     * (for example, binary data will always collect and emit local symbols).
+     *
+     * @see #setLstMinimizing(LstMinimizing)
+     * @see #withLstMinimizing(LstMinimizing)
+     *
+
+     */
+    public final LstMinimizing getLstMinimizing()
+    {
+<span class="fc" id="L522">        return myLstMinimizing;</span>
+    }
+
+    /**
+     * Sets the strategy for reducing or eliminating local symbol tables.
+     * By default, LST data is emitted as received or when necessary
+     * (for example, binary data will always collect and emit local symbols).
+     *
+     * @param minimizing the LST minimization strategy.
+     * Null indicates that LSTs will be emitted as received.
+     *
+     * @see #getLstMinimizing()
+     * @see #withLstMinimizing(LstMinimizing)
+     *
+     * @throws UnsupportedOperationException if this is immutable.
+     *
+
+     */
+    public void setLstMinimizing(LstMinimizing minimizing)
+    {
+<span class="fc" id="L542">        mutationCheck();</span>
+<span class="fc" id="L543">        myLstMinimizing = minimizing;</span>
+<span class="fc" id="L544">    }</span>
+
+    /**
+     * Sets the strategy for reducing or eliminating local symbol tables.
+     * By default, LST data is emitted as received or when necessary
+     * (for example, binary data will always collect and emit local symbols).
+     *
+     * @param minimizing the LST minimization strategy.
+     * Null indicates that LSTs will be emitted as received.
+     *
+     * @return this instance, if mutable;
+     * otherwise a mutable copy of this instance.
+     *
+     * @see #getLstMinimizing()
+     * @see #setLstMinimizing(LstMinimizing)
+     *
+
+     */
+    public final IonTextWriterBuilder
+    withLstMinimizing(LstMinimizing minimizing)
+    {
+<span class="fc" id="L565">        IonTextWriterBuilder b = mutable();</span>
+<span class="fc" id="L566">        b.setLstMinimizing(minimizing);</span>
+<span class="fc" id="L567">        return b;</span>
+    }
+
+    //-------------------------------------------------------------------------
+
+    /**
+     * Gets the length beyond which string and clob content will be rendered
+     * as triple-quoted &quot;long strings&quot;.
+     * At present, such content will only line-break on extant newlines.
+     *
+     * @return the threshold for printing triple-quoted strings and clobs.
+     * Zero means no limit.
+     *
+     * @see #setLongStringThreshold(int)
+     * @see #withLongStringThreshold(int)
+     */
+    public final int getLongStringThreshold()
+    {
+<span class="fc" id="L585">        return myLongStringThreshold;</span>
+    }
+
+    /**
+     * Sets the length beyond which string and clob content will be rendered
+     * as triple-quoted &quot;long strings&quot;.
+     * At present, such content will only line-break on extant newlines.
+     *
+     * @param threshold the new threshold; zero means none.
+     *
+     * @see #getLongStringThreshold()
+     * @see #withLongStringThreshold(int)
+     *
+     * @throws UnsupportedOperationException if this is immutable.
+     */
+    public void setLongStringThreshold(int threshold)
+    {
+<span class="fc" id="L602">        mutationCheck();</span>
+<span class="fc" id="L603">        myLongStringThreshold = threshold;</span>
+<span class="fc" id="L604">    }</span>
+
+    /**
+     * Declares the length beyond which string and clob content will be rendered
+     * as triple-quoted &quot;long strings&quot;.
+     * At present, such content will only line-break on extant newlines.
+     *
+     * @param threshold the new threshold; zero means none.
+     *
+     * @see #getLongStringThreshold()
+     * @see #setLongStringThreshold(int)
+     *
+     * @return this instance, if mutable;
+     * otherwise a mutable copy of this instance.
+     */
+    public final IonTextWriterBuilder withLongStringThreshold(int threshold)
+    {
+<span class="fc" id="L621">        IonTextWriterBuilder b = mutable();</span>
+<span class="fc" id="L622">        b.setLongStringThreshold(threshold);</span>
+<span class="fc" id="L623">        return b;</span>
+    }
+
+
+    //=========================================================================
+
+
+    /**
+     * Creates a new writer that will write text to the given output
+     * stream.
+     * &lt;p&gt;
+     * If you have an {@link OutputStream}, you'll get better performance using
+     * {@link #build(OutputStream)} as opposed to wrapping your stream in an
+     * {@link Appendable} and calling this method.
+     *
+     * @param out the stream that will receive Ion text data.
+     * Must not be null.
+     *
+     * @return a new {@link IonWriter} instance; not {@code null}.
+     */
+    public abstract IonWriter build(Appendable out);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonWriterBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.system</a> &gt; <span class="el_source">IonWriterBuilder.java</span></div><h1>IonWriterBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.system;
+
+import java.io.OutputStream;
+import com.amazon.ion.IonWriter;
+
+/**
+ * Common options for writing Ion data streams of any form.
+ * &lt;p&gt;
+ * &lt;b&gt;WARNING:&lt;/b&gt; This class should not be extended by code outside of
+ * this library.
+ * &lt;p&gt;
+ *
+ */
+public abstract class IonWriterBuilder
+{
+    /**
+     * A strategy for altering emission of Ion version markers at the start of
+     * an Ion stream.
+     *
+     * @see IonTextWriterBuilder#setInitialIvmHandling(IonWriterBuilder.InitialIvmHandling)
+     */
+<span class="fc" id="L37">    public enum InitialIvmHandling</span>
+    {
+        /**
+         * Always emits an initial IVM, even when the user hasn't explicitly
+         * written one.  If the user &lt;em&gt;does&lt;/em&gt; write one, this won't
+         * cause an extra to be emitted.
+         *
+
+         */
+<span class="fc" id="L46">        ENSURE,</span>
+
+        /**
+         * Indicates that initial IVMs should be suppressed from the output
+         * stream whenever possible, even when they are explicitly written.
+         */
+<span class="fc" id="L52">        SUPPRESS</span>
+    }
+
+
+    /**
+     * A strategy for minimizing the output of non-initial Ion version markers.
+     * &lt;p&gt;
+     * This strategy does not affect handling of IVMs at the start of a data
+     * stream; that's the job of {@link InitialIvmHandling}.
+     *
+     * @see IonTextWriterBuilder#setIvmMinimizing(IonWriterBuilder.IvmMinimizing)
+     *
+
+     */
+<span class="fc" id="L66">    public enum IvmMinimizing</span>
+    {
+        /** Replaces identical, adjacent IVMs with a single IVM. */
+<span class="fc" id="L69">        ADJACENT,</span>
+
+        /**
+         * Discards IVMs that don't change the Ion version, even when there's
+         * other data between them. This includes adjacent IVMs.
+         */
+<span class="fc" id="L75">        DISTANT</span>
+    }
+
+
+    /**
+     * NOT FOR APPLICATION USE
+     */
+    IonWriterBuilder()
+<span class="fc" id="L83">    {</span>
+<span class="fc" id="L84">    }</span>
+
+
+    /**
+     * Gets the strategy for emitting Ion version markers at the start
+     * of the stream. By default, IVMs are emitted only when explicitly
+     * written or when necessary (for example, before data that's not Ion 1.0,
+     * or at the start of Ion binary output).
+     *
+     * @return the initial IVM strategy.
+     * Null indicates the default for the specific output form.
+     */
+    public abstract InitialIvmHandling getInitialIvmHandling();
+
+
+    /**
+     * Gets the strategy for eliminating Ion version markers mid-stream.
+     * By default, IVMs are emitted as received or when necessary.
+     * &lt;p&gt;
+     * This strategy does not affect handling of IVMs at the start of the
+     * stream; that's the job of {@link InitialIvmHandling}.
+     *
+     * @return the IVM minimizing strategy.
+     *
+
+     */
+    public abstract IvmMinimizing getIvmMinimizing();
+
+    /**
+     * Builds a new writer based on this builder's configuration
+     * properties.
+     *
+     * @param out the stream that will receive Ion data.
+     * Must not be null.
+     *
+     * @return a new {@link IonWriter} instance; not {@code null}.
+     */
+    public abstract IonWriter build(OutputStream out);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SymtabApp.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.apps</a> &gt; <span class="el_source">SymtabApp.java</span></div><h1>SymtabApp.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.apps;
+
+import com.amazon.ion.IonCatalog;
+import com.amazon.ion.IonException;
+import com.amazon.ion.IonReader;
+import com.amazon.ion.IonType;
+import com.amazon.ion.IonWriter;
+import com.amazon.ion.SymbolTable;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Iterator;
+
+
+<span class="nc bnc" id="L30" title="All 2 branches missed.">public class SymtabApp</span>
+    extends BaseApp
+{
+<span class="nc" id="L33">    private ArrayList&lt;SymbolTable&gt; myImports = new ArrayList&lt;SymbolTable&gt;();</span>
+<span class="nc" id="L34">    private ArrayList&lt;String&gt;      mySymbols = new ArrayList&lt;String&gt;();</span>
+
+    private String mySymtabName;
+    private int    mySymtabVersion;
+
+
+    //=========================================================================
+    // Static methods
+
+    public static void main(String[] args)
+    {
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        if (args.length &lt; 1)</span>
+        {
+<span class="nc" id="L47">            System.err.println(&quot;Need one file to build symtab&quot;);</span>
+<span class="nc" id="L48">            return;</span>
+        }
+
+<span class="nc" id="L51">        SymtabApp app = new SymtabApp();</span>
+<span class="nc" id="L52">        app.doMain(args);</span>
+<span class="nc" id="L53">    }</span>
+
+
+    //=========================================================================
+    // Construction and Configuration
+
+    public SymtabApp()
+<span class="nc" id="L60">    {</span>
+<span class="nc" id="L61">    }</span>
+
+
+    //=========================================================================
+
+    @Override
+    protected int processOptions(String[] args)
+    {
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        for (int i = 0; i &lt; args.length; i++)</span>
+        {
+<span class="nc" id="L71">            String arg = args[i];</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">            if (&quot;--catalog&quot;.equals(arg))</span>
+            {
+<span class="nc" id="L74">                String symtabPath = args[++i];</span>
+<span class="nc" id="L75">                loadCatalog(symtabPath);</span>
+<span class="nc" id="L76">            }</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">            else if (&quot;--import&quot;.equals(arg))</span>
+            {
+                // We'll use the latest version available.
+<span class="nc" id="L80">                String name = args[++i];</span>
+<span class="nc" id="L81">                IonCatalog catalog = mySystem.getCatalog();</span>
+<span class="nc" id="L82">                SymbolTable table = catalog.getTable(name);</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">                if (table == null)</span>
+                {
+<span class="nc" id="L85">                    String message =</span>
+                        &quot;There's no symbol table in the catalog named &quot; +
+                        name;
+<span class="nc" id="L88">                    throw new RuntimeException(message);</span>
+                }
+<span class="nc" id="L90">                myImports.add(table);</span>
+<span class="nc" id="L91">                logDebug(&quot;Imported symbol table &quot; + name</span>
+<span class="nc" id="L92">                           + &quot;@&quot; + table.getVersion());</span>
+<span class="nc" id="L93">            }</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">            else if (&quot;--name&quot;.equals(arg))</span>
+            {
+<span class="nc bnc" id="L96" title="All 2 branches missed.">                if (mySymtabName != null)</span>
+                {
+<span class="nc" id="L98">                    throw new RuntimeException(&quot;Multiple names&quot;);</span>
+                }
+<span class="nc" id="L100">                mySymtabName = args[++i];</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">                if (mySymtabName.length() == 0)</span>
+                {
+<span class="nc" id="L103">                    throw new RuntimeException(&quot;Name must not be empty&quot;);</span>
+                }
+            }
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            else if (&quot;--version&quot;.equals(arg))</span>
+            {
+<span class="nc bnc" id="L108" title="All 2 branches missed.">                if (mySymtabVersion != 0)</span>
+                {
+<span class="nc" id="L110">                    throw new RuntimeException(&quot;Multiple versions&quot;);</span>
+                }
+<span class="nc" id="L112">                int version = Integer.parseInt(arg);</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">                if (version &lt; 1)</span>
+                {
+<span class="nc" id="L115">                    throw new RuntimeException(&quot;Version must be at least 1&quot;);</span>
+                }
+<span class="nc bnc" id="L117" title="All 2 branches missed.">                if (version != 1)</span>
+                {
+<span class="nc" id="L119">                    String message = &quot;Symtab extension not implemented&quot;;</span>
+<span class="nc" id="L120">                    throw new UnsupportedOperationException(message);</span>
+                }
+<span class="nc" id="L122">                mySymtabVersion = version;</span>
+<span class="nc" id="L123">            }</span>
+            else
+            {
+                // this arg is not an option, we're done here
+<span class="nc" id="L127">                return i;</span>
+            }
+        }
+
+<span class="nc" id="L131">        return args.length;</span>
+    }
+
+
+    @Override
+    protected boolean optionsAreValid(String[] filePaths)
+    {
+<span class="nc bnc" id="L138" title="All 2 branches missed.">        if (mySymtabName == null)</span>
+        {
+<span class="nc" id="L140">            throw new RuntimeException(&quot;Must provide --name&quot;);</span>
+        }
+        // TODO verify that we don't import the same name.
+
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        if (mySymtabVersion == 0)</span>
+        {
+<span class="nc" id="L146">            mySymtabVersion = 1;</span>
+        }
+
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        if (filePaths.length == 0)</span>
+        {
+<span class="nc" id="L151">            System.err.println(&quot;Must provide list of files to provide symbols&quot;);</span>
+<span class="nc" id="L152">            return false;</span>
+        }
+
+<span class="nc" id="L155">        return true;</span>
+    }
+
+
+    @Override
+    public void processFiles(String[] filePaths)
+    {
+<span class="nc" id="L162">        super.processFiles(filePaths);</span>
+
+<span class="nc" id="L164">        SymbolTable[] importArray = new SymbolTable[myImports.size()];</span>
+<span class="nc" id="L165">        myImports.toArray(importArray);</span>
+
+<span class="nc" id="L167">        SymbolTable mySymtab =</span>
+<span class="nc" id="L168">            mySystem.newSharedSymbolTable(mySymtabName,</span>
+                                          mySymtabVersion,
+<span class="nc" id="L170">                                          mySymbols.iterator(),</span>
+                                          importArray);
+
+<span class="nc" id="L173">        IonWriter w = mySystem.newTextWriter((OutputStream)System.out);</span>
+        try
+        {
+            // TODO ensure IVM is printed
+<span class="nc" id="L177">            mySymtab.writeTo(w);</span>
+<span class="nc" id="L178">            System.out.println();</span>
+        }
+<span class="nc" id="L180">        catch (IOException e)</span>
+        {
+            // TODO Auto-generated catch block
+<span class="nc" id="L183">            e.printStackTrace();</span>
+<span class="nc" id="L184">        }</span>
+<span class="nc" id="L185">    }</span>
+
+
+    @Override
+    protected void process(IonReader reader)
+        throws IonException
+    {
+<span class="nc bnc" id="L192" title="All 2 branches missed.">        while (reader.hasNext())</span>
+        {
+<span class="nc" id="L194">            IonType type = reader.next();</span>
+
+//            System.err.println(&quot;Next: &quot; + type);
+//            System.err.println(&quot;isInStruct=&quot; + reader.isInStruct());
+
+<span class="nc" id="L199">            String fieldName = reader.getFieldName();</span>
+<span class="nc" id="L200">            intern(fieldName);</span>
+
+<span class="nc" id="L202">            internAnnotations(reader);</span>
+
+<span class="nc bnc" id="L204" title="All 3 branches missed.">            switch (type) {</span>
+                case SYMBOL:
+                {
+<span class="nc" id="L207">                    String text = reader.stringValue();</span>
+<span class="nc" id="L208">                    intern(text);</span>
+<span class="nc" id="L209">                    break;</span>
+                }
+                case LIST:
+                case SEXP:
+                case STRUCT:
+                {
+//                    System.err.println(&quot;stepping in&quot;);
+<span class="nc" id="L216">                    reader.stepIn();</span>
+<span class="nc" id="L217">                    break;</span>
+                }
+                default:
+                {
+                    // do nothing
+                    break;
+                }
+            }
+
+<span class="nc bnc" id="L226" title="All 4 branches missed.">            while (! reader.hasNext() &amp;&amp; reader.getDepth() &gt; 0)</span>
+            {
+//                System.err.println(&quot;stepping out&quot;);
+<span class="nc" id="L229">                reader.stepOut();</span>
+            }
+<span class="nc" id="L231">        }</span>
+<span class="nc" id="L232">    }</span>
+
+    private void internAnnotations(IonReader reader)
+    {
+<span class="nc" id="L236">        Iterator&lt;String&gt; i = reader.iterateTypeAnnotations();</span>
+<span class="nc bnc" id="L237" title="All 4 branches missed.">        assert i != null;</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        while (i.hasNext())</span>
+        {
+<span class="nc" id="L240">            String ann = i.next();</span>
+<span class="nc" id="L241">            intern(ann);</span>
+<span class="nc" id="L242">        }</span>
+<span class="nc" id="L243">    }</span>
+
+    private void intern(String text)
+    {
+<span class="nc bnc" id="L247" title="All 2 branches missed.">        if (text != null)</span>
+        {
+<span class="nc bnc" id="L249" title="All 4 branches missed.">            if (text.equals(&quot;$ion&quot;) || text.startsWith(&quot;$ion_&quot;)) return;</span>
+<span class="nc" id="L250">            mySymbols.add(text);</span>
+        }
+<span class="nc" id="L252">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

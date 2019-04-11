@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractSymbolTable.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl.bin</a> &gt; <span class="el_source">AbstractSymbolTable.java</span></div><h1>AbstractSymbolTable.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl.bin;
+
+import static com.amazon.ion.IonType.LIST;
+import static com.amazon.ion.IonType.STRUCT;
+import static com.amazon.ion.SystemSymbols.IMPORTS_SID;
+import static com.amazon.ion.SystemSymbols.ION_1_0;
+import static com.amazon.ion.SystemSymbols.ION_SHARED_SYMBOL_TABLE_SID;
+import static com.amazon.ion.SystemSymbols.ION_SYMBOL_TABLE_SID;
+import static com.amazon.ion.SystemSymbols.MAX_ID_SID;
+import static com.amazon.ion.SystemSymbols.NAME_SID;
+import static com.amazon.ion.SystemSymbols.SYMBOLS_SID;
+import static com.amazon.ion.SystemSymbols.VERSION_SID;
+import static com.amazon.ion.impl.bin.Symbols.systemSymbol;
+import com.amazon.ion.IonWriter;
+import com.amazon.ion.SymbolTable;
+import com.amazon.ion.SymbolToken;
+import java.io.IOException;
+import java.util.Iterator;
+
+/**
+ * Provides the basic implementation bits for {@link SymbolTable}.
+ */
+/*package*/ abstract class AbstractSymbolTable implements SymbolTable
+{
+    private final String name;
+    private final int version;
+
+    public AbstractSymbolTable(final String name, final int version)
+<span class="fc" id="L44">    {</span>
+<span class="fc" id="L45">        this.name = name;</span>
+<span class="fc" id="L46">        this.version = version;</span>
+<span class="fc" id="L47">    }</span>
+
+    public final String getName()
+    {
+<span class="fc" id="L51">        return name;</span>
+    }
+
+    public final int getVersion()
+    {
+<span class="fc" id="L56">        return version;</span>
+    }
+
+    public final String getIonVersionId()
+    {
+<span class="nc" id="L61">        return ION_1_0;</span>
+    }
+
+    public final int findSymbol(final String name)
+    {
+<span class="fc" id="L66">        final SymbolToken token = find(name);</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (token == null)</span>
+        {
+<span class="nc" id="L69">            return UNKNOWN_SYMBOL_ID;</span>
+        }
+<span class="fc" id="L71">        return token.getSid();</span>
+    }
+
+    public final void writeTo(final IonWriter writer) throws IOException
+    {
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (isSharedTable())</span>
+        {
+<span class="nc" id="L78">            writer.setTypeAnnotationSymbols(systemSymbol(ION_SHARED_SYMBOL_TABLE_SID));</span>
+        }
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        else if (isLocalTable())</span>
+        {
+<span class="fc" id="L82">            writer.setTypeAnnotationSymbols(systemSymbol(ION_SYMBOL_TABLE_SID));</span>
+        }
+        else
+        {
+<span class="nc" id="L86">            throw new IllegalStateException(&quot;Invalid symbol table, neither shared nor local&quot;);</span>
+        }
+<span class="fc" id="L88">        writer.stepIn(STRUCT);</span>
+        {
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            if (isSharedTable())</span>
+            {
+<span class="nc" id="L92">                writer.setFieldNameSymbol(systemSymbol(NAME_SID));</span>
+<span class="nc" id="L93">                writer.writeString(name);</span>
+<span class="nc" id="L94">                writer.setFieldNameSymbol(systemSymbol(VERSION_SID));</span>
+<span class="nc" id="L95">                writer.writeInt(version);</span>
+            }
+<span class="fc" id="L97">            final SymbolTable[] imports = getImportedTables();</span>
+<span class="pc bpc" id="L98" title="2 of 4 branches missed.">            if (imports != null &amp;&amp; imports.length &gt; 0)</span>
+            {
+<span class="fc" id="L100">                writer.setFieldNameSymbol(systemSymbol(IMPORTS_SID));</span>
+<span class="fc" id="L101">                writer.stepIn(LIST);</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">                for (final SymbolTable st : imports)</span>
+                {
+<span class="fc" id="L104">                    writer.stepIn(STRUCT);</span>
+                    {
+<span class="fc" id="L106">                        writer.setFieldNameSymbol(systemSymbol(NAME_SID));</span>
+<span class="fc" id="L107">                        writer.writeString(st.getName());</span>
+<span class="fc" id="L108">                        writer.setFieldNameSymbol(systemSymbol(VERSION_SID));</span>
+<span class="fc" id="L109">                        writer.writeInt(st.getVersion());</span>
+<span class="fc" id="L110">                        writer.setFieldNameSymbol(systemSymbol(MAX_ID_SID));</span>
+<span class="fc" id="L111">                        writer.writeInt(st.getMaxId());</span>
+                    }
+<span class="fc" id="L113">                    writer.stepOut();</span>
+                }
+<span class="fc" id="L115">                writer.stepOut();</span>
+            }
+<span class="fc" id="L117">            writer.setFieldNameSymbol(systemSymbol(SYMBOLS_SID));</span>
+<span class="fc" id="L118">            writer.stepIn(LIST);</span>
+            {
+<span class="fc" id="L120">                final Iterator&lt;String&gt; iter = iterateDeclaredSymbolNames();</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">                while (iter.hasNext())</span>
+                {
+<span class="nc" id="L123">                    writer.writeString(iter.next());</span>
+                }
+            }
+<span class="fc" id="L126">            writer.stepOut();</span>
+        }
+<span class="fc" id="L128">        writer.stepOut();</span>
+<span class="fc" id="L129">    }</span>
+
+<span class="nc" id="L131">    public void makeReadOnly() {}</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

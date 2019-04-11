@@ -1,0 +1,526 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonValue.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion</a> &gt; <span class="el_source">IonValue.java</span></div><h1>IonValue.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion;
+
+import com.amazon.ion.system.IonTextWriterBuilder;
+import java.util.Collections;
+import java.util.concurrent.CountDownLatch;
+
+/**
+ * Base type for all Ion data nodes.
+ * &lt;p&gt;
+ * &lt;b&gt;WARNING:&lt;/b&gt; This interface should not be implemented or extended by
+ * code outside of this library.
+ * &lt;p&gt;
+ * The {@code IonValue} hierarchy presents a &quot;tree view&quot; of Ion data;
+ * every node in the tree is an instance of this class.  Since the Ion
+ * type system is highly orthogonal, most operations use this
+ * base type, and applications will need to examine individual instances and
+ * &quot;downcast&quot; the value to one of the &quot;real&quot; types (&lt;em&gt;e.g.&lt;/em&gt;,
+ * {@link IonString}) in order to access the Ion content.
+ * &lt;p&gt;
+ * Besides the real types, there are other generic interfaces that can be
+ * useful:
+ * &lt;ul&gt;
+ *   &lt;li&gt;
+ *     {@link IonText} generalizes {@link IonString} and {@link IonSymbol}
+ *   &lt;/li&gt;
+ *   &lt;li&gt;
+ *     {@link IonContainer} generalizes
+ *     {@link IonList}, {@link IonSexp}, and {@link IonStruct}
+ *   &lt;/li&gt;
+ *   &lt;li&gt;
+ *     {@link IonSequence} generalizes {@link IonList} and {@link IonSexp}
+ *   &lt;/li&gt;
+ *   &lt;li&gt;
+ *     {@link IonLob} generalizes {@link IonBlob} and {@link IonClob}
+ *   &lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;p&gt;
+ * To determine the real type of a generic {@code IonValue}, there are three
+ * main mechanisms:
+ * &lt;ul&gt;
+ *   &lt;li&gt;
+ *     Use {@code instanceof} to look for a desired interface:
+ *&lt;pre&gt;
+ *    if (v instanceof IonString)
+ *    {
+ *        useString((IonString) v);
+ *    }
+ *    else if (v instanceof IonStruct)
+ *    {
+ *        useStruct((IonStruct) v);
+ *    }
+ *    // ...
+ *&lt;/pre&gt;
+ *   &lt;/li&gt;
+ *   &lt;li&gt;
+ *     Call {@link #getType()} and then {@code switch} over the resulting
+ *     {@link IonType}:
+ *&lt;pre&gt;
+ *    switch (v.getType())
+ *    {
+ *        case IonType.STRING: useString((IonString) v); break;
+ *        case IonType.STRUCT: useStruct((IonStruct) v); break;
+ *        // ...
+ *    }
+ *&lt;/pre&gt;
+ *   &lt;/li&gt;
+ *   &lt;li&gt;
+ *     Implement {@link ValueVisitor} and call {@link #accept(ValueVisitor)}:
+ *&lt;pre&gt;
+ *    public class MyVisitor
+ *        extends AbstractValueVisitor
+ *    {
+ *        public void visit(IonString value)
+ *        {
+ *            useString(v);
+ *        }
+ *        public void visit(IonStruct value)
+ *        {
+ *            useStruct(v);
+ *        }
+ *        // ...
+ *     }
+ *&lt;/pre&gt;
+ *   &lt;/li&gt;
+ * &lt;/ul&gt;
+ * Use the most appropriate mechanism for your algorithm, depending upon how
+ * much validation you've done on the data.
+ *
+ * &lt;h2&gt;Single-Parent Restriction&lt;/h2&gt;
+ *
+ * {@code IonValue} trees are strictly hierarchical: every node has at most one
+ * parent, as exposed through {@link #getContainer()} (and, implicitly,
+ * {@link #getFieldName()}).  You cannot add an {@code IonValue} instance into
+ * two {@link IonContainer}s; any attempt to do so will result in a
+ * {@link ContainedValueException}.  You can of course add the same instance to
+ * multiple &quot;normal&quot; {@link Collections}, since that's stepping outside of the
+ * DOM.
+ * &lt;p&gt;
+ * The implication of this design is that you need to be careful when
+ * performing DOM transformations.  You must remove a node from its parent
+ * before adding it to another one; {@link #removeFromContainer()} is handy.
+ * Alternatively you can {@link #clone()} a value, but be aware that cloning is
+ * a deep-copy operation (for the very same single-parent reason).
+ *
+ * &lt;h2&gt;Thread Safety&lt;/h2&gt;
+ *
+ * &lt;b&gt;Mutable {@code IonValues} are not safe for use by multiple threads!&lt;/b&gt;
+ * Your application must perform its own synchronization if you need to access
+ * {@code IonValues} from multiple threads. This is true even for read-only use
+ * cases, since implementations may perform lazy materialization or other state
+ * changes internally.
+ * &lt;p&gt;
+ * Alternatively, you can invoke {@link #makeReadOnly()} from a single thread,
+ * &lt;b&gt;after&lt;/b&gt; which point the value (and all recursively contained values) will
+ * be immutable and hence thread-safe.
+ * &lt;p&gt;
+ * It is important to note that {@link #makeReadOnly()} is not guaranteed to
+ * implicitly provide a synchronization point between threads.
+ * This means it is the responsibility of the application to make sure
+ * operations on a thread other than the one that invoked {@link #makeReadOnly()}
+ * causally happen &lt;b&gt;after&lt;/b&gt; that invocation observing the rules of
+ * the Java Memory Model (JSR-133).
+ * &lt;p&gt;
+ * Here is an example of ensuring the correct ordering for multiple threads
+ * accessing an {@link IonValue} using a {@link CountDownLatch} to explicitly
+ * create a the temporal relationship:
+ * &lt;p&gt;
+ * &lt;pre&gt;
+ *      // ...
+ *      // Shared Between Threads
+ *      // ...
+ *
+ *      IonValue value = ...;
+ *      CountDownLatch latch = new CountDownLatch(1);
+ *
+ *      // ...
+ *      // Thread 1
+ *      // ...
+ *
+ *      value.makeReadOnly();
+ *      latch.countDown();
+ *
+ *      // ...
+ *      // Thread 2
+ *      // ...
+ *
+ *      // before this point operations on 'value' are not defined
+ *      latch.await();
+ *      // we can now operate (in a read-only way) on 'value'
+ *      value.isNullValue();
+ * &lt;/pre&gt;
+ * &lt;p&gt;
+ * In the above, two threads have a reference to &lt;code&gt;value&lt;/code&gt;.
+ * &lt;code&gt;latch&lt;/code&gt; in this example provides a way to synchronize
+ * when {@link #makeReadOnly()} happens in the first thread relative
+ * to {@link #isNullValue()} being invoked on the second thread.
+ */
+public interface IonValue
+    extends Cloneable
+{
+    /**
+     * A zero-length immutable {@code IonValue} array.
+     */
+<span class="fc" id="L179">    public static final IonValue[] EMPTY_ARRAY = new IonValue[0];</span>
+
+
+    /**
+     * Gets an enumeration value identifying the core Ion data type of this
+     * object.
+     *
+     * @return a non-&lt;code&gt;null&lt;/code&gt; enumeration value.
+     */
+    public IonType getType();
+
+
+    /**
+     * Determines whether this in an Ion null value, &lt;em&gt;e.g.&lt;/em&gt;,
+     * &lt;code&gt;null&lt;/code&gt; or &lt;code&gt;null.string&lt;/code&gt;.
+     * Note that there are unique null values for each Ion type.
+     *
+     * @return &lt;code&gt;true&lt;/code&gt; if this value is one of the Ion null values.
+     */
+    public boolean isNullValue();
+
+
+    /**
+     * Determines whether this value is read-only.  Such values are safe for
+     * simultaneous read from multiple threads.
+     *
+     * @return &lt;code&gt;true&lt;/code&gt; if this value is read-only and safe for
+     * multi-threaded reads.
+     *
+     * @see #makeReadOnly()
+     */
+    public boolean  isReadOnly();
+
+
+    /**
+     * Gets the symbol table used to encode this value.  The result is either a
+     * local or system symbol table (or null).
+     *
+     * @return the symbol table, or &lt;code&gt;null&lt;/code&gt; if this value is not
+     * currently backed by binary-encoded data.
+     */
+    public SymbolTable getSymbolTable();
+
+
+    /**
+     * Gets the field name attached to this value,
+     * or &lt;code&gt;null&lt;/code&gt; if this is not part of an {@link IonStruct}.
+     *
+     * @throws UnknownSymbolException if the field name has unknown text.
+     */
+    public String getFieldName();
+
+
+    /**
+     * Gets the field name attached to this value as an interned symbol
+     * (text + ID).
+     *
+     * @return null if this value isn't a struct field.
+     *
+     */
+    public SymbolToken getFieldNameSymbol();
+
+
+    /**
+     * Gets the symbol ID of the field name attached to this value.
+     *
+     * @return the symbol ID of the field name, if this is part of an
+     * {@link IonStruct}. If this is not a field, or if the symbol ID cannot be
+     * determined, this method returns a value &lt;em&gt;less than one&lt;/em&gt;.
+     *
+     * @deprecated Use {@link #getFieldNameSymbol()} instead.
+     */
+    @Deprecated
+    public int getFieldId();
+
+
+    /**
+     * Gets the container of this value,
+     * or &lt;code&gt;null&lt;/code&gt; if this is not part of one.
+     */
+    public IonContainer getContainer();
+
+
+    /**
+     * Removes this value from its container, if any.
+     *
+     * @return {@code true} if this value was in a container before this method
+     * was called.
+     */
+    public boolean removeFromContainer();
+
+
+    /**
+     * Finds the top level value above this value.
+     * If this value has no container, or if it's immediate container is a
+     * datagram, then this value is returned.
+     *
+     * @return the top level value above this value, never null, and never an
+     * {@link IonDatagram}.
+     *
+     * @throws UnsupportedOperationException if this is an {@link IonDatagram}.
+     *
+
+     */
+    public IonValue topLevelValue();
+
+
+    /**
+     * Gets this value's user type annotations as text.
+     *
+     * @return the (ordered) annotations on the current value, or an empty
+     * array (not {@code null}) if there are none.
+     *
+     * @throws UnknownSymbolException if any annotation has unknown text.
+     */
+    public String[] getTypeAnnotations();
+
+
+    /**
+     * Gets this value's user type annotations as interned symbols (text + ID).
+     *
+     * @return the (ordered) annotations on the current value, or an empty
+     * array (not {@code null}) if there are none.
+     *
+
+     */
+    public SymbolToken[] getTypeAnnotationSymbols();
+
+
+    /**
+     * Determines whether or not the value is annotated with
+     * a particular user type annotation.
+     * @param annotation as a string value.
+     * @return &lt;code&gt;true&lt;/code&gt; if this value has the annotation.
+     */
+    public boolean hasTypeAnnotation(String annotation);
+
+
+    /**
+     * Replaces all type annotations with the given text.
+     *
+     * @param annotations the new annotations.  If null or empty array, then
+     *  all annotations are removed.  Any duplicates are preserved.
+     *
+     * @throws NullPointerException if any of the annotations are null
+     *
+
+     */
+    public void setTypeAnnotations(String... annotations);
+
+    /**
+     * Replaces all type annotations with the given symbol tokens.
+     * The contents of the {@code annotations} array are copied into this
+     * writer, so the caller does not need to preserve the array.
+     * &lt;p&gt;
+     * &lt;b&gt;This is an &quot;expert method&quot;: correct use requires deep understanding
+     * of the Ion binary format. You almost certainly don't want to use it.&lt;/b&gt;
+     *
+     * @param annotations the new annotations.
+     * If null or empty array, then all annotations are removed.
+     * Any duplicates are preserved.
+     *
+
+     */
+    public void setTypeAnnotationSymbols(SymbolToken... annotations);
+
+    /**
+     * Removes all the user type annotations attached to this value.
+     */
+    public void clearTypeAnnotations();
+
+
+    /**
+     * Adds a user type annotation to the annotations attached to
+     * this value.  If the annotation exists the list does not change.
+     * @param annotation as a string value.
+     */
+    public void addTypeAnnotation(String annotation);
+
+
+    /**
+     * Removes a user type annotation from the list of annotations
+     * attached to this value.
+     * If the annotation appears more than once, only the first occurrance is
+     * removed.
+     * If the annotation does not exist, the value does not change.
+     *
+     * @param annotation as a string value.
+     *  If null or empty, the method has no effect.
+     */
+    public void removeTypeAnnotation(String annotation);
+
+
+    /**
+     * Copies this value to the given {@link IonWriter}.
+     * &lt;p&gt;
+     * This method writes annotations and field names (if in a struct),
+     * and performs a deep write, including the contents of
+     * any containers encountered.
+     *
+
+     */
+    public void writeTo(IonWriter writer);
+
+
+    /**
+     * Entry point for visitor pattern.  Implementations of this method by
+     * concrete classes will simply call the appropriate &lt;code&gt;visit&lt;/code&gt;
+     * method on the &lt;code&gt;visitor&lt;/code&gt;.  For example, instances of
+     * {@link IonBool} will invoke {@link ValueVisitor#visit(IonBool)}.
+     *
+     * @param visitor will have one of its &lt;code&gt;visit&lt;/code&gt; methods called.
+     * @throws Exception any exception thrown by the visitor is propagated.
+     * @throws NullPointerException if &lt;code&gt;visitor&lt;/code&gt; is
+     * &lt;code&gt;null&lt;/code&gt;.
+     */
+    public void accept(ValueVisitor visitor) throws Exception;
+
+
+    /**
+     * Marks this instance and its children to be immutable.
+     * In addition, read-only values are safe for simultaneous use
+     * from multiple threads.  This may require materializing the Java
+     * forms of the values.
+     * &lt;p&gt;
+     * After this method completes, any attempt to change the state of this
+     * instance, or of any contained value, will trigger a
+     * {@link ReadOnlyValueException}.
+     *
+     * @see #isReadOnly()
+     */
+    public void makeReadOnly();
+
+
+    /**
+     * Gets the system that constructed this value.
+     *
+     * @return not null.
+     */
+    public IonSystem getSystem();
+
+
+    /**
+     * Creates a copy of this value and all of its children. The cloned value
+     * may use the same shared symbol tables, but it will have an independent local
+     * symbol table if necessary.  The cloned value will
+     * be modifiable regardless of whether this instance {@link #isReadOnly()}.
+     * &lt;p&gt;
+     * The cloned value will be created in the context of the same
+     * {@link ValueFactory} as this instance; if you want a copy using a
+     * different factory, then use {@link ValueFactory#clone(IonValue)}
+     * instead.
+     *
+     * @throws UnknownSymbolException
+     *          if any part of this value has unknown text but known Sid for
+     *          its field name, annotation or symbol.
+     */
+    public IonValue clone()
+        throws UnknownSymbolException;
+
+
+    /**
+     * Returns a &lt;em&gt;non-canonical&lt;/em&gt; Ion-formatted ASCII representation of
+     * this value.
+     * All data will be on a single line, with (relatively) minimal whitespace.
+     * There is no guarantee that multiple invocations of this method will
+     * return identical results, only that they will be equivalent per
+     * the Ion data model.  For this reason it is erroneous for code to compare
+     * two strings returned by this method.
+     * &lt;p&gt;
+     * For more configurable rendering, see
+     * {@link com.amazon.ion.system.IonTextWriterBuilder}.
+     * &lt;p&gt;
+     * This is &lt;em&gt;not&lt;/em&gt; the correct way to retrieve the content of an
+     * {@link IonString} or {@link IonSymbol}!
+     * Use {@link IonText#stringValue()} for that purpose.
+     * &lt;pre&gt;
+     *    ionSystem.newString(&quot;Levi's&quot;).toString()     =&amp;gt;  &quot;\&quot;Levi's\&quot;&quot;
+     *    ionSystem.newString(&quot;Levi's&quot;).stringValue()  =&amp;gt;  &quot;Levi's&quot;
+     *    ionSystem.newSymbol(&quot;Levi's&quot;).toString()     =&amp;gt;  &quot;'Levi\\'s'&quot;
+     *    ionSystem.newSymbol(&quot;Levi's&quot;).stringValue()  =&amp;gt;  &quot;Levi's&quot;
+     * &lt;/pre&gt;
+     *
+     * @return Ion text data equivalent to this value.
+     *
+     * @see IonText#stringValue()
+     * @see #toString(IonTextWriterBuilder)
+     * @see #toPrettyString()
+     */
+    public String toString();
+
+
+    /**
+     * Returns a pretty-printed Ion text representation of this value, using
+     * the settings of {@link IonTextWriterBuilder#pretty()}.
+     * &lt;p&gt;
+     * The specific configuration may change between releases of this
+     * library, so automated processes should not depend on the exact output
+     * formatting. In particular, there's currently no promise regarding
+     * handling of system data.
+     *
+     * @return Ion text data equivalent to this value.
+     *
+
+     */
+    public String toPrettyString();
+
+
+    /**
+     * Returns an Ion text representation of this value, using the settings
+     * from the given builder.
+     *
+     * @param writerBuilder the configuration that will be used for writing
+     * data to a string.
+     *
+     * @return Ion text data equivalent to this value.
+     *
+
+     */
+    public String toString(IonTextWriterBuilder writerBuilder);
+
+
+    /**
+     * Compares two Ion values for structural equality, which means that they
+     * represent the exact same semantics, including annotations, numeric
+     * precision, and so on.  This is a &quot;deep&quot; comparison that recursively
+     * traverses the hierarchy, and as such it should be considered an
+     * expensive operation.
+     *
+     * @see com.amazon.ion.util.Equivalence
+     *
+     * @param   other   The value to compare with.
+     *
+     * @return  A boolean, true if the argument is an {@link IonValue} that
+     *   is semantically identical within the Ion data model, including
+     *   precision and annotations.
+     */
+    public boolean equals(Object other);
+
+
+    /**
+     * Returns a hash code consistent with {@link #equals(Object)}.
+     * &lt;p&gt;
+     * {@inheritDoc}
+     */
+    public int hashCode();
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

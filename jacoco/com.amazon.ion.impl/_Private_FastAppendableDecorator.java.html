@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>_Private_FastAppendableDecorator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl</a> &gt; <span class="el_source">_Private_FastAppendableDecorator.java</span></div><h1>_Private_FastAppendableDecorator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl;
+
+import com.amazon.ion.util._Private_FastAppendable;
+import java.io.Closeable;
+import java.io.Flushable;
+import java.io.IOException;
+
+/**
+ * NOT FOR APPLICATION USE!
+ */
+public abstract class _Private_FastAppendableDecorator
+    implements _Private_FastAppendable, Closeable, Flushable
+{
+    private final _Private_FastAppendable myOutput;
+
+<span class="fc" id="L31">    public _Private_FastAppendableDecorator(_Private_FastAppendable output) {</span>
+<span class="fc" id="L32">        myOutput = output;</span>
+<span class="fc" id="L33">    }</span>
+
+    public void flush()
+        throws IOException
+    {
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        if (myOutput instanceof Flushable) {</span>
+<span class="fc" id="L39">            ((Flushable) myOutput).flush();</span>
+        }
+<span class="fc" id="L41">    }</span>
+
+    public void close()
+        throws IOException
+    {
+<span class="nc bnc" id="L46" title="All 2 branches missed.">        if (myOutput instanceof Closeable) {</span>
+<span class="nc" id="L47">            ((Closeable) myOutput).close();</span>
+        }
+<span class="nc" id="L49">    }</span>
+
+    public Appendable append(char c)
+        throws IOException
+    {
+<span class="nc" id="L54">        myOutput.append(c);</span>
+<span class="nc" id="L55">        return this;</span>
+    }
+
+    public Appendable append(CharSequence csq)
+        throws IOException
+    {
+<span class="nc" id="L61">        myOutput.append(csq);</span>
+<span class="nc" id="L62">        return this;</span>
+    }
+
+    public Appendable append(CharSequence csq, int start, int end)
+        throws IOException
+    {
+<span class="nc" id="L68">        myOutput.append(csq, start, end);</span>
+<span class="nc" id="L69">        return this;</span>
+    }
+
+    public void appendAscii(char c)
+        throws IOException
+    {
+<span class="fc" id="L75">        myOutput.appendAscii(c);</span>
+<span class="fc" id="L76">    }</span>
+
+    public void appendAscii(CharSequence csq)
+        throws IOException
+    {
+<span class="fc" id="L81">        myOutput.appendAscii(csq);</span>
+<span class="fc" id="L82">    }</span>
+
+    public void appendAscii(CharSequence csq, int start, int end)
+        throws IOException
+    {
+<span class="fc" id="L87">        myOutput.appendAscii(csq, start, end);</span>
+<span class="fc" id="L88">    }</span>
+
+    public void appendUtf16(char c)
+        throws IOException
+    {
+<span class="nc" id="L93">        myOutput.appendUtf16(c);</span>
+<span class="nc" id="L94">    }</span>
+
+    public void appendUtf16Surrogate(char leadSurrogate, char trailSurrogate)
+        throws IOException
+    {
+<span class="nc" id="L99">        myOutput.appendUtf16Surrogate(leadSurrogate, trailSurrogate);</span>
+<span class="nc" id="L100">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

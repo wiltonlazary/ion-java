@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonBinaryWriterAdapter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl.bin</a> &gt; <span class="el_source">IonBinaryWriterAdapter.java</span></div><h1>IonBinaryWriterAdapter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl.bin;
+
+import com.amazon.ion.IonBinaryWriter;
+import com.amazon.ion.IonReader;
+import com.amazon.ion.IonType;
+import com.amazon.ion.IonValue;
+import com.amazon.ion.IonWriter;
+import com.amazon.ion.SymbolTable;
+import com.amazon.ion.SymbolToken;
+import com.amazon.ion.Timestamp;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.Date;
+
+/**
+ * Adapts arbitrary {@link IonWriter} implementations to an {@link IonBinaryWriter} instances.
+ * &lt;p&gt;
+ * This class is provided as a shim for compatibility to allow binary writer implementations to be adaptable to
+ * the legacy interface.
+ */
+@Deprecated
+/*package*/ final class IonBinaryWriterAdapter implements IonBinaryWriter
+{
+    /**
+     * Simple interface for constructing an {@link IonWriter} from an output stream.
+     * Essentially used as a polymorphic constructor.
+     */
+    public interface Factory
+    {
+        IonWriter create(final OutputStream out) throws IOException;
+    }
+
+    /** Internal {@link ByteArrayOutputStream} implementation to get access to the buffer. */
+    private static class InternalByteArrayOutputStream extends ByteArrayOutputStream
+    {
+        public byte[] bytes()
+        {
+<span class="nc" id="L56">            return buf;</span>
+        }
+    }
+
+    private final InternalByteArrayOutputStream buffer;
+    private final IonWriter delegate;
+
+    public IonBinaryWriterAdapter(final Factory factory) throws IOException
+<span class="fc" id="L64">    {</span>
+<span class="fc" id="L65">        this.buffer = new InternalByteArrayOutputStream();</span>
+<span class="fc" id="L66">        this.delegate = factory.create(buffer);</span>
+<span class="fc" id="L67">    }</span>
+
+    /*package*/ IonWriter getDelegate()
+    {
+<span class="fc" id="L71">        return delegate;</span>
+    }
+
+    /*package*/ void reset()
+    {
+<span class="fc" id="L76">        buffer.reset();</span>
+<span class="fc" id="L77">    }</span>
+
+    // Adapter Methods
+
+    public int byteSize()
+    {
+<span class="fc" id="L83">        return buffer.size();</span>
+    }
+
+    public byte[] getBytes() throws IOException
+    {
+<span class="fc" id="L88">        return buffer.toByteArray();</span>
+    }
+
+    public int getBytes(byte[] bytes, int offset, int maxlen) throws IOException
+    {
+<span class="nc" id="L93">        final int amount = Math.min(maxlen, buffer.size());</span>
+<span class="nc" id="L94">        System.arraycopy(buffer.bytes(), 0, bytes, offset, amount);</span>
+<span class="nc" id="L95">        return amount;</span>
+    }
+
+    public int writeBytes(OutputStream userstream) throws IOException
+    {
+<span class="nc" id="L100">        buffer.writeTo(userstream);</span>
+<span class="nc" id="L101">        return buffer.size();</span>
+    }
+
+    // Delegates
+
+    public SymbolTable getSymbolTable()
+    {
+<span class="fc" id="L108">        return delegate.getSymbolTable();</span>
+    }
+
+    public void flush() throws IOException
+    {
+<span class="nc" id="L113">        delegate.flush();</span>
+<span class="nc" id="L114">    }</span>
+
+    public void finish() throws IOException
+    {
+<span class="fc" id="L118">        delegate.finish();</span>
+<span class="fc" id="L119">    }</span>
+
+    public void close() throws IOException
+    {
+<span class="fc" id="L123">        delegate.close();</span>
+<span class="fc" id="L124">    }</span>
+
+    public void setFieldName(String name)
+    {
+<span class="fc" id="L128">        delegate.setFieldName(name);</span>
+<span class="fc" id="L129">    }</span>
+
+    public void setFieldNameSymbol(SymbolToken name)
+    {
+<span class="fc" id="L133">        delegate.setFieldNameSymbol(name);</span>
+<span class="fc" id="L134">    }</span>
+
+    public void setTypeAnnotations(String... annotations)
+    {
+<span class="fc" id="L138">        delegate.setTypeAnnotations(annotations);</span>
+<span class="fc" id="L139">    }</span>
+
+    public void setTypeAnnotationSymbols(SymbolToken... annotations)
+    {
+<span class="fc" id="L143">        delegate.setTypeAnnotationSymbols(annotations);</span>
+<span class="fc" id="L144">    }</span>
+
+    public void addTypeAnnotation(String annotation)
+    {
+<span class="fc" id="L148">        delegate.addTypeAnnotation(annotation);</span>
+<span class="fc" id="L149">    }</span>
+
+    public void stepIn(IonType containerType) throws IOException
+    {
+<span class="fc" id="L153">        delegate.stepIn(containerType);</span>
+<span class="fc" id="L154">    }</span>
+
+    public void stepOut() throws IOException
+    {
+<span class="fc" id="L158">        delegate.stepOut();</span>
+<span class="fc" id="L159">    }</span>
+
+    public boolean isInStruct()
+    {
+<span class="nc" id="L163">        return delegate.isInStruct();</span>
+    }
+
+    // Write Methods
+
+    public void writeValue(IonValue value) throws IOException
+    {
+<span class="nc" id="L170">        delegate.writeValue(value);</span>
+<span class="nc" id="L171">    }</span>
+
+    public void writeValue(IonReader reader) throws IOException
+    {
+<span class="nc" id="L175">        delegate.writeValue(reader);</span>
+<span class="nc" id="L176">    }</span>
+
+    public void writeValues(IonReader reader) throws IOException
+    {
+<span class="nc" id="L180">        delegate.writeValues(reader);</span>
+<span class="nc" id="L181">    }</span>
+
+    public void writeNull() throws IOException
+    {
+<span class="fc" id="L185">        delegate.writeNull();</span>
+<span class="fc" id="L186">    }</span>
+
+    public void writeNull(IonType type) throws IOException
+    {
+<span class="fc" id="L190">        delegate.writeNull(type);</span>
+<span class="fc" id="L191">    }</span>
+
+    public void writeBool(boolean value) throws IOException
+    {
+<span class="fc" id="L195">        delegate.writeBool(value);</span>
+<span class="fc" id="L196">    }</span>
+
+    public void writeInt(long value) throws IOException
+    {
+<span class="fc" id="L200">        delegate.writeInt(value);</span>
+<span class="fc" id="L201">    }</span>
+
+    public void writeInt(BigInteger value) throws IOException
+    {
+<span class="fc" id="L205">        delegate.writeInt(value);</span>
+<span class="fc" id="L206">    }</span>
+
+    public void writeFloat(double value) throws IOException
+    {
+<span class="fc" id="L210">        delegate.writeFloat(value);</span>
+<span class="fc" id="L211">    }</span>
+
+    public void writeDecimal(BigDecimal value) throws IOException
+    {
+<span class="fc" id="L215">        delegate.writeDecimal(value);</span>
+<span class="fc" id="L216">    }</span>
+
+    public void writeTimestamp(Timestamp value) throws IOException
+    {
+<span class="fc" id="L220">        delegate.writeTimestamp(value);</span>
+<span class="fc" id="L221">    }</span>
+
+    public void writeTimestampUTC(Date value) throws IOException
+    {
+<span class="nc" id="L225">        delegate.writeTimestampUTC(value);</span>
+<span class="nc" id="L226">    }</span>
+
+    public void writeSymbol(String content) throws IOException
+    {
+<span class="fc" id="L230">        delegate.writeSymbol(content);</span>
+<span class="fc" id="L231">    }</span>
+
+    public void writeSymbolToken(SymbolToken content) throws IOException
+    {
+<span class="fc" id="L235">        delegate.writeSymbolToken(content);</span>
+<span class="fc" id="L236">    }</span>
+
+    public void writeString(String value) throws IOException
+    {
+<span class="fc" id="L240">        delegate.writeString(value);</span>
+<span class="fc" id="L241">    }</span>
+
+    public void writeClob(byte[] value) throws IOException
+    {
+<span class="fc" id="L245">        delegate.writeClob(value);</span>
+<span class="fc" id="L246">    }</span>
+
+    public void writeClob(byte[] value, int start, int len) throws IOException
+    {
+<span class="nc" id="L250">        delegate.writeClob(value, start, len);</span>
+<span class="nc" id="L251">    }</span>
+
+    public void writeBlob(byte[] value) throws IOException
+    {
+<span class="fc" id="L255">        delegate.writeBlob(value);</span>
+<span class="fc" id="L256">    }</span>
+
+    public void writeBlob(byte[] value, int start, int len) throws IOException
+    {
+<span class="nc" id="L260">        delegate.writeBlob(value, start, len);</span>
+<span class="nc" id="L261">    }</span>
+
+    public &lt;T&gt; T asFacet(Class&lt;T&gt; facetType)
+    {
+        // This implementation has no facets.
+<span class="nc" id="L266">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

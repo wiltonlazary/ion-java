@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BaseApp.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.apps</a> &gt; <span class="el_source">BaseApp.java</span></div><h1>BaseApp.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.apps;
+
+import com.amazon.ion.IonCatalog;
+import com.amazon.ion.IonException;
+import com.amazon.ion.IonReader;
+import com.amazon.ion.IonSystem;
+import com.amazon.ion.SymbolTable;
+import com.amazon.ion.system.IonSystemBuilder;
+import com.amazon.ion.system.SimpleCatalog;
+import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+
+/**
+ *   ion_encode  ion_print
+ */
+<span class="nc bnc" id="L36" title="All 2 branches missed.">abstract class BaseApp</span>
+{
+<span class="nc" id="L38">    protected SimpleCatalog myCatalog = new SimpleCatalog();</span>
+<span class="nc" id="L39">    protected IonSystem mySystem = IonSystemBuilder.standard()</span>
+<span class="nc" id="L40">                                                   .withCatalog(myCatalog)</span>
+<span class="nc" id="L41">                                                   .build();</span>
+
+
+    //=========================================================================
+    // Static methods
+
+    /**
+     * @param in doesn't need to be buffered; this method will read in bulk.
+     */
+    protected static byte[] loadAsByteArray(InputStream in)
+        throws IOException
+    {
+<span class="nc" id="L53">        byte[] buf = new byte[4096];</span>
+<span class="nc" id="L54">        ByteArrayOutputStream bos = new ByteArrayOutputStream();</span>
+        int cnt;
+
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        while ((cnt = in.read(buf)) != -1) {</span>
+<span class="nc" id="L58">            bos.write(buf, 0, cnt);</span>
+        }
+<span class="nc" id="L60">        return bos.toByteArray();</span>
+    }
+
+
+    protected static byte[] loadAsByteArray(File file)
+        throws FileNotFoundException, IOException
+    {
+<span class="nc" id="L67">        long len = file.length();</span>
+<span class="nc bnc" id="L68" title="All 4 branches missed.">        if (len &lt; 0 || len &gt; Integer.MAX_VALUE)</span>
+        {
+<span class="nc" id="L70">            throw new IllegalArgumentException(&quot;File too long: &quot; + file);</span>
+        }
+
+<span class="nc" id="L73">        byte[] buffer = new byte[(int) len];</span>
+
+<span class="nc" id="L75">        FileInputStream in = new FileInputStream(file);</span>
+        try
+        {
+<span class="nc" id="L78">            int readBytesCount = in.read(buffer);</span>
+<span class="nc bnc" id="L79" title="All 4 branches missed.">            if (readBytesCount != len || in.read() != -1)</span>
+            {
+<span class="nc" id="L81">                System.err.println(&quot;Read the wrong number of bytes from &quot;</span>
+                                       + file);
+<span class="nc" id="L83">                return null;</span>
+            }
+        }
+        finally
+        {
+<span class="nc" id="L88">            in.close();</span>
+        }
+
+<span class="nc" id="L91">        return buffer;</span>
+    }
+
+
+    //=========================================================================
+
+
+    public void doMain(String[] args)
+    {
+<span class="nc" id="L100">        int firstFileIndex = processOptions(args);</span>
+
+<span class="nc" id="L102">        int fileCount = args.length - firstFileIndex;</span>
+<span class="nc" id="L103">        String[] files = new String[fileCount];</span>
+<span class="nc" id="L104">        System.arraycopy(args, firstFileIndex, files, 0, fileCount);</span>
+
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        if (optionsAreValid(files))</span>
+        {
+<span class="nc" id="L108">            processFiles(files);</span>
+        }
+<span class="nc" id="L110">    }</span>
+
+
+    protected int processOptions(String[] args)
+    {
+<span class="nc" id="L115">        return 0;</span>
+    }
+
+    protected boolean optionsAreValid(String[] filePaths)
+    {
+<span class="nc" id="L120">        return true;</span>
+    }
+
+    protected void processFiles(String[] filePaths)
+    {
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        if (filePaths.length == 0)</span>
+        {
+<span class="nc" id="L127">            processStdIn();</span>
+        }
+        else
+        {
+<span class="nc bnc" id="L131" title="All 2 branches missed.">            for (int i = 0; i &lt; filePaths.length; i++)</span>
+            {
+<span class="nc" id="L133">                String filePath = filePaths[i];</span>
+<span class="nc" id="L134">                processFile(filePath);</span>
+            }
+        }
+<span class="nc" id="L137">    }</span>
+
+    protected boolean processFile(String path)
+    {
+<span class="nc" id="L141">        File file = new File(path);</span>
+<span class="nc bnc" id="L142" title="All 4 branches missed.">        if (file.canRead() &amp;&amp; file.isFile())</span>
+        {
+            try
+            {
+<span class="nc" id="L146">                process(file);</span>
+<span class="nc" id="L147">                return true;</span>
+            }
+<span class="nc" id="L149">            catch (IonException e)</span>
+            {
+<span class="nc" id="L151">                System.err.println(&quot;An error occurred while processing &quot;</span>
+                                   + path);
+<span class="nc" id="L153">                System.err.println(e.getMessage());</span>
+            }
+<span class="nc" id="L155">            catch (IOException e)</span>
+            {
+<span class="nc" id="L157">                System.err.println(&quot;An error occurred while processing &quot;</span>
+                                   + path);
+<span class="nc" id="L159">                System.err.println(e.getMessage());</span>
+<span class="nc" id="L160">            }</span>
+        }
+        else
+        {
+<span class="nc" id="L164">            System.err.println(&quot;Skipping unreadable file: &quot; + path);</span>
+        }
+<span class="nc" id="L166">        return false;</span>
+    }
+
+    protected void processStdIn() {
+    try
+        {
+<span class="nc" id="L172">        byte[] buffer = loadAsByteArray(System.in);</span>
+<span class="nc" id="L173">        IonReader reader = mySystem.newReader(buffer);</span>
+<span class="nc" id="L174">        process(reader);</span>
+            }
+<span class="nc" id="L176">    catch (IonException e)</span>
+            {
+<span class="nc" id="L178">                System.err.println(&quot;An error occurred while processing stdin&quot;);</span>
+<span class="nc" id="L179">                System.err.println(e.getMessage());</span>
+            }
+<span class="nc" id="L181">    catch (IOException e)</span>
+            {
+<span class="nc" id="L183">                System.err.println(&quot;An error occurred while processing stdin&quot;);</span>
+<span class="nc" id="L184">        System.err.println(e.getMessage());</span>
+<span class="nc" id="L185">            }</span>
+<span class="nc" id="L186">    }</span>
+
+    protected void process(File file)
+        throws IOException, IonException
+    {
+<span class="nc" id="L191">        byte[] buffer = loadAsByteArray(file);</span>
+
+<span class="nc" id="L193">        IonReader reader = mySystem.newReader(buffer);</span>
+
+<span class="nc" id="L195">        process(file, reader);</span>
+<span class="nc" id="L196">    }</span>
+
+    protected void process(File inputFile, IonReader reader)
+        throws IOException, IonException
+    {
+<span class="nc" id="L201">        process(reader);</span>
+<span class="nc" id="L202">    }</span>
+
+    protected void process(IonReader reader)
+        throws IOException, IonException
+    {
+        // Do nothing...
+<span class="nc" id="L208">    }</span>
+
+
+    protected void loadCatalog(String catalogPath)
+    {
+<span class="nc" id="L213">        System.err.println(&quot;Loading catalog from &quot; + catalogPath);</span>
+<span class="nc" id="L214">        File catalogFile = new File(catalogPath);</span>
+        try
+        {
+<span class="nc" id="L217">            InputStream in =</span>
+                new BufferedInputStream(new FileInputStream(catalogFile));
+            try
+            {
+<span class="nc" id="L221">                IonReader reader = mySystem.newReader(in);</span>
+<span class="nc bnc" id="L222" title="All 2 branches missed.">                while (reader.next() != null)</span>
+                {
+<span class="nc" id="L224">                    SymbolTable symtab =</span>
+<span class="nc" id="L225">                        mySystem.newSharedSymbolTable(reader, true);</span>
+<span class="nc" id="L226">                    myCatalog.putTable(symtab);</span>
+<span class="nc" id="L227">                }</span>
+            }
+            finally
+            {
+<span class="nc" id="L231">                in.close();</span>
+            }
+        }
+<span class="nc" id="L234">        catch (Exception e)</span>
+        {
+<span class="nc" id="L236">            throw new RuntimeException(&quot;Error loading catalog from &quot;</span>
+<span class="nc" id="L237">                                         + catalogPath + &quot;: &quot; + e.getMessage(),</span>
+                                       e);
+<span class="nc" id="L239">        }</span>
+
+<span class="nc" id="L241">        IonCatalog catalog = mySystem.getCatalog();</span>
+<span class="nc bnc" id="L242" title="All 4 branches missed.">        assert myCatalog == catalog;</span>
+//        logDebug(&quot;----Catalog content:&quot;);
+//        for (Iterator&lt;StaticSymbolTable&gt; i = catalog.iterator(); i.hasNext(); )
+//        {
+//            StaticSymbolTable table = i.next();
+//            logDebug(table.getName() + &quot;@&quot; + table.getVersion());
+//        }
+//        logDebug(&quot;----&quot;);
+<span class="nc" id="L250">    }</span>
+
+
+    protected SymbolTable getLatestSharedSymtab(String name)
+    {
+<span class="nc" id="L255">        IonCatalog catalog = mySystem.getCatalog();</span>
+<span class="nc" id="L256">        SymbolTable table = catalog.getTable(name);</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">        if (table == null)</span>
+        {
+<span class="nc" id="L259">            String message =</span>
+                &quot;There's no symbol table in the catalog named &quot; + name;
+<span class="nc" id="L261">            throw new RuntimeException(message);</span>
+        }
+<span class="nc" id="L263">        logDebug(&quot;Found shared symbol table &quot; + name</span>
+<span class="nc" id="L264">                   + &quot;@&quot; + table.getVersion());</span>
+<span class="nc" id="L265">        return table;</span>
+    }
+
+
+    protected void logDebug(String message)
+    {
+<span class="nc" id="L271">        System.err.println(message);</span>
+<span class="nc" id="L272">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

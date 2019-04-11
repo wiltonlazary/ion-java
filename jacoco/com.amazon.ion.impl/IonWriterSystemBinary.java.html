@@ -1,0 +1,1051 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonWriterSystemBinary.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl</a> &gt; <span class="el_source">IonWriterSystemBinary.java</span></div><h1>IonWriterSystemBinary.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl;
+
+import static com.amazon.ion.impl._Private_IonConstants.tidDATAGRAM;
+import static com.amazon.ion.impl._Private_IonConstants.tidList;
+import static com.amazon.ion.impl._Private_IonConstants.tidSexp;
+import static com.amazon.ion.impl._Private_IonConstants.tidStruct;
+import static com.amazon.ion.impl.lite._Private_LiteDomTrampoline.reverseEncode;
+
+import com.amazon.ion.IonException;
+import com.amazon.ion.IonType;
+import com.amazon.ion.SymbolTable;
+import com.amazon.ion.Timestamp;
+import com.amazon.ion.impl.BlockedBuffer.BlockedByteInputStream;
+import com.amazon.ion.impl.IonBinary.BufferManager;
+import com.amazon.ion.system.IonWriterBuilder.InitialIvmHandling;
+import com.amazon.ion.system.IonWriterBuilder.IvmMinimizing;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.LinkedList;
+import java.util.Queue;
+
+
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">final class IonWriterSystemBinary</span>
+    extends IonWriterSystem
+    implements _Private_ListWriter
+{
+
+    /**
+     * Implements patching of the internal OutputStream with actual value
+     * lengths and types. Every instance of this class represents a container
+     * (including the datagram). Information about the children of the container
+     * is stored in _types/_positions/_lengths arrays.
+     *
+     * The patching mechanism works as follows. For every primitive value, we store
+     * its type, position in internal OutputStream and the serialized lengths
+     * in this class. With every value insertion, its length is then summed to the
+     * length of the @_parent. Upon seeing a container, a new PatchedValue is created
+     * and inserted into @_children queue, then all subsequent values are written
+     * as described above. As the container is finished, its @_parent becomes active
+     * and values are continued to be written. In the end, a general tree is created
+     * with information about all the values in the datagram. The values themselves
+     * are serialized into internal OutputStream
+     *
+     * To finalize the internal OutputStream into a user stream, the arrays in
+     * PatchedValues are traversed from the beginning. For every value in
+     * in @_types[i], it's type descriptor is written into user stream. If the type
+     * is primitive, content of the internal OutputStream is copied starting
+     * from @_positions[i] with length @_lengths[i]. If @_types[i] is a container,
+     * a child is popped from the @_children queue and recursively written as
+     * described above. Whenever TID_SYMBOL_TABLE_PATCH is seen in @_types, the
+     * current symbol table gets reset with the one on the top of @_symtabs queue.
+     */
+    static class PatchedValues {
+
+        private final static int DEFAULT_PATCH_COUNT    = 10;
+
+        /** first free position in the _types/_positions/_lengths arrays */
+        int _freePos;
+        /** types of the container */
+        int[] _types;
+        /** positions where values start in buffer */
+        int[] _positions;
+        /**
+         * lengths of the values. The high 32bits of this value store the length
+         * of the field name, the low 32bits store the actual value length. We need the
+         * field name length to properly adjust the total @_parent length in @endPatch
+         */
+        long[] _lengths;
+        // the parent
+        PatchedValues _parent;
+        Queue&lt;PatchedValues&gt; _children;
+        Queue&lt;SymbolTable&gt; _symtabs;
+
+<span class="fc" id="L91">        PatchedValues() {</span>
+<span class="fc" id="L92">            _freePos = -1;</span>
+<span class="fc" id="L93">            _types = new int[DEFAULT_PATCH_COUNT];</span>
+<span class="fc" id="L94">            _positions = new int[DEFAULT_PATCH_COUNT];</span>
+<span class="fc" id="L95">            _lengths = new long[DEFAULT_PATCH_COUNT];</span>
+<span class="fc" id="L96">        }</span>
+
+        void reset() {
+<span class="fc" id="L99">            _freePos = -1;</span>
+<span class="fc" id="L100">            _children = null;</span>
+<span class="fc" id="L101">            _symtabs = null;</span>
+<span class="fc" id="L102">        }</span>
+
+        /**
+         * Add a new PatchedValues instance to _children and return it
+         */
+        PatchedValues addChild() {
+<span class="fc" id="L108">            PatchedValues pv = new PatchedValues();</span>
+<span class="fc" id="L109">            pv._parent = this;</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            if (_children == null) {</span>
+<span class="fc" id="L111">                _children = new LinkedList&lt;PatchedValues&gt;();</span>
+            }
+<span class="fc" id="L113">            _children.add(pv);</span>
+<span class="fc" id="L114">            return pv;</span>
+        }
+
+        /**
+         * Inject a symbol table at the specified position in internal OutputStream. Most of the
+         * times, the injection will happen upon seeing the first non-system symbol. At that point
+         * the information about the symbol is already stored here by @startPatch call, so we need
+         * to be able to inject a symtab before this value (injectBeforeCurrent)
+         *
+         * @param st
+         * @param injectBeforeCurrent Flags if symbol table must be injected before the current value
+         *                            which essentially shifts the array by 1
+         * @throws IllegalStateException if the PatchedValues is not a top-level one
+         */
+        void injectSymbolTable(SymbolTable st, boolean injectBeforeCurrent) {
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            if (_parent != null) {</span>
+                // we're not on top-level
+<span class="nc" id="L131">                throw new IllegalStateException(&quot;Cannot inject a symbol table when not on top-level&quot;);</span>
+            }
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            if (_symtabs == null) {</span>
+<span class="fc" id="L134">                _symtabs = new LinkedList&lt;SymbolTable&gt;();</span>
+            }
+<span class="fc" id="L136">            ++_freePos;</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">            if (_freePos == _positions.length) {</span>
+<span class="nc" id="L138">                grow();</span>
+            }
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            if (injectBeforeCurrent) {</span>
+                // move current value to the right
+<span class="fc" id="L142">                _types[_freePos] = _types[_freePos - 1];</span>
+<span class="fc" id="L143">                _lengths[_freePos] = _lengths[_freePos - 1];</span>
+                // set previous value to symbol table type
+<span class="fc" id="L145">                _types[_freePos - 1] = TID_SYMBOL_TABLE_PATCH;</span>
+<span class="fc" id="L146">                _lengths[_freePos - 1] = 0;</span>
+            } else {
+                // add symbol table to the next free position as a usual value
+<span class="fc" id="L149">                _types[_freePos] = TID_SYMBOL_TABLE_PATCH;</span>
+<span class="fc" id="L150">                _lengths[_freePos] = 0;</span>
+            }
+            // inject the symbol table to the current position on the top
+<span class="fc" id="L153">            _symtabs.add(st);</span>
+<span class="fc" id="L154">        }</span>
+
+        int getType() {
+<span class="fc" id="L157">            return _types[_freePos];</span>
+        }
+
+        PatchedValues getParent() {
+<span class="fc" id="L161">            return _parent;</span>
+        }
+
+        /** Start the patch for given @type at given @pos */
+        void startPatch(int type, int pos) {
+<span class="fc" id="L166">            ++_freePos;</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">            if (_freePos == _positions.length) {</span>
+<span class="fc" id="L168">                grow();</span>
+            }
+<span class="fc" id="L170">            _types[_freePos] = type;</span>
+<span class="fc" id="L171">            _lengths[_freePos] = 0;</span>
+<span class="fc" id="L172">            _positions[_freePos] = pos;</span>
+<span class="fc" id="L173">        }</span>
+
+        /** Set the field name length as high 32bits of @_lengths item */
+        void patchFieldName(int fieldNameLength) {
+<span class="fc" id="L177">            _lengths[_freePos] = ((long)fieldNameLength) &lt;&lt; 32;</span>
+<span class="fc" id="L178">        }</span>
+
+        /**
+         * Set the value length as low 32bits of @_lengths item. The low 32bits will be
+         * summed with the given value (say, it's a list that is in struct)
+         * @param len
+         */
+        void patchValue(int len) {
+<span class="fc" id="L186">            long memLen = (_lengths[_freePos] &amp; 0xFFFFFFFF00000000L);</span>
+<span class="fc" id="L187">            long curLen = (_lengths[_freePos] &amp; 0x00000000FFFFFFFFL);</span>
+<span class="fc" id="L188">            _lengths[_freePos] = memLen | (curLen + len);</span>
+<span class="fc" id="L189">        }</span>
+
+        /**
+         * End this patch. If there's a @_parent available, it's @_length will be summed
+         * with the length of current patched value
+         */
+        void endPatch() {
+<span class="fc bfc" id="L196" title="All 2 branches covered.">            if (_parent != null) {</span>
+<span class="fc" id="L197">                int memberLen = (int)(_lengths[_freePos] &gt;&gt; 32);</span>
+<span class="fc" id="L198">                int valueLen = (int)(_lengths[_freePos] &amp; 0xFFFFFFFF);</span>
+<span class="fc" id="L199">                int totalLen = memberLen + valueLen;</span>
+<span class="fc bfc" id="L200" title="All 3 branches covered.">                switch (_types[_freePos]) {</span>
+                case TID_SYMBOL_TABLE_PATCH:
+                case TID_RAW:
+<span class="fc" id="L203">                    break;</span>
+                case TID_ANNOTATION_PATCH:
+<span class="fc" id="L205">                    totalLen += IonBinary.lenVarUInt(valueLen);</span>
+<span class="fc" id="L206">                    break;</span>
+                default:
+                    // add the type if it's specified
+<span class="fc" id="L209">                    ++totalLen;</span>
+                    // add actual length of @totalLen :)
+<span class="fc bfc" id="L211" title="All 2 branches covered.">                    if (valueLen &gt;= _Private_IonConstants.lnIsVarLen) {</span>
+<span class="fc" id="L212">                        totalLen += IonBinary.lenVarUInt(valueLen);</span>
+                    }
+                }
+<span class="fc" id="L215">                _parent.patchValue(totalLen);</span>
+            }
+<span class="fc" id="L217">        }</span>
+
+        // grow all related arrays
+        private void grow() {
+<span class="fc" id="L221">            int newSize = _positions.length * 2;</span>
+<span class="fc" id="L222">            _types = growOne(_types, newSize);</span>
+<span class="fc" id="L223">            _positions = growOne(_positions, newSize);</span>
+<span class="fc" id="L224">            _lengths = growOne(_lengths, newSize);</span>
+<span class="fc" id="L225">        }</span>
+        // grow single array and return the result
+        static int[] growOne(int[] source, int newSize) {
+<span class="fc" id="L228">            int[] dest = new int[newSize];</span>
+<span class="fc" id="L229">            System.arraycopy(source, 0, dest, 0, source.length);</span>
+<span class="fc" id="L230">            return dest;</span>
+        }
+        // grow single array and return the result
+        static long[] growOne(long[] source, int newSize) {
+<span class="fc" id="L234">            long[] dest = new long[newSize];</span>
+<span class="fc" id="L235">            System.arraycopy(source, 0, dest, 0, source.length);</span>
+<span class="fc" id="L236">            return dest;</span>
+        }
+    }
+
+    // top-level patch
+<span class="fc" id="L241">    PatchedValues _patch = new PatchedValues();</span>
+
+    private final static int TID_ANNOTATION_PATCH = _Private_IonConstants.tidDATAGRAM + 1;
+    private final static int TID_SYMBOL_TABLE_PATCH = _Private_IonConstants.tidDATAGRAM + 2;
+    private final static int TID_RAW = _Private_IonConstants.tidDATAGRAM + 3;
+
+    // private static final boolean _verbose_debug = false;
+
+    static final int UNKNOWN_LENGTH = -1;
+
+    BufferManager     _manager;
+    IonBinary.Writer  _writer;
+
+    /** Not null */
+    private final OutputStream _user_output_stream;
+
+    /**
+     * Do we {@link #flush()} after each top-level value?
+     * @see #closeValue()
+     */
+    private final boolean _auto_flush;
+
+    boolean           _in_struct;
+
+    /** Ensure we don't use a closed {@link #output} stream. */
+    private boolean _closed;
+
+    private final static int TID_FOR_SYMBOL_TABLE_PATCH = _Private_IonConstants.tidDATAGRAM + 1;
+    private final static int DEFAULT_PATCH_COUNT        = 10;
+    private final static int DEFAULT_PATCH_DEPTH        = 10;
+    private final static int NOT_A_SYMBOL_TABLE_IDX     = -1;
+
+    // Patch:
+    //          offset in data stream
+    //          accumulated length    -- combine w offset in long? offset:len (allows len+=more)
+    //          type of data (should this be in the data stream?
+    //          patched value's parent is struct flag (low nibble in data stream?)
+    //
+    // the patches are the accumulated list of patch points and are
+    // in position order (which is conveniently the order they are
+    // encountered and created).
+<span class="fc" id="L282">    int        _patch_count     = 0;</span>
+<span class="fc" id="L283">    int []     _patch_lengths   = new int[DEFAULT_PATCH_COUNT];     // TODO: should these be merged? (since array access is expensive)</span>
+<span class="fc" id="L284">    int []     _patch_offsets   = new int[DEFAULT_PATCH_COUNT];     // should patch lengths and patch offsets be longs?</span>
+<span class="fc" id="L285">    int []     _patch_table_idx = new int[DEFAULT_PATCH_COUNT];</span>
+<span class="fc" id="L286">    int []     _patch_types     = new int[DEFAULT_PATCH_COUNT];</span>
+<span class="fc" id="L287">    boolean [] _patch_in_struct = new boolean[DEFAULT_PATCH_COUNT];</span>
+
+    // this is only loaded by the User writer, but it is read
+    // by the &quot;get byte&quot; operations and must be coordinated
+    // with the patch list that the system writer maintains here.
+<span class="fc" id="L292">    int           _patch_symbol_table_count = 0;</span>
+<span class="fc" id="L293">    SymbolTable[] _patch_symbol_tables      = new SymbolTable[DEFAULT_PATCH_COUNT];</span>
+
+    // the patch stack is the list of patch points that currently
+    // need updating.  The value is the index into the patch arrays.
+    // As a value requiring patches is closed its patch idx is removed
+    // from the stack.
+    int    _top;
+<span class="fc" id="L300">    int [] _patch_stack = new int[DEFAULT_PATCH_DEPTH];</span>
+
+    /**
+     * This is the depth as seen by the user.  Since there are cases where we
+     * don't push onto the patch stack and cases where we push non-user
+     * containers onto the patch stack we compute this separately during
+     * stepIn and stepOut.
+     */
+    private int _user_depth;
+
+
+    /**
+     * @param out OutputStream the users output byte stream, if specified
+     * @param autoFlush when true the writer flushes to the output stream
+     *  between top level values
+     * @param ensureInitialIvm when true, an initial IVM will be emitted even
+     *  when the user doesn't explicitly write one. When false, an initial IVM
+     *  won't be emitted unless the user does it. That can result in an invalid
+     *  Ion stream if not used carefully.
+     * @throws NullPointerException if any parameter is null.
+     */
+    IonWriterSystemBinary(SymbolTable defaultSystemSymtab,
+                          OutputStream out,
+                          boolean autoFlush,
+                          boolean ensureInitialIvm)
+    {
+<span class="fc" id="L326">        super(defaultSystemSymtab,</span>
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">              (ensureInitialIvm ? InitialIvmHandling.ENSURE : null),</span>
+              IvmMinimizing.ADJACENT);
+
+<span class="fc" id="L330">        out.getClass(); // Efficient null check</span>
+<span class="fc" id="L331">        _user_output_stream = out;</span>
+
+        // the buffer manager and writer
+        // are used to hold the buffered
+        // binary values pending flush().
+<span class="fc" id="L336">        _manager = new BufferManager();</span>
+<span class="fc" id="L337">        _writer = _manager.openWriter();</span>
+<span class="fc" id="L338">        _auto_flush = autoFlush;</span>
+<span class="fc" id="L339">    }</span>
+
+    /**
+     * Empty our buffers, assuming it is safe to do so.
+     * This is called by {@link #flush()} and {@link #finish()}.
+     */
+    private void writeAllBufferedData()
+        throws IOException
+    {
+<span class="fc" id="L348">        writeBytes(_user_output_stream);</span>
+
+<span class="fc" id="L350">        clearFieldName();</span>
+<span class="fc" id="L351">        clearAnnotations();</span>
+
+<span class="fc" id="L353">        _in_struct = false;</span>
+<span class="fc" id="L354">        _patch_count = 0;</span>
+<span class="fc" id="L355">        _patch_symbol_table_count = 0;</span>
+<span class="fc" id="L356">        _top = 0;</span>
+        try {
+<span class="fc" id="L358">            _writer.setPosition(0);</span>
+<span class="fc" id="L359">            _writer.truncate();</span>
+        }
+<span class="nc" id="L361">        catch (IOException e) {</span>
+<span class="nc" id="L362">            throw new IonException(e);</span>
+<span class="fc" id="L363">        }</span>
+<span class="fc" id="L364">    }</span>
+
+    @Override
+    public void finish() throws IOException
+    {
+<span class="fc bfc" id="L369" title="All 2 branches covered.">        if (getDepth() != 0) {</span>
+<span class="fc" id="L370">            throw new IllegalStateException(ERROR_FINISH_NOT_AT_TOP_LEVEL);</span>
+        }
+
+<span class="fc" id="L373">        writeAllBufferedData();</span>
+<span class="fc" id="L374">        super.finish();</span>
+<span class="fc" id="L375">    }</span>
+
+    final OutputStream getOutputStream()
+    {
+<span class="fc" id="L379">        return _user_output_stream;</span>
+    }
+
+    public final boolean isInStruct()
+    {
+<span class="fc" id="L384">        return _in_struct;</span>
+    }
+
+    private final boolean topInStruct() {
+<span class="nc bnc" id="L388" title="All 2 branches missed.">        if (_top == 0) return false;</span>
+<span class="nc" id="L389">        boolean in_struct = _patch_in_struct[_patch_stack[_top - 1]];</span>
+<span class="nc" id="L390">        return in_struct;</span>
+    }
+    protected final boolean atDatagramLevel()
+    {
+<span class="pc bpc" id="L394" title="1 of 2 branches missed.">        return (topType() == _Private_IonConstants.tidDATAGRAM);</span>
+//        return is_datagram;
+    }
+
+    @Override
+    public final int getDepth()
+    {
+<span class="fc" id="L401">        return _user_depth;</span>
+    }
+
+    protected final IonType getContainer()
+    {
+        IonType type;
+<span class="nc" id="L407">        int tid = parentType();</span>
+<span class="nc bnc" id="L408" title="All 5 branches missed.">        switch (tid) {</span>
+        case tidList:
+<span class="nc" id="L410">            type = IonType.LIST;</span>
+<span class="nc" id="L411">            break;</span>
+        case tidSexp:
+<span class="nc" id="L413">            type = IonType.SEXP;</span>
+<span class="nc" id="L414">            break;</span>
+        case tidStruct:
+<span class="nc" id="L416">            type = IonType.STRUCT;</span>
+<span class="nc" id="L417">            break;</span>
+        case tidDATAGRAM:
+<span class="nc" id="L419">            type = IonType.DATAGRAM;</span>
+<span class="nc" id="L420">            break;</span>
+        default:
+<span class="nc" id="L422">            throw new IonException(&quot;unexpected parent type &quot;+tid+&quot; does not represent a container&quot;);</span>
+        }
+<span class="nc" id="L424">        return type;</span>
+    }
+
+    @Override
+    final SymbolTable inject_local_symbol_table() throws IOException
+    {
+<span class="fc" id="L430">        SymbolTable symbols = super.inject_local_symbol_table();</span>
+        PatchedValues top;
+        // find the parent
+<span class="fc bfc" id="L433" title="All 2 branches covered.">        for (top = _patch; top.getParent() != null; top = top.getParent()) {}</span>
+        // inject the symbol table; if @_patch is not the top element, then inject
+        // the symtab before this top-level value begins
+<span class="fc" id="L436">        super.startValue();</span>
+<span class="fc bfc" id="L437" title="All 2 branches covered.">        top.injectSymbolTable(symbols, _patch.getParent() != null);</span>
+<span class="fc" id="L438">        super.endValue();</span>
+<span class="fc" id="L439">        return symbols;</span>
+    }
+
+    private final int topLength() {
+<span class="nc" id="L443">        return _patch_lengths[_patch_stack[_top - 1]];</span>
+    }
+
+    private final int topType() {
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">        if (_top == 0) return _Private_IonConstants.tidDATAGRAM;</span>
+<span class="nc" id="L448">        return _patch_types[_patch_stack[_top - 1]];</span>
+    }
+
+    private final int parentType() {
+<span class="nc" id="L452">        int ii = _top - 2;</span>
+<span class="nc bnc" id="L453" title="All 2 branches missed.">        while (ii &gt;= 0) {</span>
+<span class="nc" id="L454">            int type = _patch_types[_patch_stack[ii]];</span>
+<span class="nc bnc" id="L455" title="All 2 branches missed.">            if (type != _Private_IonConstants.tidTypedecl) return type;</span>
+<span class="nc" id="L456">            ii--;</span>
+<span class="nc" id="L457">        }</span>
+<span class="nc" id="L458">        return _Private_IonConstants.tidDATAGRAM;</span>
+    }
+
+    private final void startValue(int value_type)
+        throws IOException
+    {
+<span class="fc" id="L464">        super.startValue();</span>
+
+<span class="fc" id="L466">        int[] sids = null;</span>
+<span class="fc" id="L467">        int sid_count = annotationCount();</span>
+<span class="fc bfc" id="L468" title="All 2 branches covered.">        if (sid_count &gt; 0) {</span>
+            // prepare the SIDs of annotations before doing the patch as this may
+            // fail and leave the Writer in undefined state
+<span class="fc" id="L471">            sids = super.internAnnotationsAndGetSids();</span>
+<span class="fc" id="L472">            _patch.startPatch(_Private_IonConstants.tidTypedecl, _writer.position());</span>
+        } else {
+<span class="fc" id="L474">            _patch.startPatch(value_type, _writer.position());</span>
+        }
+        // write field name
+<span class="fc bfc" id="L477" title="All 2 branches covered.">        if (_in_struct) {</span>
+<span class="fc bfc" id="L478" title="All 2 branches covered.">            if (!isFieldNameSet()) {</span>
+<span class="fc" id="L479">                throw new IllegalStateException(ERROR_MISSING_FIELD_NAME);</span>
+            }
+<span class="fc" id="L481">            int sid = super.getFieldId();</span>
+<span class="pc bpc" id="L482" title="1 of 2 branches missed.">            if (sid &lt; 0) {</span>
+<span class="nc" id="L483">                throw new UnsupportedOperationException(&quot;symbol resolution must be handled by the user writer&quot;);</span>
+            }
+<span class="fc" id="L485">            int fieldNameLength = _writer.writeVarUIntValue(sid, true);</span>
+<span class="fc" id="L486">            _patch.patchFieldName(fieldNameLength);</span>
+<span class="fc" id="L487">            clearFieldName();</span>
+        }
+
+        // write annotations
+<span class="fc bfc" id="L491" title="All 2 branches covered.">        if (sid_count &gt; 0) {</span>
+<span class="fc" id="L492">            _patch = _patch.addChild();</span>
+            // add all annotations as if it's a value with type = -1
+<span class="fc" id="L494">            _patch.startPatch(TID_ANNOTATION_PATCH, _writer.position());</span>
+<span class="fc" id="L495">            int len = 0;</span>
+<span class="fc bfc" id="L496" title="All 2 branches covered.">            for (int ii=0; ii&lt;sid_count; ii++) {</span>
+<span class="fc" id="L497">                len += _writer.writeVarUIntValue(sids[ii], true);</span>
+            }
+<span class="fc" id="L499">            _patch.patchValue(len);</span>
+<span class="fc" id="L500">            _patch.endPatch();</span>
+<span class="fc" id="L501">            clearAnnotations();</span>
+            // add the actual value now
+<span class="fc" id="L503">            _patch.startPatch(value_type, _writer.position());</span>
+        }
+<span class="fc" id="L505">    }</span>
+
+    private final void closeValue()
+        throws IOException
+    {
+<span class="fc" id="L510">        super.endValue();</span>
+<span class="fc" id="L511">        _patch.endPatch();</span>
+<span class="fc bfc" id="L512" title="All 2 branches covered.">        if (_patch.getParent() != null</span>
+<span class="fc bfc" id="L513" title="All 2 branches covered.">            &amp;&amp; _patch.getParent().getType() == _Private_IonConstants.tidTypedecl)</span>
+        {
+            // this is an annotated value, gotta get out
+<span class="fc" id="L516">            _patch = _patch.getParent();</span>
+<span class="fc" id="L517">            _patch.endPatch();</span>
+<span class="pc bpc" id="L518" title="2 of 4 branches missed.">            assert _patch != null;</span>
+        }
+<span class="fc" id="L520">    }</span>
+
+
+    /**
+     * {@inheritDoc}
+     * &lt;p&gt;
+     * The {@link OutputStream} spec is mum regarding the behavior of flush on
+     * a closed stream, so we shouldn't assume that our stream can handle that.
+     */
+    public final void flush() throws IOException
+    {
+<span class="fc bfc" id="L531" title="All 2 branches covered.">        if (! _closed)</span>
+        {
+<span class="pc bpc" id="L533" title="1 of 4 branches missed.">            if (atDatagramLevel() &amp;&amp; ! hasAnnotations())</span>
+            {
+<span class="fc" id="L535">                SymbolTable symtab = getSymbolTable();</span>
+
+<span class="pc bpc" id="L537" title="1 of 2 branches missed.">                if (symtab != null &amp;&amp;</span>
+<span class="fc bfc" id="L538" title="All 2 branches covered.">                    symtab.isReadOnly() &amp;&amp;</span>
+<span class="pc bpc" id="L539" title="1 of 2 branches missed.">                    symtab.isLocalTable())</span>
+                {
+                    // It's no longer possible to add more symbols to the local
+                    // symtab, so we can safely write everything out.
+<span class="nc" id="L543">                    writeAllBufferedData();</span>
+                }
+            }
+
+<span class="fc" id="L547">            _user_output_stream.flush();</span>
+        }
+<span class="fc" id="L549">    }</span>
+
+    public final void close() throws IOException
+    {
+<span class="fc bfc" id="L553" title="All 2 branches covered.">        if (! _closed) {</span>
+            try
+            {
+<span class="fc bfc" id="L556" title="All 2 branches covered.">                if (getDepth() == 0) {</span>
+<span class="fc" id="L557">                    finish();</span>
+                }
+            }
+            finally
+            {
+                // Do this first so we are closed even if the call below throws.
+<span class="fc" id="L563">                _closed = true;</span>
+
+<span class="fc" id="L565">                _user_output_stream.close();</span>
+            }
+        }
+<span class="fc" id="L568">    }</span>
+
+
+
+    @Override
+    void writeIonVersionMarkerAsIs(SymbolTable systemSymtab)
+        throws IOException
+    {
+<span class="pc bpc" id="L576" title="1 of 2 branches missed.">        if (_user_depth != 0) {</span>
+<span class="nc" id="L577">            throw new IllegalStateException(&quot;IVM not on top-level&quot;);</span>
+        }
+<span class="fc" id="L579">        super.startValue();</span>
+<span class="fc" id="L580">        _patch.startPatch(TID_RAW, _writer.position());</span>
+<span class="fc" id="L581">        _patch.patchValue(4);</span>
+<span class="fc" id="L582">        _writer.write(_Private_IonConstants.BINARY_VERSION_MARKER_1_0);</span>
+<span class="fc" id="L583">        _patch.endPatch();</span>
+<span class="fc" id="L584">        super.endValue();</span>
+<span class="fc" id="L585">    }</span>
+
+    @Override
+    void writeLocalSymtab(SymbolTable symbols)
+        throws IOException
+    {
+        // this method *should* be called when @_patch is a top-level value, but
+        // we cannot be sure, so try to find the top-level anyway
+        PatchedValues top;
+        // find the parent
+<span class="pc bpc" id="L595" title="1 of 2 branches missed.">        for (top = _patch; top.getParent() != null; top = top.getParent()) {}</span>
+<span class="fc" id="L596">        super.startValue();</span>
+<span class="pc bpc" id="L597" title="1 of 2 branches missed.">        top.injectSymbolTable(symbols, _patch.getParent() != null);</span>
+<span class="fc" id="L598">        super.endValue();</span>
+<span class="fc" id="L599">        super.writeLocalSymtab(symbols);</span>
+<span class="fc" id="L600">    }</span>
+
+    public final void stepIn(IonType containerType) throws IOException
+    {
+        int tid;
+<span class="pc bpc" id="L605" title="1 of 4 branches missed.">        switch (containerType)</span>
+        {
+<span class="fc" id="L607">            case LIST:   tid = tidList;   break;</span>
+<span class="fc" id="L608">            case SEXP:   tid = tidSexp;   break;</span>
+<span class="fc" id="L609">            case STRUCT: tid = tidStruct; break;</span>
+            default:
+<span class="nc" id="L611">                throw new IllegalArgumentException();</span>
+        }
+<span class="fc" id="L613">        startValue(tid);</span>
+<span class="fc" id="L614">        _patch = _patch.addChild();</span>
+<span class="fc bfc" id="L615" title="All 2 branches covered.">        _in_struct = (tid == tidStruct);</span>
+<span class="fc" id="L616">        ++_user_depth;</span>
+<span class="fc" id="L617">    }</span>
+
+    public final void stepOut() throws IOException
+    {
+<span class="pc bpc" id="L621" title="1 of 2 branches missed.">        if (_patch.getParent() == null) {</span>
+<span class="nc" id="L622">            throw new IllegalStateException(IonMessages.CANNOT_STEP_OUT);</span>
+        }
+        // container is over, getting out
+<span class="fc" id="L625">        _patch = _patch.getParent();</span>
+        // now close current value
+<span class="fc" id="L627">        closeValue();</span>
+<span class="fc bfc" id="L628" title="All 2 branches covered.">        if (_patch.getParent() == null) {</span>
+<span class="fc" id="L629">            _in_struct = false;</span>
+            // we're on top-level
+<span class="pc bpc" id="L631" title="1 of 2 branches missed.">            if (_auto_flush) {</span>
+<span class="nc" id="L632">                flush();</span>
+            }
+        } else {
+<span class="fc bfc" id="L635" title="All 2 branches covered.">            _in_struct = (_patch.getParent().getType() == _Private_IonConstants.tidStruct);</span>
+        }
+<span class="fc" id="L637">        --_user_depth;</span>
+<span class="fc" id="L638">    }</span>
+
+
+    public void writeNull(IonType type) throws IOException
+    {
+        int tid;
+<span class="pc bpc" id="L644" title="1 of 14 branches missed.">        switch (type) {</span>
+<span class="fc" id="L645">        case NULL:      tid = _Private_IonConstants.tidNull;      break;</span>
+<span class="fc" id="L646">        case BOOL:      tid = _Private_IonConstants.tidBoolean;   break;</span>
+<span class="fc" id="L647">        case INT:       tid = _Private_IonConstants.tidPosInt;    break;</span>
+<span class="fc" id="L648">        case FLOAT:     tid = _Private_IonConstants.tidFloat;     break;</span>
+<span class="fc" id="L649">        case DECIMAL:   tid = _Private_IonConstants.tidDecimal;   break;</span>
+<span class="fc" id="L650">        case TIMESTAMP: tid = _Private_IonConstants.tidTimestamp; break;</span>
+<span class="fc" id="L651">        case SYMBOL:    tid = _Private_IonConstants.tidSymbol;    break;</span>
+<span class="fc" id="L652">        case STRING:    tid = _Private_IonConstants.tidString;    break;</span>
+<span class="fc" id="L653">        case BLOB:      tid = _Private_IonConstants.tidBlob;      break;</span>
+<span class="fc" id="L654">        case CLOB:      tid = _Private_IonConstants.tidClob;      break;</span>
+<span class="fc" id="L655">        case SEXP:      tid = _Private_IonConstants.tidSexp;      break;</span>
+<span class="fc" id="L656">        case LIST:      tid = _Private_IonConstants.tidList;      break;</span>
+<span class="fc" id="L657">        case STRUCT:    tid = _Private_IonConstants.tidStruct;    break;</span>
+        default:
+<span class="nc" id="L659">            throw new IllegalArgumentException(&quot;Invalid type: &quot; + type);</span>
+        }
+<span class="fc" id="L661">        startValue(TID_RAW);</span>
+<span class="fc" id="L662">        _writer.write((tid &lt;&lt; 4) | _Private_IonConstants.lnIsNull);</span>
+<span class="fc" id="L663">        _patch.patchValue(1);</span>
+<span class="fc" id="L664">        closeValue();</span>
+<span class="fc" id="L665">    }</span>
+
+    public void writeBool(boolean value) throws IOException
+    {
+<span class="fc bfc" id="L669" title="All 2 branches covered.">        int ln = value ? _Private_IonConstants.lnBooleanTrue : _Private_IonConstants.lnBooleanFalse;</span>
+<span class="fc" id="L670">        startValue(TID_RAW);</span>
+<span class="fc" id="L671">        _writer.write((_Private_IonConstants.tidBoolean &lt;&lt; 4) | ln);</span>
+<span class="fc" id="L672">        _patch.patchValue(1);</span>
+<span class="fc" id="L673">        closeValue();</span>
+<span class="fc" id="L674">    }</span>
+    public void writeInt(long value) throws IOException
+    {
+        int len;
+<span class="fc bfc" id="L678" title="All 2 branches covered.">        if (value &lt; 0) {</span>
+<span class="fc" id="L679">            startValue(_Private_IonConstants.tidNegInt);</span>
+<span class="fc" id="L680">            len = _writer.writeUIntValue(-value);</span>
+        } else {
+<span class="fc" id="L682">            startValue(_Private_IonConstants.tidPosInt);</span>
+<span class="fc" id="L683">            len = _writer.writeUIntValue(value);</span>
+        }
+<span class="fc" id="L685">        _patch.patchValue(len);</span>
+<span class="fc" id="L686">        closeValue();</span>
+<span class="fc" id="L687">    }</span>
+
+    public void writeInt(BigInteger value) throws IOException
+    {
+<span class="fc bfc" id="L691" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L692">            writeNull(IonType.INT);</span>
+<span class="fc" id="L693">            return;</span>
+        }
+
+<span class="fc bfc" id="L696" title="All 2 branches covered.">        boolean     is_negative = (value.signum() &lt; 0);</span>
+<span class="fc" id="L697">        BigInteger  positive = value;</span>
+
+<span class="fc bfc" id="L699" title="All 2 branches covered.">        if (is_negative) {</span>
+<span class="fc" id="L700">            positive = value.negate();</span>
+        }
+
+<span class="fc" id="L703">        int len = IonBinary.lenIonInt(positive);</span>
+<span class="fc bfc" id="L704" title="All 2 branches covered.">        startValue(is_negative ? _Private_IonConstants.tidNegInt : _Private_IonConstants.tidPosInt);</span>
+<span class="fc" id="L705">        _writer.writeUIntValue(positive, len);</span>
+<span class="fc" id="L706">        _patch.patchValue(len);</span>
+
+<span class="fc" id="L708">        closeValue();</span>
+<span class="fc" id="L709">    }</span>
+
+    public void writeFloat(double value) throws IOException
+    {
+<span class="fc" id="L713">        int len = IonBinary.lenIonFloat(value);</span>
+<span class="fc" id="L714">        startValue(_Private_IonConstants.tidFloat); // int's are always less than varlen long</span>
+<span class="fc" id="L715">        len = _writer.writeFloatValue(value);</span>
+<span class="fc" id="L716">        _patch.patchValue(len);</span>
+<span class="fc" id="L717">        closeValue();</span>
+<span class="fc" id="L718">    }</span>
+
+    @Override
+    public void writeDecimal(BigDecimal value) throws IOException
+    {
+<span class="fc bfc" id="L723" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L724">            writeNull(IonType.DECIMAL);</span>
+<span class="fc" id="L725">            return;</span>
+        }
+<span class="fc" id="L727">        startValue(_Private_IonConstants.tidDecimal);</span>
+<span class="fc" id="L728">        int len = _writer.writeDecimalContent(value);</span>
+<span class="fc" id="L729">        _patch.patchValue(len);</span>
+<span class="fc" id="L730">        closeValue();</span>
+<span class="fc" id="L731">    }</span>
+
+    public void writeTimestamp(Timestamp value) throws IOException
+    {
+<span class="fc bfc" id="L735" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L736">            writeNull(IonType.TIMESTAMP);</span>
+<span class="fc" id="L737">            return;</span>
+        }
+<span class="fc" id="L739">        startValue(_Private_IonConstants.tidTimestamp);</span>
+<span class="fc" id="L740">        int len = _writer.writeTimestamp(value);</span>
+<span class="fc" id="L741">        _patch.patchValue(len);</span>
+<span class="fc" id="L742">        closeValue();</span>
+<span class="fc" id="L743">    }</span>
+
+    public void writeString(String value) throws IOException
+    {
+<span class="fc bfc" id="L747" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L748">            writeNull(IonType.STRING);</span>
+<span class="fc" id="L749">            return;</span>
+        }
+<span class="fc" id="L751">        startValue(_Private_IonConstants.tidString);</span>
+<span class="fc" id="L752">        int len = _writer.writeStringData(value);</span>
+<span class="fc" id="L753">        _patch.patchValue(len);</span>
+<span class="fc" id="L754">        closeValue();</span>
+<span class="fc" id="L755">    }</span>
+
+    @Override
+    void writeSymbolAsIs(int symbolId) throws IOException
+    {
+<span class="fc" id="L760">        startValue(_Private_IonConstants.tidSymbol);</span>
+<span class="fc" id="L761">        int len = _writer.writeUIntValue(symbolId);</span>
+<span class="fc" id="L762">        _patch.patchValue(len);</span>
+<span class="fc" id="L763">        closeValue();</span>
+<span class="fc" id="L764">    }</span>
+
+    @Override
+    public void writeSymbolAsIs(String value) throws IOException
+    {
+<span class="fc bfc" id="L769" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L770">            writeNull(IonType.SYMBOL);</span>
+<span class="fc" id="L771">            return;</span>
+        }
+<span class="fc" id="L773">        int sid = add_symbol(value);</span>
+<span class="fc" id="L774">        writeSymbolAsIs(sid);</span>
+<span class="fc" id="L775">    }</span>
+
+    public void writeClob(byte[] value, int start, int len) throws IOException
+    {
+<span class="fc bfc" id="L779" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L780">            writeNull(IonType.CLOB);</span>
+<span class="fc" id="L781">            return;</span>
+        }
+<span class="pc bpc" id="L783" title="3 of 6 branches missed.">        if (start &lt; 0 || len &lt; 0 || start+len &gt; value.length) {</span>
+<span class="nc" id="L784">            throw new IllegalArgumentException(&quot;the start and len must be contained in the byte array&quot;);</span>
+        }
+<span class="fc" id="L786">        startValue(_Private_IonConstants.tidClob);</span>
+<span class="fc" id="L787">        _writer.write(value, start, len);</span>
+<span class="fc" id="L788">        _patch.patchValue(len);</span>
+<span class="fc" id="L789">        closeValue();</span>
+<span class="fc" id="L790">    }</span>
+
+    public void writeBlob(byte[] value, int start, int len) throws IOException
+    {
+<span class="fc bfc" id="L794" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L795">            writeNull(IonType.BLOB);</span>
+<span class="fc" id="L796">            return;</span>
+        }
+<span class="pc bpc" id="L798" title="3 of 6 branches missed.">        if (start &lt; 0 || len &lt; 0 || start+len &gt; value.length) {</span>
+<span class="nc" id="L799">            throw new IllegalArgumentException(&quot;the start and len must be contained in the byte array&quot;);</span>
+        }
+<span class="fc" id="L801">        startValue(_Private_IonConstants.tidBlob);</span>
+<span class="fc" id="L802">        _writer.write(value, start, len);</span>
+<span class="fc" id="L803">        _patch.patchValue(len);</span>
+<span class="fc" id="L804">        closeValue();</span>
+<span class="fc" id="L805">    }</span>
+
+    // just transfer the bytes into the current patch as 'proper' ion binary serialization
+    public void writeRaw(byte[] value, int start, int len) throws IOException
+    {
+<span class="fc" id="L810">        startValue(TID_RAW);</span>
+<span class="fc" id="L811">        _writer.write(value, start, len);</span>
+<span class="fc" id="L812">        _patch.patchValue(len);</span>
+<span class="fc" id="L813">        closeValue();</span>
+<span class="fc" id="L814">    }</span>
+
+    public void writeBoolList(boolean[] values) throws IOException
+    {
+<span class="nc" id="L818">        stepIn(IonType.LIST);</span>
+<span class="nc bnc" id="L819" title="All 2 branches missed.">        for (boolean b : values) {</span>
+<span class="nc" id="L820">            writeBool(b);</span>
+        }
+<span class="nc" id="L822">        stepOut();</span>
+<span class="nc" id="L823">    }</span>
+
+    public void writeIntList(byte[] values) throws IOException
+    {
+<span class="nc" id="L827">        stepIn(IonType.LIST);</span>
+<span class="nc bnc" id="L828" title="All 2 branches missed.">        for (byte b : values) {</span>
+<span class="nc" id="L829">            writeInt(b);</span>
+        }
+<span class="nc" id="L831">        stepOut();</span>
+<span class="nc" id="L832">    }</span>
+
+    public void writeIntList(short[] values) throws IOException
+    {
+<span class="nc" id="L836">        stepIn(IonType.LIST);</span>
+<span class="nc bnc" id="L837" title="All 2 branches missed.">        for (short s : values) {</span>
+<span class="nc" id="L838">            writeInt(s);</span>
+        }
+<span class="nc" id="L840">        stepOut();</span>
+<span class="nc" id="L841">    }</span>
+
+    public void writeIntList(int[] values) throws IOException
+    {
+<span class="nc" id="L845">        stepIn(IonType.LIST);</span>
+<span class="nc bnc" id="L846" title="All 2 branches missed.">        for (int i : values) {</span>
+<span class="nc" id="L847">            writeInt(i);</span>
+        }
+<span class="nc" id="L849">        stepOut();</span>
+<span class="nc" id="L850">    }</span>
+
+    public void writeIntList(long[] values) throws IOException
+    {
+<span class="nc" id="L854">        stepIn(IonType.LIST);</span>
+<span class="nc bnc" id="L855" title="All 2 branches missed.">        for (long l : values) {</span>
+<span class="nc" id="L856">            writeInt(l);</span>
+        }
+<span class="nc" id="L858">        stepOut();</span>
+<span class="nc" id="L859">    }</span>
+
+    public void writeFloatList(float[] values) throws IOException
+    {
+<span class="nc" id="L863">        stepIn(IonType.LIST);</span>
+<span class="nc bnc" id="L864" title="All 2 branches missed.">        for (float f : values) {</span>
+<span class="nc" id="L865">            writeFloat(f);</span>
+        }
+<span class="nc" id="L867">        stepOut();</span>
+<span class="nc" id="L868">    }</span>
+
+    public void writeFloatList(double[] values) throws IOException
+    {
+<span class="nc" id="L872">        stepIn(IonType.LIST);</span>
+<span class="nc bnc" id="L873" title="All 2 branches missed.">        for (double d : values) {</span>
+<span class="nc" id="L874">            writeFloat(d);</span>
+        }
+<span class="nc" id="L876">        stepOut();</span>
+<span class="nc" id="L877">    }</span>
+
+    public void writeStringList(String[] values) throws IOException
+    {
+<span class="nc" id="L881">        stepIn(IonType.LIST);</span>
+<span class="nc bnc" id="L882" title="All 2 branches missed.">        for (String s : values) {</span>
+<span class="nc" id="L883">            writeString(s);</span>
+        }
+<span class="nc" id="L885">        stepOut();</span>
+<span class="nc" id="L886">    }</span>
+
+    // TODO make private after IonBinaryWriter is removed
+    /**
+     * Writes everything we've got into the output stream, performing all
+     * necessary patches along the way.
+     *
+     * This implements {@link com.amazon.ion.IonBinaryWriter#writeBytes(OutputStream)}
+     * via our subclass {@link IonWriterBinaryCompatibility.System}.
+     */
+    int writeBytes(OutputStream userstream) throws IOException {
+<span class="pc bpc" id="L897" title="1 of 2 branches missed.">        if (_patch.getParent() != null) {</span>
+<span class="nc" id="L898">            throw new IllegalStateException(&quot;Tried to flush while not on top-level&quot;);</span>
+        }
+
+        try {
+<span class="fc" id="L902">            BlockedByteInputStream datastream =</span>
+<span class="fc" id="L903">                new BlockedByteInputStream(_manager.buffer());</span>
+<span class="fc" id="L904">            int size = writeRecursive(datastream, userstream, _patch);</span>
+<span class="fc" id="L905">            return size;</span>
+        } finally {
+<span class="fc" id="L907">            _patch.reset();</span>
+        }
+    }
+
+    int writeRecursive(BlockedByteInputStream datastream, OutputStream userstream, PatchedValues p) throws IOException {
+<span class="fc" id="L912">        int totalSize = 0;</span>
+<span class="fc bfc" id="L913" title="All 2 branches covered.">        for (int i = 0; i &lt;= p._freePos; ++i) {</span>
+<span class="fc" id="L914">            int type = p._types[i];</span>
+<span class="fc" id="L915">            int pos = p._positions[i];</span>
+<span class="fc" id="L916">            int fnlen = (int)(p._lengths[i] &gt;&gt; 32);</span>
+<span class="fc" id="L917">            int vallen = (int)(p._lengths[i] &amp; 0xFFFFFFFF);</span>
+<span class="fc bfc" id="L918" title="All 2 branches covered.">            if (p.getParent() == null) {</span>
+<span class="pc bpc" id="L919" title="1 of 2 branches missed.">                if (pos &gt; totalSize) {</span>
+                    // write whatever data that we have in the datastream (eg external data)
+<span class="nc" id="L921">                    datastream.writeTo(userstream, pos - totalSize);</span>
+<span class="nc" id="L922">                    totalSize = pos;</span>
+                }
+<span class="fc" id="L924">                totalSize += fnlen + vallen;</span>
+            }
+            // write member name
+<span class="fc bfc" id="L927" title="All 2 branches covered.">            if (fnlen &gt; 0) {</span>
+<span class="fc" id="L928">                datastream.writeTo(userstream, fnlen);</span>
+            }
+<span class="fc bfc" id="L930" title="All 4 branches covered.">            switch (type) {</span>
+            case TID_ANNOTATION_PATCH:
+<span class="fc" id="L932">                IonBinary.writeVarUInt(userstream, vallen);</span>
+<span class="fc" id="L933">                datastream.writeTo(userstream, vallen);</span>
+<span class="fc" id="L934">                break;</span>
+
+            case TID_SYMBOL_TABLE_PATCH:
+<span class="fc" id="L937">                SymbolTable symtab = p._symtabs.remove();</span>
+<span class="pc bpc" id="L938" title="1 of 2 branches missed.">                if (!symtab.isSystemTable()) {</span>
+<span class="fc" id="L939">                    byte[] symtabBytes = reverseEncode(1024, symtab);</span>
+<span class="fc" id="L940">                    userstream.write(symtabBytes);</span>
+<span class="fc" id="L941">                    totalSize += symtabBytes.length;</span>
+<span class="fc" id="L942">                }</span>
+                break;
+
+            case TID_RAW:
+<span class="fc" id="L946">                datastream.writeTo(userstream, vallen);</span>
+<span class="fc" id="L947">                break;</span>
+
+            default:
+                // write type
+<span class="fc bfc" id="L951" title="All 2 branches covered.">                if (vallen &gt;= _Private_IonConstants.lnIsVarLen) {</span>
+<span class="fc" id="L952">                    int typeByte = (type &lt;&lt; 4) | _Private_IonConstants.lnIsVarLen;</span>
+<span class="fc" id="L953">                    userstream.write(typeByte);</span>
+<span class="fc" id="L954">                    IonBinary.writeVarUInt(userstream, vallen);</span>
+<span class="fc" id="L955">                } else {</span>
+<span class="fc" id="L956">                    int typeByte = (type &lt;&lt; 4) | vallen;</span>
+<span class="fc" id="L957">                    userstream.write(typeByte);</span>
+                }
+<span class="fc bfc" id="L959" title="All 2 branches covered.">                switch (type) {</span>
+                case _Private_IonConstants.tidList:
+                case _Private_IonConstants.tidSexp:
+                case _Private_IonConstants.tidStruct:
+                case _Private_IonConstants.tidTypedecl:
+                    // write the container
+<span class="pc bpc" id="L965" title="2 of 4 branches missed.">                    assert p._children != null;</span>
+<span class="fc" id="L966">                    writeRecursive(datastream, userstream, p._children.remove());</span>
+<span class="fc" id="L967">                    break;</span>
+
+                default:
+<span class="fc" id="L970">                    datastream.writeTo(userstream, vallen);</span>
+                }
+            }
+        }
+<span class="fc" id="L974">        return totalSize;</span>
+    }
+
+    static class CountingStream extends OutputStream
+    {
+        private final OutputStream _wrapped;
+        private       int          _written;
+
+<span class="nc" id="L982">        CountingStream(OutputStream userstream) {</span>
+<span class="nc" id="L983">            _wrapped = userstream;</span>
+<span class="nc" id="L984">        }</span>
+
+        public int getBytesWritten() {
+<span class="nc" id="L987">            return _written;</span>
+        }
+
+        @Override
+        public void write(int b) throws IOException
+        {
+<span class="nc" id="L993">            _wrapped.write(b);</span>
+<span class="nc" id="L994">            _written++;</span>
+<span class="nc" id="L995">        }</span>
+        @Override
+        public void write(byte[] bytes) throws IOException
+        {
+<span class="nc" id="L999">            _wrapped.write(bytes);</span>
+<span class="nc" id="L1000">            _written += bytes.length;</span>
+<span class="nc" id="L1001">        }</span>
+        @Override
+        public void write(byte[] bytes, int off, int len) throws IOException
+        {
+<span class="nc" id="L1005">            _wrapped.write(bytes, off, len);</span>
+<span class="nc" id="L1006">            _written += len;</span>
+<span class="nc" id="L1007">        }</span>
+
+    }
+
+    protected int write_symbol_table(OutputStream userstream,
+                                     SymbolTable symtab) throws IOException
+    {
+<span class="nc" id="L1014">        CountingStream cs = new CountingStream(userstream);</span>
+        // TODO this is assuming the symtab needed here, broken for open content.
+<span class="nc" id="L1016">        IonWriterSystemBinary writer =</span>
+            new IonWriterSystemBinary(_default_system_symbol_table,
+                                      cs,
+                                      false /* autoflush */ ,
+                                      false /* ensureInitialIvm */);
+<span class="nc" id="L1021">        symtab.writeTo(writer);</span>
+<span class="nc" id="L1022">        writer.finish();</span>
+<span class="nc" id="L1023">        int symtab_len = cs.getBytesWritten();</span>
+<span class="nc" id="L1024">        return symtab_len;</span>
+    }
+
+    protected int XXX_get_pending_length_with_no_symbol_tables()
+    {
+<span class="nc" id="L1029">        int buffer_length = _manager.buffer().size();</span>
+<span class="nc" id="L1030">        int patch_amount = 0;</span>
+
+<span class="nc bnc" id="L1032" title="All 2 branches missed.">        for (int patch_idx = 0; patch_idx &lt; _patch_count; patch_idx ++) {</span>
+            // int vlen = _patch_list[patch_idx + IonBinaryWriter.POSITION_OFFSET];
+<span class="nc" id="L1034">            int vlen = _patch_lengths[patch_idx];</span>
+<span class="nc bnc" id="L1035" title="All 2 branches missed.">            if (vlen &gt;= _Private_IonConstants.lnIsVarLen) {</span>
+<span class="nc" id="L1036">                int ln = IonBinary.lenVarUInt(vlen);</span>
+<span class="nc" id="L1037">                patch_amount += ln;</span>
+            }
+        }
+
+<span class="nc" id="L1041">        int symbol_table_length = 0;</span>
+
+<span class="nc" id="L1043">        int total_length = 0;</span>
+<span class="nc" id="L1044">        total_length += buffer_length</span>
+                     +  patch_amount
+                     +  symbol_table_length;
+
+<span class="nc" id="L1048">        return total_length;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

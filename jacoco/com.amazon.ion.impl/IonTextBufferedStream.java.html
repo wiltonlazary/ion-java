@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonTextBufferedStream.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl</a> &gt; <span class="el_source">IonTextBufferedStream.java</span></div><h1>IonTextBufferedStream.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl;
+
+import java.io.IOException;
+import java.io.InputStream;
+
+/**
+ * InputStream implementations over a number of types (byte[] and String)
+ * that do not handle character decoding.  Each byte is treated as just
+ * a character from 0 to 255.  These are used internally to wire up some
+ * of the Iterator code to some of the base64 encoding (or decoding)
+ * routins in ion.impl.
+ */
+<span class="nc" id="L28">abstract class IonTextBufferedStream extends InputStream</span>
+{
+    public static IonTextBufferedStream makeStream(byte[] bytes) {
+<span class="nc" id="L31">        return new SimpleBufferStream(bytes);</span>
+    }
+    public static IonTextBufferedStream makeStream(byte[] bytes, int offset, int len) {
+<span class="nc" id="L34">        return new OffsetBufferStream(bytes, offset, len);</span>
+    }
+    public static IonTextBufferedStream makeStream(String text) {
+<span class="nc" id="L37">        return new StringStream(text);</span>
+    }
+    /*** FIXME: REMOVE OR FINISH
+    public static IonTextBufferedStream makeStream(InputStream stream) {
+        return new StreamStream(stream);
+    }
+    */
+    public abstract int getByte(int pos);
+    public abstract int position();
+    public abstract IonTextBufferedStream setPosition(int pos);
+
+    /*** FIXME: REMOVE OR FINISH
+    static final class StreamStream extends IonTextBufferedStream
+    {
+        static final int DEFAULT_BUFFER_SIZE = (32*1024);
+
+        InputStream _stream;
+        byte []     _buffer1;
+        byte []     _buffer2;
+        long        _file_pos1;
+        long        _file_pos2;
+        int         _len;
+        int         _pos;
+
+        public StreamStream (InputStream stream)
+        {
+            _stream = stream;
+            _buffer1 = new byte[DEFAULT_BUFFER_SIZE];
+            _buffer2 = new byte[DEFAULT_BUFFER_SIZE];
+            _pos = 0;
+            _file_pos1 = 0;
+            _file_pos2 = -1;
+            _len = load(_buffer1);
+        }
+        int load(byte[] buffer) {
+
+        }
+
+        @Override
+        public final int getByte(int pos) {
+            if (pos &lt; 0 || pos &gt;= _len) return -1;
+            return _buffer[pos] &amp; 0xff;
+        }
+
+        @Override
+        public final int read()
+            throws IOException
+        {
+            if (_pos &gt;= _len) return -1;
+            return _buffer[_pos++];
+        }
+
+        @Override
+        public final int read(byte[] bytes, int offset, int len) throws IOException
+        {
+            int copied = 0;
+            if (offset &lt; 0) throw new IllegalArgumentException();
+            copied = len;
+            if (_pos + len &gt;= _len) copied = _len - _pos;
+            System.arraycopy(_buffer, _pos, bytes, offset, copied);
+            _pos += copied;
+            return copied;
+        }
+
+        @Override
+        public final int position() {
+            return _pos;
+        }
+
+        @Override
+        public final SimpleBufferStream setPosition(int pos)
+        {
+            if (_pos &lt; 0 || _pos &gt; _len) throw new IllegalArgumentException();
+            _pos = pos;
+            return this;
+        }
+
+        @Override
+        public void close() throws IOException
+        {
+            _stream.close();
+            super.close();
+        }
+    }
+    */
+
+    static final class SimpleBufferStream extends IonTextBufferedStream
+    {
+        byte [] _buffer;
+        int     _len;
+        int     _pos;
+
+        public SimpleBufferStream(byte[] buffer)
+<span class="nc" id="L130">        {</span>
+<span class="nc" id="L131">            _buffer = buffer;</span>
+<span class="nc" id="L132">            _pos = 0;</span>
+<span class="nc" id="L133">            _len = buffer.length;</span>
+<span class="nc" id="L134">        }</span>
+
+        @Override
+        public final int getByte(int pos) {
+<span class="nc bnc" id="L138" title="All 4 branches missed.">            if (pos &lt; 0 || pos &gt;= _len) return -1;</span>
+<span class="nc" id="L139">            return _buffer[pos] &amp; 0xff;</span>
+        }
+
+        @Override
+        public final int read()
+            throws IOException
+        {
+<span class="nc bnc" id="L146" title="All 2 branches missed.">            if (_pos &gt;= _len) return -1;</span>
+<span class="nc" id="L147">            return _buffer[_pos++];</span>
+        }
+
+        @Override
+        public final int read(byte[] bytes, int offset, int len) throws IOException
+        {
+<span class="nc" id="L153">            int copied = 0;</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">            if (offset &lt; 0) throw new IllegalArgumentException();</span>
+<span class="nc" id="L155">            copied = len;</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">            if (_pos + len &gt;= _len) copied = _len - _pos;</span>
+<span class="nc" id="L157">            System.arraycopy(_buffer, _pos, bytes, offset, copied);</span>
+<span class="nc" id="L158">            _pos += copied;</span>
+<span class="nc" id="L159">            return copied;</span>
+        }
+
+        @Override
+        public final int position() {
+<span class="nc" id="L164">            return _pos;</span>
+        }
+
+        @Override
+        public final SimpleBufferStream setPosition(int pos)
+        {
+<span class="nc bnc" id="L170" title="All 4 branches missed.">            if (_pos &lt; 0 || _pos &gt; _len) throw new IllegalArgumentException();</span>
+<span class="nc" id="L171">            _pos = pos;</span>
+<span class="nc" id="L172">            return this;</span>
+        }
+
+        @Override
+        public void close()
+            throws IOException
+        {
+<span class="nc" id="L179">            _pos = _len;</span>
+<span class="nc" id="L180">            super.close();</span>
+<span class="nc" id="L181">        }</span>
+    }
+
+    static final class StringStream extends IonTextBufferedStream
+    {
+
+        String _string;
+        int    _end;
+        int    _pos;
+
+        public StringStream(String text)
+<span class="nc" id="L192">        {</span>
+<span class="nc" id="L193">            _string = text;</span>
+<span class="nc" id="L194">            _pos = 0;</span>
+<span class="nc" id="L195">            _end = text.length();</span>
+<span class="nc" id="L196">        }</span>
+
+        @Override
+        public final int getByte(int pos) {
+<span class="nc bnc" id="L200" title="All 2 branches missed.">            if (pos &lt; 0) return -1;</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">            if (pos &gt;= _end) return -1;</span>
+<span class="nc" id="L202">            return _string.charAt(pos);</span>
+        }
+
+        @Override
+        public final int read()
+            throws IOException
+        {
+<span class="nc bnc" id="L209" title="All 2 branches missed.">            if (_pos &gt;= _end) return -1;</span>
+<span class="nc" id="L210">            char c = _string.charAt(_pos++);</span>
+<span class="nc" id="L211">            return c;</span>
+        }
+
+        @Override
+        public final int read(byte[] bytes, int offset, int len) throws IOException
+        {
+<span class="nc" id="L217">            throw new UnsupportedOperationException();</span>
+        }
+
+        @Override
+        public final int position() {
+<span class="nc" id="L222">            return _pos;</span>
+        }
+
+        @Override
+        public final StringStream setPosition(int pos)
+        {
+<span class="nc bnc" id="L228" title="All 2 branches missed.">            if (pos &lt; 0) throw new IllegalArgumentException();</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">            if (pos &gt; _end) throw new IllegalArgumentException();</span>
+<span class="nc" id="L230">            _pos = pos;</span>
+<span class="nc" id="L231">            return this;</span>
+        }
+
+        @Override
+        public void close()
+            throws IOException
+        {
+<span class="nc" id="L238">            _pos = _end;</span>
+<span class="nc" id="L239">            super.close();</span>
+<span class="nc" id="L240">        }</span>
+    }
+
+    static final class OffsetBufferStream extends IonTextBufferedStream
+    {
+        byte [] _buffer;
+        int     _start;
+        int     _end;
+        int     _pos;
+
+        public OffsetBufferStream(byte[] buffer, int start, int max)
+<span class="nc" id="L251">        {</span>
+<span class="nc" id="L252">            _buffer = buffer;</span>
+<span class="nc" id="L253">            _pos = start;</span>
+<span class="nc" id="L254">            _start = start;</span>
+<span class="nc" id="L255">            _end = start + max;</span>
+<span class="nc" id="L256">        }</span>
+
+        @Override
+        public final int getByte(int pos) {
+<span class="nc bnc" id="L260" title="All 2 branches missed.">            if (pos &lt; 0) return -1;</span>
+<span class="nc" id="L261">            pos += _start;</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">            if (pos &gt;= _end) return -1;</span>
+<span class="nc" id="L263">            return _buffer[pos] &amp; 0xff;</span>
+        }
+
+        @Override
+        public final int read()
+            throws IOException
+        {
+            int c;
+<span class="nc bnc" id="L271" title="All 2 branches missed.">            if (_pos &gt;= _end) return -1;</span>
+<span class="nc" id="L272">            c = (((int)_buffer[_pos++]) &amp; 0xFF);  // trim sign extension bits</span>
+<span class="nc" id="L273">            return c;</span>
+        }
+
+        @Override
+        public final int read(byte[] bytes, int offset, int len) throws IOException
+        {
+<span class="nc" id="L279">            int copied = 0;</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">            if (offset &lt; 0) throw new IllegalArgumentException();</span>
+<span class="nc" id="L281">            copied = len;</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">            if (_pos + len &gt;= _end) copied = _end - _pos;</span>
+<span class="nc" id="L283">            System.arraycopy(_buffer, _pos, bytes, offset, copied);</span>
+<span class="nc" id="L284">            _pos += copied;</span>
+<span class="nc" id="L285">            return copied;</span>
+        }
+
+        @Override
+        public final int position() {
+<span class="nc" id="L290">            return _pos - _start;</span>
+        }
+
+        @Override
+        public final OffsetBufferStream setPosition(int pos)
+        {
+<span class="nc bnc" id="L296" title="All 2 branches missed.">            if (pos &lt; 0) throw new IllegalArgumentException();</span>
+<span class="nc" id="L297">            pos += _start;</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">            if (pos &gt; _end) throw new IllegalArgumentException();</span>
+<span class="nc" id="L299">            _pos = pos;</span>
+<span class="nc" id="L300">            return this;</span>
+        }
+
+        @Override
+        public void close()
+            throws IOException
+        {
+<span class="nc" id="L307">            _pos = _end;</span>
+<span class="nc" id="L308">            super.close();</span>
+<span class="nc" id="L309">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

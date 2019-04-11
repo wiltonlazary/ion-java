@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GzipOrRawInputStream.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.util</a> &gt; <span class="el_source">GzipOrRawInputStream.java</span></div><h1>GzipOrRawInputStream.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.util;
+
+import java.io.FilterInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.PushbackInputStream;
+import java.util.Arrays;
+import java.util.zip.GZIPInputStream;
+
+/**
+ * Represents an {@link InputStream} that may be GZIP compressed or not.
+ * This stream assumes that the GZIP header is unique to the raw content.
+ * That is, one should not use this on a stream that may have raw data
+ * in the begining of the stream that collides with the GZIP header.
+ * In the case of Ion binary, Ion text, and XML, a GZIP stream is unambiguous
+ * from them.
+ */
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">class GzipOrRawInputStream</span>
+    extends FilterInputStream
+{
+    /** GZIP magic cookie. */
+<span class="fc" id="L37">    static final byte[] GZIP_HEADER = {0x1F, (byte) 0x8B};</span>
+
+    /**
+     * Wraps the given stream determining based on the GZIP header
+     * whether or not the stream is compressed and should be dynamically
+     * de-compressed.
+     *
+     * @param raw The input stream to wrap.
+     *
+     * @throws IOException
+     *         Thrown if there is a problem reading from the underlying stream.
+     */
+    GzipOrRawInputStream(final InputStream raw)
+        throws IOException
+    {
+<span class="fc" id="L52">        this(raw, 512); // 512 is the default buffer size in GZIPInputStream</span>
+<span class="fc" id="L53">    }</span>
+
+    /**
+     * Wraps the given stream determining based on the GZIP header
+     * whether or not the stream is compressed and should be dynamically
+     * de-compressed.
+     *
+     * @param raw The input stream to wrap.
+     * @param bufferSize internal buffer size to use for decompression.
+     *
+     * @throws IOException
+     *         Thrown if there is a problem reading from the underlying stream.
+     */
+    GzipOrRawInputStream(final InputStream raw, final int bufferSize)
+        throws IOException
+    {
+<span class="fc" id="L69">        super(null);</span>
+<span class="fc" id="L70">        final byte[] header = new byte[GZIP_HEADER.length];</span>
+<span class="fc" id="L71">        final PushbackInputStream input = new PushbackInputStream(raw, 2);</span>
+
+        // fetch the header and determine length
+<span class="fc" id="L74">        int size = 0;</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        while (size &lt; header.length) {</span>
+<span class="fc" id="L76">            int octet = input.read();</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            if (octet == -1) break;</span>
+
+<span class="fc" id="L79">            header[size] = (byte) octet;</span>
+<span class="fc" id="L80">            size++;</span>
+<span class="fc" id="L81">        }</span>
+<span class="pc bpc" id="L82" title="2 of 4 branches missed.">        assert size &lt;= 2;</span>
+        // unread the header
+<span class="fc" id="L84">        input.unread(header, 0, size);</span>
+        // determine the underlying stream
+<span class="fc bfc" id="L86" title="All 4 branches covered.">        if (size == 2 &amp;&amp; Arrays.equals(header, GZIP_HEADER)) {</span>
+<span class="fc" id="L87">            in = new GZIPInputStream(input, bufferSize);</span>
+        } else {
+<span class="fc" id="L89">            in = input;</span>
+        }
+<span class="fc" id="L91">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

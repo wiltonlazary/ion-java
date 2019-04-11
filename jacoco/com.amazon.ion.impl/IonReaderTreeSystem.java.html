@@ -1,0 +1,546 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonReaderTreeSystem.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl</a> &gt; <span class="el_source">IonReaderTreeSystem.java</span></div><h1>IonReaderTreeSystem.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl;
+
+import static com.amazon.ion.impl._Private_Utils.readFully;
+
+import com.amazon.ion.Decimal;
+import com.amazon.ion.IntegerSize;
+import com.amazon.ion.IonBool;
+import com.amazon.ion.IonContainer;
+import com.amazon.ion.IonDatagram;
+import com.amazon.ion.IonDecimal;
+import com.amazon.ion.IonException;
+import com.amazon.ion.IonFloat;
+import com.amazon.ion.IonInt;
+import com.amazon.ion.IonLob;
+import com.amazon.ion.IonNull;
+import com.amazon.ion.IonReader;
+import com.amazon.ion.IonStruct;
+import com.amazon.ion.IonSymbol;
+import com.amazon.ion.IonSystem;
+import com.amazon.ion.IonText;
+import com.amazon.ion.IonTimestamp;
+import com.amazon.ion.IonType;
+import com.amazon.ion.IonValue;
+import com.amazon.ion.SymbolTable;
+import com.amazon.ion.SymbolToken;
+import com.amazon.ion.Timestamp;
+import com.amazon.ion.impl._Private_IonValue.SymbolTableProvider;
+import java.io.IOException;
+import java.io.InputStream;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.Date;
+import java.util.Iterator;
+
+
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">class IonReaderTreeSystem</span>
+    implements IonReader, _Private_ReaderWriter
+{
+    protected final SymbolTable   _system_symtab;
+    protected Iterator&lt;IonValue&gt;  _iter;
+    protected IonValue            _parent;
+    protected _Private_IonValue   _next;
+    protected _Private_IonValue   _curr;
+    protected boolean             _eof;
+
+    /** Holds pairs: IonValue parent, Iterator&lt;IonValue&gt; cursor */
+<span class="fc" id="L62">    private   Object[]           _stack = new Object[10];</span>
+    protected int                _top;
+
+    // Interface that allows access to the _symbols value (whatever that might be in terms of
+    // stream processing context)
+    private   final SymbolTableProvider _symbolTableAccessor;
+
+    public IonReaderTreeSystem(IonValue value)
+<span class="fc" id="L70">    {</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        if (value == null) {</span>
+            // do nothing
+<span class="nc" id="L73">            _system_symtab = null;</span>
+<span class="nc" id="L74">            _symbolTableAccessor = null;</span>
+        }
+        else {
+<span class="fc" id="L77">            _system_symtab = value.getSystem().getSystemSymbolTable();</span>
+<span class="fc" id="L78">            re_init(value, /* hoisted */ false);</span>
+<span class="fc" id="L79">            _symbolTableAccessor = new SymbolTableProvider()</span>
+<span class="fc" id="L80">            {</span>
+                public SymbolTable getSymbolTable()
+                {
+<span class="fc" id="L83">                    return IonReaderTreeSystem.this.getSymbolTable();</span>
+                }
+            };
+        }
+<span class="fc" id="L87">    }</span>
+
+
+    /**
+     * @return This implementation always returns null.
+     */
+    public &lt;T&gt; T asFacet(Class&lt;T&gt; facetType)
+    {
+<span class="fc" id="L95">        return null;</span>
+    }
+
+    //========================================================================
+
+    void re_init(IonValue value, boolean hoisted)
+    {
+<span class="fc" id="L102">        _curr = null;</span>
+<span class="fc" id="L103">        _eof = false;</span>
+<span class="fc" id="L104">        _top = 0;</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (value instanceof IonDatagram) {</span>
+            // datagrams interacting with these readers must be
+            // IonContainerPrivate containers
+<span class="pc bpc" id="L108" title="2 of 4 branches missed.">            assert(value instanceof _Private_IonContainer);</span>
+<span class="fc" id="L109">            IonDatagram dg = (IonDatagram) value;</span>
+<span class="fc" id="L110">            _parent = dg;</span>
+<span class="fc" id="L111">            _next = null;</span>
+<span class="fc" id="L112">            _iter = dg.systemIterator(); // we want a system reader not: new Children(dg);</span>
+<span class="fc" id="L113">        }</span>
+        else {
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            _parent = (hoisted ? null : value.getContainer());</span>
+<span class="fc" id="L116">            _next = (_Private_IonValue) value;</span>
+        }
+<span class="fc" id="L118">    }</span>
+
+    public void close()
+    {
+<span class="fc" id="L122">        _eof = true;</span>
+<span class="fc" id="L123">    }</span>
+
+    private void push() {
+<span class="fc" id="L126">        int oldlen = _stack.length;</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        if (_top + 1 &gt;= oldlen) { // we're going to do a &quot;+2&quot; on top so we need extra space</span>
+<span class="fc" id="L128">            int newlen = oldlen * 2;</span>
+<span class="fc" id="L129">            Object[] temp = new Object[newlen];</span>
+<span class="fc" id="L130">            System.arraycopy(_stack, 0, temp, 0, oldlen);</span>
+<span class="fc" id="L131">            _stack = temp;</span>
+        }
+<span class="fc" id="L133">        _stack[_top++] = _parent;</span>
+<span class="fc" id="L134">        _stack[_top++] = _iter;</span>
+<span class="fc" id="L135">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private void pop() {
+<span class="pc bpc" id="L139" title="2 of 4 branches missed.">        assert _top &gt;= 2;</span>
+
+<span class="fc" id="L141">        _top--;</span>
+<span class="fc" id="L142">        _iter = (Iterator&lt;IonValue&gt;)_stack[_top];</span>
+<span class="fc" id="L143">        _stack[_top] = null;  // Allow iterator to be garbage collected!</span>
+
+<span class="fc" id="L145">        _top--;</span>
+<span class="fc" id="L146">        _parent = (IonValue)_stack[_top];</span>
+<span class="fc" id="L147">        _stack[_top] = null;</span>
+
+        // We don't know if we're at the end of the container, so check again.
+<span class="fc" id="L150">        _eof = false;</span>
+<span class="fc" id="L151">    }</span>
+
+    public boolean hasNext()
+    {
+<span class="fc" id="L155">        IonType next_type = next_helper_system();</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        return (next_type != null);</span>
+    }
+
+    public IonType next()
+    {
+<span class="fc bfc" id="L161" title="All 4 branches covered.">        if (this._next == null &amp;&amp; !this.hasNext()) {</span>
+<span class="fc" id="L162">            this._curr = null;</span>
+<span class="fc" id="L163">            return null;</span>
+        }
+<span class="fc" id="L165">        this._curr = this._next;</span>
+<span class="fc" id="L166">        this._next = null;</span>
+
+<span class="fc" id="L168">        return this._curr.getType();</span>
+    }
+
+    IonType next_helper_system()
+    {
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (this._eof) return null;</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (this._next != null) return this._next.getType();</span>
+
+<span class="fc bfc" id="L176" title="All 4 branches covered.">        if (this._iter != null &amp;&amp; this._iter.hasNext()) {</span>
+<span class="fc" id="L177">            this._next = (_Private_IonValue) this._iter.next();</span>
+        }
+
+<span class="fc bfc" id="L180" title="All 4 branches covered.">        if ((this._eof =(this._next == null)) == true) {</span>
+<span class="fc" id="L181">            return null;</span>
+        }
+<span class="fc" id="L183">        return this._next.getType();</span>
+    }
+
+    public final void stepIn()
+    {
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (!(this._curr instanceof IonContainer)) {</span>
+<span class="nc" id="L189">            throw new IllegalStateException(&quot;current value must be a container&quot;);</span>
+        }
+<span class="fc" id="L191">        push();</span>
+<span class="fc" id="L192">        _parent = _curr;</span>
+<span class="fc" id="L193">        _iter = new Children(((IonContainer)this._curr));</span>
+<span class="fc" id="L194">        _curr = null;</span>
+<span class="fc" id="L195">    }</span>
+
+    public final void stepOut()
+    {
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        if (this._top &lt; 1) {</span>
+<span class="fc" id="L200">            throw new IllegalStateException(IonMessages.CANNOT_STEP_OUT);</span>
+        }
+<span class="fc" id="L202">        pop();</span>
+<span class="fc" id="L203">        _curr = null;</span>
+<span class="fc" id="L204">    }</span>
+
+    public final int getDepth() {
+<span class="fc" id="L207">        return _top/2;</span>
+    }
+
+    public SymbolTable getSymbolTable()
+    {
+<span class="fc" id="L212">        return _system_symtab;</span>
+    }
+
+    public IonType getType()
+    {
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        return (_curr == null) ? null : _curr.getType();</span>
+    }
+
+    public final String[] getTypeAnnotations()
+    {
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        if (_curr == null) {</span>
+<span class="fc" id="L223">            throw new IllegalStateException();</span>
+        }
+<span class="fc" id="L225">        return _curr.getTypeAnnotations();</span>
+    }
+
+
+    public final SymbolToken[] getTypeAnnotationSymbols()
+    {
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">        if (_curr == null) {</span>
+<span class="nc" id="L232">            throw new IllegalStateException();</span>
+        }
+        // TODO should this localize the symbols?
+<span class="fc" id="L235">        return _curr.getTypeAnnotationSymbols(_symbolTableAccessor);</span>
+    }
+
+    public final Iterator&lt;String&gt; iterateTypeAnnotations()
+    {
+<span class="fc" id="L240">        String [] annotations = getTypeAnnotations();</span>
+<span class="fc" id="L241">        return _Private_Utils.stringIterator(annotations);</span>
+    }
+
+
+    public boolean isInStruct()
+    {
+<span class="fc bfc" id="L247" title="All 4 branches covered.">        return getDepth() &gt; 0 &amp;&amp; _parent instanceof IonStruct;</span>
+    }
+
+    public boolean isNullValue()
+    {
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        if (_curr instanceof IonNull) return true;</span>
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">        if (_curr == null) {</span>
+<span class="nc" id="L254">            throw new IllegalStateException(&quot;must call next() before isNullValue()&quot;);</span>
+
+        }
+<span class="fc" id="L257">        return _curr.isNullValue();</span>
+    }
+
+    public int getFieldId()
+    {
+        // FIXME IonValueImpl.getFieldId doesn't return -1 as specced here!
+<span class="fc bfc" id="L263" title="All 4 branches covered.">        return (_curr == null || _top == 0) ? SymbolTable.UNKNOWN_SYMBOL_ID : _curr.getFieldId();</span>
+    }
+
+    public String getFieldName()
+    {
+<span class="fc bfc" id="L268" title="All 4 branches covered.">        return (_curr == null || _top == 0) ? null : _curr.getFieldName();</span>
+    }
+
+    public final SymbolToken getFieldNameSymbol()
+    {
+<span class="fc bfc" id="L273" title="All 4 branches covered.">        if (_curr == null || _top == 0) return null;</span>
+<span class="fc" id="L274">        return _curr.getFieldNameSymbol(_symbolTableAccessor);</span>
+    }
+
+
+    public boolean booleanValue()
+    {
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        if (_curr instanceof IonBool) {</span>
+<span class="fc" id="L281">            return ((IonBool)_curr).booleanValue();</span>
+        }
+<span class="nc" id="L283">        throw new IllegalStateException(&quot;current value is not a boolean&quot;);</span>
+
+    }
+
+    public int intValue()
+    {
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        if (_curr instanceof IonInt)  {</span>
+<span class="fc" id="L290">            return ((IonInt)_curr).intValue();</span>
+        }
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">        if (_curr instanceof IonFloat)  {</span>
+<span class="nc" id="L293">            return (int)((IonFloat)_curr).doubleValue();</span>
+        }
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">        if (_curr instanceof IonDecimal)  {</span>
+<span class="nc" id="L296">            return (int)((IonDecimal)_curr).doubleValue();</span>
+        }
+<span class="fc" id="L298">        throw new IllegalStateException(&quot;current value is not an ion int, float, or decimal&quot;);</span>
+    }
+
+    public long longValue()
+    {
+<span class="fc bfc" id="L303" title="All 2 branches covered.">        if (_curr instanceof IonInt)  {</span>
+<span class="fc" id="L304">            return ((IonInt)_curr).longValue();</span>
+        }
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">        if (_curr instanceof IonFloat)  {</span>
+<span class="nc" id="L307">            return (long)((IonFloat)_curr).doubleValue();</span>
+        }
+<span class="fc bfc" id="L309" title="All 2 branches covered.">        if (_curr instanceof IonDecimal)  {</span>
+<span class="fc" id="L310">            return (long)((IonDecimal)_curr).doubleValue();</span>
+        }
+<span class="fc" id="L312">        throw new IllegalStateException(&quot;current value is not an ion int, float, or decimal&quot;);</span>
+    }
+
+    public BigInteger bigIntegerValue()
+    {
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        if (_curr instanceof IonInt)  {</span>
+<span class="fc" id="L318">            return ((IonInt)_curr).bigIntegerValue();</span>
+        }
+<span class="fc bfc" id="L320" title="All 2 branches covered.">        if (_curr instanceof IonFloat)  {</span>
+            // To avoid decapitating values that are &gt; Long.MAX_VALUE, we must
+            // convert to BigDecimal first.
+<span class="fc" id="L323">            BigDecimal bd = ((IonFloat)_curr).bigDecimalValue();</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">            return (bd == null ? null : bd.toBigInteger());</span>
+        }
+<span class="fc bfc" id="L326" title="All 2 branches covered.">        if (_curr instanceof IonDecimal)  {</span>
+<span class="fc" id="L327">            BigDecimal bd = ((IonDecimal)_curr).bigDecimalValue();</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">            return (bd == null ? null : bd.toBigInteger());</span>
+        }
+<span class="fc" id="L330">        throw new IllegalStateException(&quot;current value is not an ion int, float, or decimal&quot;);</span>
+    }
+
+    public double doubleValue()
+    {
+<span class="fc bfc" id="L335" title="All 2 branches covered.">        if (_curr instanceof IonFloat)  {</span>
+<span class="fc" id="L336">            return ((IonFloat)_curr).doubleValue();</span>
+        }
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">        if (_curr instanceof IonDecimal)  {</span>
+<span class="fc" id="L339">            return ((IonDecimal)_curr).doubleValue();</span>
+        }
+<span class="nc" id="L341">        throw new IllegalStateException(&quot;current value is not an ion float or decimal&quot;);</span>
+    }
+
+    public BigDecimal bigDecimalValue()
+    {
+<span class="pc bpc" id="L346" title="1 of 2 branches missed.">        if (_curr instanceof IonDecimal)  {</span>
+<span class="fc" id="L347">            return ((IonDecimal)_curr).bigDecimalValue();</span>
+        }
+<span class="nc" id="L349">        throw new IllegalStateException(&quot;current value is not an ion decimal&quot;);</span>
+    }
+
+    public Decimal decimalValue()
+    {
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">        if (_curr instanceof IonDecimal)  {</span>
+<span class="fc" id="L355">            return ((IonDecimal)_curr).decimalValue();</span>
+        }
+<span class="nc" id="L357">        throw new IllegalStateException(&quot;current value is not an ion decimal&quot;);</span>
+    }
+
+    public Timestamp timestampValue()
+    {
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">        if (_curr instanceof IonTimestamp) {</span>
+<span class="fc" id="L363">            return ((IonTimestamp)_curr).timestampValue();</span>
+        }
+<span class="nc" id="L365">        throw new IllegalStateException(&quot;current value is not a timestamp&quot;);</span>
+    }
+
+    public Date dateValue()
+    {
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">        if (_curr instanceof IonTimestamp)  {</span>
+<span class="fc" id="L371">            return ((IonTimestamp)_curr).dateValue();</span>
+        }
+<span class="nc" id="L373">        throw new IllegalStateException(&quot;current value is not an ion timestamp&quot;);</span>
+    }
+
+    public String stringValue()
+    {
+<span class="fc bfc" id="L378" title="All 2 branches covered.">        if (_curr instanceof IonText) {</span>
+<span class="fc" id="L379">            return ((IonText)_curr).stringValue();</span>
+        }
+<span class="fc" id="L381">        throw new IllegalStateException(&quot;current value is not a symbol or string&quot;);</span>
+    }
+
+    public SymbolToken symbolValue()
+    {
+<span class="fc bfc" id="L386" title="All 2 branches covered.">        if (! (_curr instanceof IonSymbol))</span>
+        {
+<span class="fc" id="L388">            throw new IllegalStateException();</span>
+        }
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        if (_curr.isNullValue()) return null;</span>
+<span class="fc" id="L391">        return ((IonSymbol)_curr).symbolValue();</span>
+    }
+
+    public int byteSize()
+    {
+<span class="pc bpc" id="L396" title="1 of 2 branches missed.">        if (_curr instanceof IonLob) {</span>
+<span class="fc" id="L397">            IonLob lob = (IonLob)_curr;</span>
+<span class="fc" id="L398">            return lob.byteSize();</span>
+        }
+<span class="nc" id="L400">        throw new IllegalStateException(&quot;current value is not an ion blob or clob&quot;);</span>
+    }
+
+    public byte[] newBytes()
+    {
+<span class="pc bpc" id="L405" title="1 of 2 branches missed.">        if (_curr instanceof IonLob) {</span>
+<span class="fc" id="L406">            IonLob lob = (IonLob)_curr;</span>
+<span class="fc" id="L407">            int loblen = lob.byteSize();</span>
+<span class="fc" id="L408">            byte[] buffer = new byte[loblen];</span>
+<span class="fc" id="L409">            InputStream is = lob.newInputStream();</span>
+            int retlen;
+            try {
+<span class="fc" id="L412">                retlen = readFully(is, buffer, 0, loblen);</span>
+<span class="fc" id="L413">                is.close();</span>
+            }
+<span class="nc" id="L415">            catch (IOException e) {</span>
+<span class="nc" id="L416">                throw new IonException(e);</span>
+<span class="fc" id="L417">            }</span>
+<span class="pc bpc" id="L418" title="5 of 8 branches missed.">            assert (retlen == -1 ? loblen == 0 : retlen == loblen);</span>
+<span class="fc" id="L419">            return buffer;</span>
+        }
+<span class="nc" id="L421">        throw new IllegalStateException(&quot;current value is not an ion blob or clob&quot;);</span>
+    }
+
+    public int getBytes(byte[] buffer, int offset, int len)
+    {
+<span class="nc bnc" id="L426" title="All 2 branches missed.">        if (_curr instanceof IonLob) {</span>
+<span class="nc" id="L427">            IonLob lob = (IonLob)_curr;</span>
+<span class="nc" id="L428">            int loblen = lob.byteSize();</span>
+<span class="nc bnc" id="L429" title="All 2 branches missed.">            if (loblen &gt; len) {</span>
+<span class="nc" id="L430">                throw new IllegalArgumentException(&quot;insufficient space in buffer for this value&quot;);</span>
+            }
+<span class="nc" id="L432">            InputStream is = lob.newInputStream();</span>
+            int retlen;
+            try {
+<span class="nc" id="L435">                retlen = readFully(is, buffer, 0, loblen);</span>
+<span class="nc" id="L436">                is.close();</span>
+            }
+<span class="nc" id="L438">            catch (IOException e) {</span>
+<span class="nc" id="L439">                throw new IonException(e);</span>
+<span class="nc" id="L440">            }</span>
+<span class="nc bnc" id="L441" title="All 4 branches missed.">            assert retlen == loblen;</span>
+<span class="nc" id="L442">            return retlen;</span>
+        }
+<span class="nc" id="L444">        throw new IllegalStateException(&quot;current value is not an ion blob or clob&quot;);</span>
+    }
+
+    public IonValue getIonValue(IonSystem sys)
+    {
+<span class="nc" id="L449">        return _curr;</span>
+    }
+
+    public String valueToString()
+    {
+<span class="nc bnc" id="L454" title="All 2 branches missed.">        return (_curr == null) ? null : _curr.toString();</span>
+    }
+
+
+    private static final class Children implements Iterator&lt;IonValue&gt;
+    {
+        boolean             _eof;
+        int                 _next_idx;
+        _Private_IonContainer _parent;
+        IonValue            _curr;
+
+        Children(IonContainer parent)
+<span class="fc" id="L466">        {</span>
+<span class="pc bpc" id="L467" title="1 of 2 branches missed.">            if (parent instanceof _Private_IonContainer) {</span>
+<span class="fc" id="L468">                _parent = (_Private_IonContainer) parent;</span>
+<span class="fc" id="L469">                _next_idx = 0;</span>
+<span class="fc" id="L470">                _curr = null;</span>
+<span class="fc bfc" id="L471" title="All 2 branches covered.">                if (_parent.isNullValue()) {</span>
+                    // otherwise the empty contents member will cause trouble
+<span class="fc" id="L473">                    _eof = true;</span>
+                }
+            }
+            else {
+<span class="nc" id="L477">                throw new UnsupportedOperationException(&quot;this only supports IonContainerImpl instances&quot;);</span>
+            }
+<span class="fc" id="L479">        }</span>
+
+        public boolean hasNext()
+        {
+<span class="fc bfc" id="L483" title="All 2 branches covered.">            if (_eof) return false;</span>
+
+<span class="fc" id="L485">            int len = _parent.get_child_count();</span>
+
+<span class="fc bfc" id="L487" title="All 2 branches covered.">            if (_next_idx &gt; 0) {</span>
+                // first we have to verify the position of the
+                // current value, since it might move if local
+                // symbol tables get created.  In which case it
+                // will be moved down the list.
+<span class="fc" id="L492">                int ii = _next_idx - 1;</span>
+<span class="fc" id="L493">                _next_idx = len; // if we can't find our current</span>
+                                 // value we'll be at eof anyway
+<span class="pc bpc" id="L495" title="1 of 2 branches missed.">                while (ii&lt;len) {</span>
+<span class="pc bpc" id="L496" title="1 of 2 branches missed.">                    if (_curr == _parent.get_child(ii)) {</span>
+<span class="fc" id="L497">                        _next_idx = ii+1;</span>
+<span class="fc" id="L498">                        break;</span>
+                    }
+                }
+            }
+            // if there anything left?
+<span class="fc bfc" id="L503" title="All 2 branches covered.">            if (_next_idx &gt;= _parent.get_child_count()) {</span>
+<span class="fc" id="L504">                _eof = true;</span>
+            }
+<span class="fc bfc" id="L506" title="All 2 branches covered.">            return !_eof;</span>
+        }
+
+        public IonValue next()
+        {
+            // the hasNext() is needed to adjust our _next_idx
+            // value if the underlying arraylist moved under us
+<span class="pc bpc" id="L513" title="1 of 2 branches missed.">            if (!hasNext()) {</span>
+<span class="nc" id="L514">                _curr = null;</span>
+            }
+            else {
+<span class="fc" id="L517">                _curr = _parent.get_child(_next_idx);</span>
+<span class="fc" id="L518">                _next_idx++;</span>
+            }
+<span class="fc" id="L520">            return _curr;</span>
+        }
+
+        public void remove()
+        {
+<span class="nc" id="L525">            throw new UnsupportedOperationException();</span>
+        }
+    }
+
+    // system readers don't skip any symbol tables
+    public SymbolTable pop_passed_symbol_table()
+    {
+<span class="fc" id="L532">        return null;</span>
+    }
+
+
+    public IntegerSize getIntegerSize()
+    {
+<span class="fc bfc" id="L538" title="All 2 branches covered.">        if(_curr instanceof IonInt)</span>
+        {
+<span class="fc" id="L540">            return ((IonInt)_curr).getIntegerSize();</span>
+
+        }
+<span class="fc" id="L543">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

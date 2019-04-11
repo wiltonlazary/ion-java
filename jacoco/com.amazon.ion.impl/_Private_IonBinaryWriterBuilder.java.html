@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>_Private_IonBinaryWriterBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl</a> &gt; <span class="el_source">_Private_IonBinaryWriterBuilder.java</span></div><h1>_Private_IonBinaryWriterBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl;
+
+import static com.amazon.ion.impl._Private_Utils.initialSymtab;
+
+import com.amazon.ion.IonBinaryWriter;
+import com.amazon.ion.IonCatalog;
+import com.amazon.ion.IonException;
+import com.amazon.ion.IonSystem;
+import com.amazon.ion.IonWriter;
+import com.amazon.ion.SubstituteSymbolTableException;
+import com.amazon.ion.SymbolTable;
+import com.amazon.ion.ValueFactory;
+import com.amazon.ion.impl.BlockedBuffer.BufferedOutputStream;
+import com.amazon.ion.impl.bin._Private_IonManagedBinaryWriterBuilder;
+import com.amazon.ion.impl.bin._Private_IonManagedBinaryWriterBuilder.AllocatorMode;
+import com.amazon.ion.system.IonBinaryWriterBuilder;
+import com.amazon.ion.system.IonSystemBuilder;
+import java.io.IOException;
+import java.io.OutputStream;
+
+/**
+ * NOT FOR APPLICATION USE!
+ */
+@SuppressWarnings(&quot;deprecation&quot;)
+public class _Private_IonBinaryWriterBuilder
+    extends IonBinaryWriterBuilder
+{
+    // amzn/ion-java/issues/59 expose configuration points properly and figure out deprecation path for the old writer.
+    private final _Private_IonManagedBinaryWriterBuilder myBinaryWriterBuilder;
+    private ValueFactory mySymtabValueFactory;
+
+    /** System or local */
+    private SymbolTable  myInitialSymbolTable;
+
+
+    private _Private_IonBinaryWriterBuilder()
+<span class="fc" id="L52">    {</span>
+<span class="fc" id="L53">        myBinaryWriterBuilder =</span>
+            _Private_IonManagedBinaryWriterBuilder
+<span class="fc" id="L55">                .create(AllocatorMode.POOLED)</span>
+<span class="fc" id="L56">                .withPaddedLengthPreallocation(0)</span>
+                ;
+<span class="fc" id="L58">    }</span>
+
+
+    private
+    _Private_IonBinaryWriterBuilder(_Private_IonBinaryWriterBuilder that)
+    {
+<span class="fc" id="L64">        super(that);</span>
+
+<span class="fc" id="L66">        this.mySymtabValueFactory = that.mySymtabValueFactory;</span>
+<span class="fc" id="L67">        this.myInitialSymbolTable = that.myInitialSymbolTable;</span>
+<span class="fc" id="L68">        this.myBinaryWriterBuilder = that.myBinaryWriterBuilder.copy();</span>
+<span class="fc" id="L69">    }</span>
+
+
+    /**
+     * @return a new mutable builder.
+     */
+    public static _Private_IonBinaryWriterBuilder standard()
+    {
+<span class="fc" id="L77">        return new _Private_IonBinaryWriterBuilder.Mutable();</span>
+    }
+
+
+    //=========================================================================
+
+
+    @Override
+    public final _Private_IonBinaryWriterBuilder copy()
+    {
+<span class="fc" id="L87">        return new Mutable(this);</span>
+    }
+
+    @Override
+    public _Private_IonBinaryWriterBuilder immutable()
+    {
+<span class="nc" id="L93">        return this;</span>
+    }
+
+    @Override
+    public _Private_IonBinaryWriterBuilder mutable()
+    {
+<span class="fc" id="L99">        return copy();</span>
+    }
+
+
+    //=========================================================================
+
+    // TODO The symtab value factory should not be needed.
+    //      It's an artifact of how the binary writer gathers symtabs that
+    //      are written through it.
+
+    public ValueFactory getSymtabValueFactory()
+    {
+<span class="fc" id="L111">        return mySymtabValueFactory;</span>
+    }
+
+    public void setSymtabValueFactory(ValueFactory factory)
+    {
+<span class="fc" id="L116">        mutationCheck();</span>
+<span class="fc" id="L117">        mySymtabValueFactory = factory;</span>
+<span class="fc" id="L118">    }</span>
+
+    public _Private_IonBinaryWriterBuilder
+    withSymtabValueFactory(ValueFactory factory)
+    {
+<span class="nc" id="L123">        _Private_IonBinaryWriterBuilder b = mutable();</span>
+<span class="nc" id="L124">        b.setSymtabValueFactory(factory);</span>
+<span class="nc" id="L125">        return b;</span>
+    }
+
+
+    //=========================================================================
+
+
+    @Override
+    public SymbolTable getInitialSymbolTable()
+    {
+<span class="fc" id="L135">        return myInitialSymbolTable;</span>
+    }
+
+    /**
+     * Declares the symbol table to use for encoded data.
+     * To avoid conflicts between different data streams, if the given instance
+     * is mutable, it will be copied when {@code build()} is called.
+     *
+     * @param symtab must be a local or system symbol table.
+     * May be null, in which case the initial symtab is that of
+     * {@code $ion_1_0}.
+     *
+     * @throws SubstituteSymbolTableException
+     * if any imported table is a substitute (see {@link SymbolTable}).
+     */
+    @Override
+    public void setInitialSymbolTable(SymbolTable symtab)
+    {
+<span class="fc" id="L153">        mutationCheck();</span>
+
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        if (symtab != null)</span>
+        {
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            if (symtab.isLocalTable())</span>
+            {
+<span class="fc" id="L159">                SymbolTable[] imports =</span>
+<span class="fc" id="L160">                    ((LocalSymbolTable) symtab).getImportedTablesNoCopy();</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">                for (SymbolTable imported : imports)</span>
+                {
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">                    if (imported.isSubstitute())</span>
+                    {
+<span class="nc" id="L165">                        String message =</span>
+                            &quot;Cannot encode with substitute symbol table: &quot; +
+<span class="nc" id="L167">                            imported.getName();</span>
+<span class="nc" id="L168">                        throw new SubstituteSymbolTableException(message);</span>
+                    }
+                }
+<span class="fc" id="L171">            }</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">            else if (! symtab.isSystemTable())</span>
+            {
+<span class="fc" id="L174">                String message = &quot;symtab must be local or system table&quot;;</span>
+<span class="fc" id="L175">                throw new IllegalArgumentException(message);</span>
+            }
+        }
+
+<span class="fc" id="L179">        myInitialSymbolTable = symtab;</span>
+<span class="fc" id="L180">        myBinaryWriterBuilder.withInitialSymbolTable(symtab);</span>
+<span class="fc" id="L181">    }</span>
+
+    /**
+     * Defaults to $ion_1_0 if null.
+     * @param symtab may be null.
+     */
+    @Override
+    public
+    _Private_IonBinaryWriterBuilder withInitialSymbolTable(SymbolTable symtab)
+    {
+<span class="fc" id="L191">        _Private_IonBinaryWriterBuilder b = mutable();</span>
+<span class="fc" id="L192">        b.setInitialSymbolTable(symtab);</span>
+<span class="fc" id="L193">        return b;</span>
+    }
+
+    @Override
+    public void setIsFloatBinary32Enabled(boolean enabled) {
+<span class="fc" id="L198">        mutationCheck();</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        if (enabled)</span>
+        {
+<span class="fc" id="L201">            myBinaryWriterBuilder.withFloatBinary32Enabled();</span>
+        }
+        else
+        {
+<span class="fc" id="L205">            myBinaryWriterBuilder.withFloatBinary32Disabled();</span>
+        }
+<span class="fc" id="L207">    }</span>
+
+    @Override
+    public
+    _Private_IonBinaryWriterBuilder withFloatBinary32Enabled() {
+<span class="fc" id="L212">        _Private_IonBinaryWriterBuilder b = mutable();</span>
+<span class="fc" id="L213">        b.setIsFloatBinary32Enabled(true);</span>
+<span class="fc" id="L214">        return b;</span>
+    }
+
+    @Override
+    public
+    _Private_IonBinaryWriterBuilder withFloatBinary32Disabled() {
+<span class="fc" id="L220">        _Private_IonBinaryWriterBuilder b = mutable();</span>
+<span class="fc" id="L221">        b.setIsFloatBinary32Enabled(false);</span>
+<span class="fc" id="L222">        return b;</span>
+    }
+
+    @Override
+    public void setImports(final SymbolTable... imports)
+    {
+<span class="fc" id="L228">        super.setImports(imports);</span>
+<span class="fc" id="L229">        myBinaryWriterBuilder.withImports(imports);</span>
+<span class="fc" id="L230">    }</span>
+
+    @Override
+    public void setCatalog(final IonCatalog catalog)
+    {
+<span class="fc" id="L235">        super.setCatalog(catalog);</span>
+<span class="fc" id="L236">        myBinaryWriterBuilder.withCatalog(catalog);</span>
+<span class="fc" id="L237">    }</span>
+
+    @Override
+    public void setStreamCopyOptimized(final boolean optimized)
+    {
+<span class="fc" id="L242">        super.setStreamCopyOptimized(optimized);</span>
+<span class="fc" id="L243">        myBinaryWriterBuilder.withStreamCopyOptimization(optimized);</span>
+<span class="fc" id="L244">    }</span>
+
+    //=========================================================================
+
+
+    /**
+     * Fills all properties and returns an immutable builder.
+     */
+    private _Private_IonBinaryWriterBuilder fillDefaults()
+    {
+        // Ensure that we don't modify the user's builder.
+<span class="fc" id="L255">        _Private_IonBinaryWriterBuilder b = copy();</span>
+
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        if (b.getSymtabValueFactory() == null)</span>
+        {
+<span class="fc" id="L259">            IonSystem system = IonSystemBuilder.standard().build();</span>
+<span class="fc" id="L260">            b.setSymtabValueFactory(system);</span>
+        }
+
+<span class="fc" id="L263">        return b.immutable();</span>
+    }
+
+    /**
+     * Fills all properties and returns an immutable builder.
+     */
+    private _Private_IonBinaryWriterBuilder fillLegacyDefaults()
+    {
+        // amzn/ion-java/issues/59 Fix this to use the new writer or eliminate it
+
+        // Ensure that we don't modify the user's builder.
+<span class="fc" id="L274">        _Private_IonBinaryWriterBuilder b = copy();</span>
+
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">        if (b.getSymtabValueFactory() == null)</span>
+        {
+<span class="nc" id="L278">            IonSystem system = IonSystemBuilder.standard().build();</span>
+<span class="nc" id="L279">            b.setSymtabValueFactory(system);</span>
+        }
+
+<span class="fc" id="L282">        SymbolTable initialSymtab = b.getInitialSymbolTable();</span>
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        if (initialSymtab == null)</span>
+        {
+<span class="nc" id="L285">            initialSymtab = initialSymtab(LocalSymbolTable.DEFAULT_LST_FACTORY,</span>
+<span class="nc" id="L286">                                          _Private_Utils.systemSymtab(1),</span>
+<span class="nc" id="L287">                                          b.getImports());</span>
+<span class="nc" id="L288">            b.setInitialSymbolTable(initialSymtab);</span>
+        }
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">        else if (initialSymtab.isSystemTable())</span>
+        {
+<span class="fc" id="L292">            initialSymtab = initialSymtab(LocalSymbolTable.DEFAULT_LST_FACTORY,</span>
+                                          initialSymtab,
+<span class="fc" id="L294">                                          b.getImports());</span>
+<span class="fc" id="L295">            b.setInitialSymbolTable(initialSymtab);</span>
+        }
+
+<span class="fc" id="L298">        return b.immutable();</span>
+    }
+
+
+    private IonWriterSystemBinary buildSystemWriter(OutputStream out)
+    {
+<span class="fc" id="L304">        SymbolTable defaultSystemSymtab =</span>
+<span class="fc" id="L305">            myInitialSymbolTable.getSystemSymbolTable();</span>
+
+<span class="fc" id="L307">        return new IonWriterSystemBinary(defaultSystemSymtab,</span>
+                                         out,
+                                         false /* autoFlush */,
+                                         true /* ensureInitialIvm */);
+    }
+
+
+    /**
+     * Returns a symtab usable in a local context.
+     * This copies {@link #myInitialSymbolTable} if symbols have been added to
+     * it since {@link #setInitialSymbolTable(SymbolTable)} was called.
+     */
+    SymbolTable buildContextSymbolTable()
+    {
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        if (myInitialSymbolTable.isReadOnly())</span>
+        {
+<span class="fc" id="L323">            return myInitialSymbolTable;</span>
+        }
+
+<span class="fc" id="L326">        return ((LocalSymbolTable) myInitialSymbolTable).makeCopy();</span>
+    }
+
+
+    @Override
+    public final IonWriter build(OutputStream out)
+    {
+<span class="fc" id="L333">        _Private_IonBinaryWriterBuilder b = fillDefaults();</span>
+        try
+        {
+<span class="fc" id="L336">            return b.myBinaryWriterBuilder.newWriter(out);</span>
+        }
+<span class="nc" id="L338">        catch (final IOException e)</span>
+        {
+<span class="nc" id="L340">            throw new IonException(&quot;I/O Error&quot;, e);</span>
+        }
+    }
+
+
+    @Deprecated
+    public final IonBinaryWriter buildLegacy()
+    {
+        // amzn/ion-java/issues/59 Fix this to use the new writer or eliminate it
+<span class="fc" id="L349">        _Private_IonBinaryWriterBuilder b = fillLegacyDefaults();</span>
+
+<span class="fc" id="L351">        IonWriterSystemBinary systemWriter =</span>
+<span class="fc" id="L352">            b.buildSystemWriter(new BufferedOutputStream());</span>
+
+<span class="fc" id="L354">        return new _Private_IonBinaryWriterImpl(b, systemWriter);</span>
+    }
+
+
+    //=========================================================================
+
+
+    private static final class Mutable
+        extends _Private_IonBinaryWriterBuilder
+    {
+<span class="fc" id="L364">        private Mutable() { }</span>
+
+        private Mutable(_Private_IonBinaryWriterBuilder that)
+        {
+<span class="fc" id="L368">            super(that);</span>
+<span class="fc" id="L369">        }</span>
+
+        @Override
+        public _Private_IonBinaryWriterBuilder immutable()
+        {
+<span class="fc" id="L374">            return new _Private_IonBinaryWriterBuilder(this);</span>
+        }
+
+        @Override
+        public _Private_IonBinaryWriterBuilder mutable()
+        {
+<span class="fc" id="L380">            return this;</span>
+        }
+
+        @Override
+        protected void mutationCheck()
+        {
+<span class="fc" id="L386">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

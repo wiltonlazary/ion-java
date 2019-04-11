@@ -1,0 +1,1387 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SimpleByteBuffer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl</a> &gt; <span class="el_source">SimpleByteBuffer.java</span></div><h1>SimpleByteBuffer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl;
+
+import com.amazon.ion.Decimal;
+import com.amazon.ion.IonException;
+import com.amazon.ion.Timestamp;
+import com.amazon.ion.Timestamp.Precision;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.math.MathContext;
+
+/**
+ * Manages a very simple byte buffer that is a single contiguous
+ * byte array, without resize ability.
+ */
+final class SimpleByteBuffer
+    implements ByteBuffer
+{
+    byte[]  _bytes;
+    int     _start;
+    int     _eob;
+    boolean _is_read_only;
+
+
+    /**
+     * Creates a read-write buffer.
+     *
+     * @param bytes assumed to be owned by this new instance.
+     */
+    public SimpleByteBuffer(byte[] bytes) {
+<span class="nc" id="L47">        this(bytes, 0, bytes.length, false);</span>
+<span class="nc" id="L48">    }</span>
+
+    /**
+     *
+     * @param bytes assumed to be owned by this new instance.
+     */
+    public SimpleByteBuffer(byte[] bytes, boolean isReadOnly) {
+<span class="nc" id="L55">        this(bytes, 0, bytes.length, isReadOnly);</span>
+<span class="nc" id="L56">    }</span>
+
+    /**
+     * Creates a read-write buffer.
+     *
+     * @param bytes assumed to be owned by this new instance.
+     */
+    public SimpleByteBuffer(byte[] bytes, int start, int length) {
+<span class="nc" id="L64">        this(bytes, start, length, false);</span>
+<span class="nc" id="L65">    }</span>
+
+    /**
+     *
+     * @param bytes assumed to be owned by this new instance.
+     */
+<span class="nc" id="L71">    public SimpleByteBuffer(byte[] bytes, int start, int length, boolean isReadOnly) {</span>
+<span class="nc bnc" id="L72" title="All 10 branches missed.">        if (bytes == null || start &lt; 0 || start &gt; bytes.length || length &lt; 0 || start + length &gt; bytes.length) {</span>
+<span class="nc" id="L73">            throw new IllegalArgumentException();</span>
+        }
+<span class="nc" id="L75">        _bytes = bytes;</span>
+<span class="nc" id="L76">        _start = start;</span>
+<span class="nc" id="L77">        _eob   = start + length;</span>
+<span class="nc" id="L78">        _is_read_only = isReadOnly;</span>
+<span class="nc" id="L79">    }</span>
+
+    public int getLength()
+    {
+<span class="nc" id="L83">        int length = _eob - _start;</span>
+<span class="nc" id="L84">        return length;</span>
+    }
+
+    /**
+     * Makes a copy of the internal byte array.
+     */
+    public byte[] getBytes()
+    {
+<span class="nc" id="L92">        int length = _eob - _start;</span>
+<span class="nc" id="L93">        byte[] copy = new byte[length];</span>
+<span class="nc" id="L94">        System.arraycopy(_bytes, _start, copy, 0, length);</span>
+<span class="nc" id="L95">        return copy;</span>
+    }
+
+    public int getBytes(byte[] buffer, int offset, int length)
+    {
+<span class="nc bnc" id="L100" title="All 10 branches missed.">        if (buffer == null || offset &lt; 0 || offset &gt; buffer.length || length &lt; 0 || offset + length &gt; buffer.length) {</span>
+<span class="nc" id="L101">            throw new IllegalArgumentException();</span>
+        }
+
+<span class="nc" id="L104">        int datalength = _eob - _start;</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        if (datalength &gt; length) {</span>
+<span class="nc" id="L106">            throw new IllegalArgumentException(&quot;insufficient space in destination buffer&quot;);</span>
+        }
+
+<span class="nc" id="L109">        System.arraycopy(_bytes, _start, buffer, offset, datalength);</span>
+
+<span class="nc" id="L111">        return datalength;</span>
+
+    }
+    public ByteReader getReader()
+    {
+<span class="nc" id="L116">        ByteReader reader = new SimpleByteReader(this);</span>
+<span class="nc" id="L117">        return reader;</span>
+    }
+
+    public ByteWriter getWriter()
+    {
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        if (_is_read_only) {</span>
+<span class="nc" id="L123">            throw new IllegalStateException(&quot;this buffer is read only&quot;);</span>
+        }
+<span class="nc" id="L125">        SimpleByteWriter writer = new SimpleByteWriter(this);</span>
+<span class="nc" id="L126">        return writer;</span>
+    }
+
+    public void writeBytes(OutputStream out) throws IOException
+    {
+<span class="nc" id="L131">        int length = _eob - _start;</span>
+<span class="nc" id="L132">        out.write(_bytes, _start, length);</span>
+<span class="nc" id="L133">    }</span>
+
+<span class="nc bnc" id="L135" title="All 2 branches missed.">    static final class SimpleByteReader implements ByteReader</span>
+    {
+        SimpleByteBuffer _buffer;
+        int              _position;
+
+<span class="nc" id="L140">        SimpleByteReader(SimpleByteBuffer bytebuffer) {</span>
+<span class="nc" id="L141">            _buffer = bytebuffer;</span>
+<span class="nc" id="L142">            _position = bytebuffer._start;</span>
+<span class="nc" id="L143">        }</span>
+
+        public int position()
+        {
+<span class="nc" id="L147">            int pos = _position - _buffer._start;</span>
+<span class="nc" id="L148">            return pos;</span>
+        }
+
+        public void position(int newPosition)
+        {
+<span class="nc bnc" id="L153" title="All 2 branches missed.">            if (newPosition &lt; 0) {</span>
+<span class="nc" id="L154">                throw new IllegalArgumentException(&quot;position must be non-negative&quot;);</span>
+            }
+<span class="nc" id="L156">            int pos = newPosition + _buffer._start;</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">            if (pos &gt; _buffer._eob) {</span>
+<span class="nc" id="L158">               throw new IllegalArgumentException(&quot;position is past end of buffer&quot;);</span>
+            }
+<span class="nc" id="L160">            _position = pos;</span>
+<span class="nc" id="L161">        }</span>
+
+        public void skip(int length)
+        {
+<span class="nc bnc" id="L165" title="All 2 branches missed.">            if (length &lt; 0) {</span>
+<span class="nc" id="L166">                throw new IllegalArgumentException(&quot;length to skip must be non-negative&quot;);</span>
+            }
+<span class="nc" id="L168">            int pos = _position + length;</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">            if (pos &gt; _buffer._eob) {</span>
+<span class="nc" id="L170">               throw new IllegalArgumentException(&quot;skip would skip past end of buffer&quot;);</span>
+            }
+<span class="nc" id="L172">            _position = pos;</span>
+<span class="nc" id="L173">        }</span>
+
+        public int read()
+        {
+<span class="nc bnc" id="L177" title="All 2 branches missed.">            if (_position &gt;= _buffer._eob) return EOF;</span>
+<span class="nc" id="L178">            int b = _buffer._bytes[_position++];</span>
+<span class="nc" id="L179">            return (b &amp; 0xff);</span>
+        }
+
+        public int read(byte[] dst, int start, int len)
+        {
+<span class="nc bnc" id="L184" title="All 8 branches missed.">            if (dst == null || start &lt; 0 || len &lt; 0 || start + len &gt; dst.length) {</span>
+                // no need to test this start &gt;= dst.length ||
+                // since we test start+len &gt; dst.length which is the correct test
+<span class="nc" id="L187">                throw new IllegalArgumentException();</span>
+            }
+
+<span class="nc bnc" id="L190" title="All 2 branches missed.">            if (_position &gt;= _buffer._eob) return 0;</span>
+<span class="nc" id="L191">            int readlen = len;</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">            if (readlen + _position &gt; _buffer._eob) readlen = _buffer._eob - _position;</span>
+<span class="nc" id="L193">            System.arraycopy(_buffer._bytes, _position, dst, start, readlen);</span>
+<span class="nc" id="L194">            _position += readlen;</span>
+<span class="nc" id="L195">            return readlen;</span>
+        }
+
+        public int readTypeDesc()
+        {
+<span class="nc" id="L200">            return read();</span>
+        }
+
+        public long readULong(int len) throws IOException
+        {
+<span class="nc" id="L205">            long    retvalue = 0;</span>
+            int b;
+
+<span class="nc bnc" id="L208" title="All 10 branches missed.">            switch (len) {</span>
+            default:
+<span class="nc" id="L210">                throw new IonException(&quot;value too large for Java long&quot;);</span>
+            case 8:
+<span class="nc bnc" id="L212" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc" id="L213">                retvalue = (retvalue &lt;&lt; 8) | b;</span>
+            case 7:
+<span class="nc bnc" id="L215" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc" id="L216">                retvalue = (retvalue &lt;&lt; 8) | b;</span>
+            case 6:
+<span class="nc bnc" id="L218" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc" id="L219">                retvalue = (retvalue &lt;&lt; 8) | b;</span>
+            case 5:
+<span class="nc bnc" id="L221" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc" id="L222">                retvalue = (retvalue &lt;&lt; 8) | b;</span>
+            case 4:
+<span class="nc bnc" id="L224" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc" id="L225">                retvalue = (retvalue &lt;&lt; 8) | b;</span>
+            case 3:
+<span class="nc bnc" id="L227" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc" id="L228">                retvalue = (retvalue &lt;&lt; 8) | b;</span>
+            case 2:
+<span class="nc bnc" id="L230" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc" id="L231">                retvalue = (retvalue &lt;&lt; 8) | b;</span>
+            case 1:
+<span class="nc bnc" id="L233" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc" id="L234">                retvalue = (retvalue &lt;&lt; 8) | b;</span>
+            case 0:
+                // do nothing, it's just a 0 length is a 0 value
+            }
+<span class="nc" id="L238">            return retvalue;</span>
+        }
+
+
+        public int readVarInt() throws IOException
+        {
+<span class="nc" id="L244">            int     retvalue = 0;</span>
+<span class="nc" id="L245">            boolean is_negative = false;</span>
+            int     b;
+
+            // synthetic label &quot;done&quot; (yuck)
+done:       for (;;) {
+                // read the first byte - it has the sign bit
+<span class="nc bnc" id="L251" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">                if ((b &amp; 0x40) != 0) {</span>
+<span class="nc" id="L253">                    is_negative = true;</span>
+                }
+<span class="nc" id="L255">                retvalue = (b &amp; 0x3F);</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">                if ((b &amp; 0x80) != 0) break done;</span>
+
+                // for the second byte we shift our eariler bits just as much,
+                // but there are fewer of them there to shift
+<span class="nc bnc" id="L260" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc" id="L261">                retvalue = (retvalue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">                if ((b &amp; 0x80) != 0) break done;</span>
+
+                // for the rest, they're all the same
+<span class="nc bnc" id="L265" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc" id="L266">                retvalue = (retvalue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">                if ((b &amp; 0x80) != 0) break done;</span>
+
+                // for the rest, they're all the same
+<span class="nc bnc" id="L270" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc" id="L271">                retvalue = (retvalue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="nc bnc" id="L272" title="All 2 branches missed.">                if ((b &amp; 0x80) != 0) break done;</span>
+
+                // for the rest, they're all the same
+<span class="nc bnc" id="L275" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc" id="L276">                retvalue = (retvalue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="nc bnc" id="L277" title="All 2 branches missed.">                if ((b &amp; 0x80) != 0) break done;</span>
+
+                // if we get here we have more bits than we have room for :(
+<span class="nc" id="L280">                throwIntOverflowExeption();</span>
+            }
+<span class="nc bnc" id="L282" title="All 2 branches missed.">            if (is_negative) {</span>
+<span class="nc" id="L283">                retvalue = -retvalue;</span>
+            }
+<span class="nc" id="L285">            return retvalue;</span>
+        }
+
+        public long readVarLong() throws IOException
+        {
+<span class="nc" id="L290">            long    retvalue = 0;</span>
+<span class="nc" id="L291">            boolean is_negative = false;</span>
+            int     b;
+
+            // synthetic label &quot;done&quot; (yuck)
+done:       for (;;) {
+                // read the first byte - it has the sign bit
+<span class="nc bnc" id="L297" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">                if ((b &amp; 0x40) != 0) {</span>
+<span class="nc" id="L299">                    is_negative = true;</span>
+                }
+<span class="nc" id="L301">                retvalue = (b &amp; 0x3F);</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">                if ((b &amp; 0x80) != 0) break done;</span>
+
+                // for the second byte we shift our eariler bits just as much,
+                // but there are fewer of them there to shift
+<span class="nc bnc" id="L306" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc" id="L307">                retvalue = (retvalue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">                if ((b &amp; 0x80) != 0) break done;</span>
+
+                // for the rest, they're all the same
+                for (;;) {
+<span class="nc bnc" id="L312" title="All 2 branches missed.">                    if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc bnc" id="L313" title="All 2 branches missed.">                    if ((retvalue &amp; 0xFE00000000000000L) != 0) throwIntOverflowExeption();</span>
+<span class="nc" id="L314">                    retvalue = (retvalue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="nc bnc" id="L315" title="All 2 branches missed.">                    if ((b &amp; 0x80) != 0) break done;</span>
+                }
+            }
+<span class="nc bnc" id="L318" title="All 2 branches missed.">            if (is_negative) {</span>
+<span class="nc" id="L319">                retvalue = -retvalue;</span>
+            }
+<span class="nc" id="L321">            return retvalue;</span>
+        }
+
+        /**
+         * Reads an integer value, returning null to mean -0.
+         * @throws IOException
+         */
+        public Integer readVarInteger() throws IOException
+        {
+<span class="nc" id="L330">            int     retvalue = 0;</span>
+<span class="nc" id="L331">            boolean is_negative = false;</span>
+            int     b;
+
+            // sythetic label &quot;done&quot; (yuck)
+done:       for (;;) {
+                // read the first byte - it has the sign bit
+<span class="nc bnc" id="L337" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc bnc" id="L338" title="All 2 branches missed.">                if ((b &amp; 0x40) != 0) {</span>
+<span class="nc" id="L339">                    is_negative = true;</span>
+                }
+<span class="nc" id="L341">                retvalue = (b &amp; 0x3F);</span>
+<span class="nc bnc" id="L342" title="All 2 branches missed.">                if ((b &amp; 0x80) != 0) break done;</span>
+
+                // for the second byte we shift our eariler bits just as much,
+                // but there are fewer of them there to shift
+<span class="nc bnc" id="L346" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc" id="L347">                retvalue = (retvalue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="nc bnc" id="L348" title="All 2 branches missed.">                if ((b &amp; 0x80) != 0) break done;</span>
+
+                // for the rest, they're all the same
+<span class="nc bnc" id="L351" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc" id="L352">                retvalue = (retvalue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="nc bnc" id="L353" title="All 2 branches missed.">                if ((b &amp; 0x80) != 0) break done;</span>
+
+                // for the rest, they're all the same
+<span class="nc bnc" id="L356" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc" id="L357">                retvalue = (retvalue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="nc bnc" id="L358" title="All 2 branches missed.">                if ((b &amp; 0x80) != 0) break done;</span>
+
+                // for the rest, they're all the same
+<span class="nc bnc" id="L361" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc" id="L362">                retvalue = (retvalue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="nc bnc" id="L363" title="All 2 branches missed.">                if ((b &amp; 0x80) != 0) break done;</span>
+
+                // if we get here we have more bits than we have room for :(
+<span class="nc" id="L366">                throwIntOverflowExeption();</span>
+            }
+
+<span class="nc" id="L369">            Integer retInteger = null;</span>
+<span class="nc bnc" id="L370" title="All 2 branches missed.">            if (is_negative) {</span>
+<span class="nc bnc" id="L371" title="All 2 branches missed.">                if (retvalue != 0) {</span>
+<span class="nc" id="L372">                    retInteger = new Integer(-retvalue);</span>
+                }
+            }
+            else {
+<span class="nc" id="L376">                retInteger = new Integer(retvalue);</span>
+            }
+<span class="nc" id="L378">            return retInteger;</span>
+        }
+
+        public int readVarUInt() throws IOException
+        {
+<span class="nc" id="L383">            int retvalue = 0;</span>
+            int  b;
+
+            for (;;) { // fake loop to create a &quot;goto done&quot;
+<span class="nc bnc" id="L387" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc" id="L388">                retvalue = (retvalue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="nc bnc" id="L389" title="All 2 branches missed.">                if ((b &amp; 0x80) != 0) break;</span>
+
+<span class="nc bnc" id="L391" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc" id="L392">                retvalue = (retvalue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="nc bnc" id="L393" title="All 2 branches missed.">                if ((b &amp; 0x80) != 0) break;</span>
+
+<span class="nc bnc" id="L395" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc" id="L396">                retvalue = (retvalue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="nc bnc" id="L397" title="All 2 branches missed.">                if ((b &amp; 0x80) != 0) break;</span>
+
+<span class="nc bnc" id="L399" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc" id="L400">                retvalue = (retvalue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="nc bnc" id="L401" title="All 2 branches missed.">                if ((b &amp; 0x80) != 0) break;</span>
+
+<span class="nc bnc" id="L403" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc" id="L404">                retvalue = (retvalue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="nc bnc" id="L405" title="All 2 branches missed.">                if ((b &amp; 0x80) != 0) break;</span>
+
+                // if we get here we have more bits than we have room for :(
+<span class="nc" id="L408">                throwIntOverflowExeption();</span>
+            }
+<span class="nc" id="L410">            return retvalue;</span>
+        }
+
+        public double readFloat(int len) throws IOException
+        {
+<span class="nc bnc" id="L415" title="All 2 branches missed.">            if (len == 0)</span>
+            {
+                // special case, return pos zero
+<span class="nc" id="L418">                return 0.0d;</span>
+            }
+
+<span class="nc bnc" id="L421" title="All 2 branches missed.">            if (len != 8)</span>
+            {
+<span class="nc" id="L423">                throw new IOException(&quot;Length of float read must be 0 or 8&quot;);</span>
+            }
+
+<span class="nc" id="L426">            long dBits = this.readULong(len);</span>
+<span class="nc" id="L427">            return Double.longBitsToDouble(dBits);</span>
+        }
+
+        public long readVarULong() throws IOException
+        {
+<span class="nc" id="L432">            long retvalue = 0;</span>
+            int  b;
+
+            for (;;) {
+<span class="nc bnc" id="L436" title="All 2 branches missed.">                if ((b = read()) &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc bnc" id="L437" title="All 2 branches missed.">                if ((retvalue &amp; 0xFE00000000000000L) != 0) throwIntOverflowExeption();</span>
+<span class="nc" id="L438">                retvalue = (retvalue &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="nc bnc" id="L439" title="All 2 branches missed.">                if ((b &amp; 0x80) != 0) break;</span>
+            }
+<span class="nc" id="L441">            return retvalue;</span>
+        }
+
+        /**
+         * Near clone of {@link IonReaderBinaryRawX#readDecimal(int)}
+         * and {@link IonBinary.Reader#readDecimalValue(IonDecimalImpl, int)}
+         * so keep them in sync!
+         */
+        public Decimal readDecimal(int len) throws IOException
+        {
+<span class="nc" id="L451">            MathContext mathContext = MathContext.UNLIMITED;</span>
+
+            Decimal bd;
+
+            // we only write out the '0' value as the nibble 0
+<span class="nc bnc" id="L456" title="All 2 branches missed.">            if (len == 0) {</span>
+<span class="nc" id="L457">                bd = Decimal.valueOf(0, mathContext);</span>
+            }
+            else {
+                // otherwise we to it the hard way ....
+<span class="nc" id="L461">                int         startpos = this.position();</span>
+<span class="nc" id="L462">                int         exponent = this.readVarInt();</span>
+<span class="nc" id="L463">                int         bitlen = len - (this.position() - startpos);</span>
+
+                BigInteger value;
+                int signum;
+<span class="nc bnc" id="L467" title="All 2 branches missed.">                if (bitlen &gt; 0)</span>
+                {
+<span class="nc" id="L469">                    byte[] bits = new byte[bitlen];</span>
+<span class="nc" id="L470">                    this.read(bits, 0, bitlen);</span>
+
+<span class="nc" id="L472">                    signum = 1;</span>
+<span class="nc bnc" id="L473" title="All 2 branches missed.">                    if (bits[0] &lt; 0)</span>
+                    {
+                        // value is negative, clear the sign
+<span class="nc" id="L476">                        bits[0] &amp;= 0x7F;</span>
+<span class="nc" id="L477">                        signum = -1;</span>
+                    }
+<span class="nc" id="L479">                    value = new BigInteger(signum, bits);</span>
+<span class="nc" id="L480">                }</span>
+                else {
+<span class="nc" id="L482">                    signum = 0;</span>
+<span class="nc" id="L483">                    value = BigInteger.ZERO;</span>
+                }
+
+                // Ion stores exponent, BigDecimal uses the negation &quot;scale&quot;
+<span class="nc" id="L487">                int scale = -exponent;</span>
+<span class="nc bnc" id="L488" title="All 4 branches missed.">                if (value.signum() == 0 &amp;&amp; signum == -1)</span>
+                {
+<span class="nc bnc" id="L490" title="All 4 branches missed.">                    assert value.equals(BigInteger.ZERO);</span>
+<span class="nc" id="L491">                    bd = Decimal.negativeZero(scale, mathContext);</span>
+                }
+                else
+                {
+<span class="nc" id="L495">                    bd = Decimal.valueOf(value, scale, mathContext);</span>
+                }
+            }
+<span class="nc" id="L498">            return bd;</span>
+        }
+
+        public Timestamp readTimestamp(int len) throws IOException
+        {
+<span class="nc bnc" id="L503" title="All 2 branches missed.">            if (len &lt; 1) {</span>
+                // nothing to do here - and the timestamp will be NULL
+<span class="nc" id="L505">                return null;</span>
+            }
+
+            Timestamp val;
+<span class="nc" id="L509">            Precision   p = null; // FIXME remove</span>
+<span class="nc" id="L510">            Integer     offset = null;</span>
+<span class="nc" id="L511">            int         year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0;</span>
+<span class="nc" id="L512">            BigDecimal  frac = null;</span>
+<span class="nc" id="L513">            int         remaining, end = this.position() + len;</span>
+
+            // first up is the offset, which requires a special int reader
+            // to return the -0 as a null Integer
+<span class="nc" id="L517">            offset = this.readVarInteger();</span>
+
+            // now we'll read the struct values from the input stream
+<span class="nc bnc" id="L520" title="All 4 branches missed.">            assert position() &lt; end;</span>
+<span class="nc bnc" id="L521" title="All 2 branches missed.">            if (position() &lt; end) {  // FIXME remove</span>
+                // year is from 0001 to 9999
+                // or 0x1 to 0x270F or 14 bits - 1 or 2 bytes
+<span class="nc" id="L524">                year  = readVarUInt();</span>
+<span class="nc" id="L525">                p = Precision.YEAR; // our lowest significant option</span>
+
+                // now we look for hours and minutes
+<span class="nc bnc" id="L528" title="All 2 branches missed.">                if (position() &lt; end) {</span>
+<span class="nc" id="L529">                    month = readVarUInt();</span>
+<span class="nc" id="L530">                    p = Precision.MONTH;</span>
+
+                    // now we look for hours and minutes
+<span class="nc bnc" id="L533" title="All 2 branches missed.">                    if (position() &lt; end) {</span>
+<span class="nc" id="L534">                        day   = readVarUInt();</span>
+<span class="nc" id="L535">                        p = Precision.DAY; // our lowest significant option</span>
+
+                        // now we look for hours and minutes
+<span class="nc bnc" id="L538" title="All 2 branches missed.">                        if (position() &lt; end) {</span>
+<span class="nc" id="L539">                            hour   = readVarUInt();</span>
+<span class="nc" id="L540">                            minute = readVarUInt();</span>
+<span class="nc" id="L541">                            p = Precision.MINUTE;</span>
+
+<span class="nc bnc" id="L543" title="All 2 branches missed.">                            if (position() &lt; end) {</span>
+<span class="nc" id="L544">                                second = readVarUInt();</span>
+<span class="nc" id="L545">                                p = Precision.SECOND;</span>
+
+<span class="nc" id="L547">                                remaining = end - position();</span>
+<span class="nc bnc" id="L548" title="All 2 branches missed.">                                if (remaining &gt; 0) {</span>
+                                    // now we read in our actual &quot;milliseconds since the epoch&quot;
+<span class="nc" id="L550">                                    frac = this.readDecimal(remaining);</span>
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // now we let timestamp put it all together
+<span class="nc" id="L559">            val = Timestamp.createFromUtcFields(p, year, month, day, hour, minute, second, frac, offset);</span>
+<span class="nc" id="L560">            return val;</span>
+        }
+
+        public String readString(int len) throws IOException
+        {
+            // len is bytes, which is greater than or equal to java
+            // chars even after utf8 to utf16 decoding nonsense
+            // the char array is way faster than using string buffer
+<span class="nc" id="L568">            char[] chars = new char[len];</span>
+<span class="nc" id="L569">            int ii = 0;</span>
+            int c;
+<span class="nc" id="L571">            int endPosition = this.position() + len;</span>
+
+<span class="nc bnc" id="L573" title="All 2 branches missed.">            while (this.position() &lt; endPosition) {</span>
+<span class="nc" id="L574">                c = readUnicodeScalar();</span>
+<span class="nc bnc" id="L575" title="All 2 branches missed.">                if (c &lt; 0) throwUnexpectedEOFException();</span>
+<span class="nc bnc" id="L576" title="All 2 branches missed.">                if (c &lt; 0x10000) {</span>
+<span class="nc" id="L577">                    chars[ii++] = (char)c;</span>
+                }
+                else { // when c is &gt;= 0x10000 we need surrogate encoding
+<span class="nc" id="L580">                    chars[ii++] = (char)_Private_IonConstants.makeHighSurrogate(c);</span>
+<span class="nc" id="L581">                    chars[ii++] = (char)_Private_IonConstants.makeLowSurrogate(c);</span>
+                }
+            }
+<span class="nc bnc" id="L584" title="All 2 branches missed.">            if (this.position() &lt; endPosition) throwUnexpectedEOFException();</span>
+
+<span class="nc" id="L586">            return new String(chars, 0, ii);</span>
+        }
+
+        public final int readUnicodeScalar() throws IOException {
+            int b;
+
+<span class="nc" id="L592">            b = read();</span>
+            // ascii is all good, even -1 (eof)
+<span class="nc bnc" id="L594" title="All 2 branches missed.">            if (b &gt;= 0x80) {</span>
+<span class="nc" id="L595">                b = readUnicodeScalar_helper(b);</span>
+
+            }
+<span class="nc" id="L598">            return b;</span>
+        }
+        private final  int readUnicodeScalar_helper(int b) throws IOException
+        {
+<span class="nc" id="L602">            int c = -1;</span>
+
+            // now we start gluing the multi-byte value together
+<span class="nc bnc" id="L605" title="All 2 branches missed.">            if ((b &amp; 0xe0) == 0xc0) {</span>
+                // for values from 0x80 to 0x7FF (all legal)
+<span class="nc" id="L607">                c = (b &amp; ~0xe0);</span>
+<span class="nc" id="L608">                b = read();</span>
+<span class="nc bnc" id="L609" title="All 2 branches missed.">                if ((b &amp; 0xc0) != 0x80) throwUTF8Exception();</span>
+<span class="nc" id="L610">                c &lt;&lt;= 6;</span>
+<span class="nc" id="L611">                c |= (b &amp; ~0x80);</span>
+            }
+<span class="nc bnc" id="L613" title="All 2 branches missed.">            else if ((b &amp; 0xf0) == 0xe0) {</span>
+                // for values from 0x800 to 0xFFFFF (NOT all legal)
+<span class="nc" id="L615">                c = (b &amp; ~0xf0);</span>
+<span class="nc" id="L616">                b = read();</span>
+<span class="nc bnc" id="L617" title="All 2 branches missed.">                if ((b &amp; 0xc0) != 0x80) throwUTF8Exception();</span>
+<span class="nc" id="L618">                c &lt;&lt;= 6;</span>
+<span class="nc" id="L619">                c |= (b &amp; ~0x80);</span>
+<span class="nc" id="L620">                b = read();</span>
+<span class="nc bnc" id="L621" title="All 2 branches missed.">                if ((b &amp; 0xc0) != 0x80) throwUTF8Exception();</span>
+<span class="nc" id="L622">                c &lt;&lt;= 6;</span>
+<span class="nc" id="L623">                c |= (b &amp; ~0x80);</span>
+<span class="nc bnc" id="L624" title="All 4 branches missed.">                if (c &gt; 0x00D7FF &amp;&amp; c &lt; 0x00E000) {</span>
+<span class="nc" id="L625">                    throw new IonException(&quot;illegal surrogate value encountered in input utf-8 stream&quot;);</span>
+                }
+            }
+<span class="nc bnc" id="L628" title="All 2 branches missed.">            else if ((b &amp; 0xf8) == 0xf0) {</span>
+                // for values from 0x010000 to 0x1FFFFF (NOT all legal)
+<span class="nc" id="L630">                c = (b &amp; ~0xf8);</span>
+<span class="nc" id="L631">                b = read();</span>
+<span class="nc bnc" id="L632" title="All 2 branches missed.">                if ((b &amp; 0xc0) != 0x80) throwUTF8Exception();</span>
+<span class="nc" id="L633">                c &lt;&lt;= 6;</span>
+<span class="nc" id="L634">                c |= (b &amp; ~0x80);</span>
+<span class="nc" id="L635">                b = read();</span>
+<span class="nc bnc" id="L636" title="All 2 branches missed.">                if ((b &amp; 0xc0) != 0x80) throwUTF8Exception();</span>
+<span class="nc" id="L637">                c &lt;&lt;= 6;</span>
+<span class="nc" id="L638">                c |= (b &amp; ~0x80);</span>
+<span class="nc" id="L639">                b = read();</span>
+<span class="nc bnc" id="L640" title="All 2 branches missed.">                if ((b &amp; 0xc0) != 0x80) throwUTF8Exception();</span>
+<span class="nc" id="L641">                c &lt;&lt;= 6;</span>
+<span class="nc" id="L642">                c |= (b &amp; ~0x80);</span>
+<span class="nc bnc" id="L643" title="All 2 branches missed.">                if (c &gt; 0x10FFFF) {</span>
+<span class="nc" id="L644">                    throw new IonException(&quot;illegal utf value encountered in input utf-8 stream&quot;);</span>
+                }
+            }
+            else {
+<span class="nc" id="L648">                throwUTF8Exception();</span>
+            }
+<span class="nc" id="L650">            return c;</span>
+        }
+        void throwUTF8Exception() throws IOException
+        {
+<span class="nc" id="L654">            throw new IOException(&quot;Invalid UTF-8 character encounter in a string at pos &quot; + this.position());</span>
+        }
+        void throwUnexpectedEOFException() throws IOException {
+<span class="nc" id="L657">            throw new IOException(&quot;unexpected EOF in value at offset &quot; + this.position());</span>
+        }
+        void throwIntOverflowExeption() throws IOException {
+<span class="nc" id="L660">            throw new IOException(&quot;int in stream is too long for a Java int 32 use readLong()&quot;);</span>
+        }
+    }
+
+    static final class UserByteWriter extends OutputStream implements ByteWriter
+    {
+        SimpleByteWriter _simple_writer;
+        OutputStream     _user_stream;
+        int              _position;
+        int              _limit;
+        int              _buffer_size;
+
+        // constants used for the various write routines to verify
+        // sufficient room in the output buffer for writing
+        private final static int MAX_UINT7_BINARY_LENGTH = 5; // (1 + (32 / 7))
+        private final static int MAX_FLOAT_BINARY_LENGTH = 8; // ieee 64 bit float
+
+        private final static int REQUIRED_BUFFER_SPACE   = 8; // max of the required lengths
+
+        UserByteWriter(OutputStream userOuputStream, byte[] buf)
+<span class="nc" id="L680">        {</span>
+<span class="nc bnc" id="L681" title="All 4 branches missed.">            if (buf == null || buf.length &lt; REQUIRED_BUFFER_SPACE) {</span>
+<span class="nc" id="L682">                throw new IllegalArgumentException(&quot;requires a buffer at least &quot;+REQUIRED_BUFFER_SPACE+&quot; bytes long&quot;);</span>
+            }
+
+<span class="nc" id="L685">            SimpleByteBuffer bytebuffer = new SimpleByteBuffer(buf);</span>
+<span class="nc" id="L686">            _simple_writer =  new SimpleByteWriter(bytebuffer);</span>
+<span class="nc" id="L687">            _user_stream = userOuputStream;</span>
+<span class="nc" id="L688">            _buffer_size = buf.length;</span>
+<span class="nc" id="L689">            _limit = _buffer_size;</span>
+<span class="nc" id="L690">        }</span>
+
+        private final void checkForSpace(int needed) {
+<span class="nc bnc" id="L693" title="All 2 branches missed.">            if (_position + needed &gt; _limit) {</span>
+<span class="nc" id="L694">                flush();</span>
+            }
+<span class="nc" id="L696">        }</span>
+
+        /**
+         * this flushes the current buffer to the users output
+         * stream and resets the buffer.  It is called automatically
+         * as the buffer fills.  It can be called at any time if more
+         * frequent flushing is desired.
+         */
+        @Override
+        public void flush() {
+            // is there anything to flush?
+<span class="nc bnc" id="L707" title="All 2 branches missed.">            if (_position + _buffer_size &gt; _limit) {</span>
+                try {
+<span class="nc" id="L709">                    _simple_writer.flushTo(_user_stream);</span>
+                }
+<span class="nc" id="L711">                catch (IOException e) {</span>
+<span class="nc" id="L712">                    throw new IonException(e);</span>
+<span class="nc" id="L713">                }</span>
+<span class="nc" id="L714">                _limit = _position + _buffer_size;</span>
+            }
+<span class="nc" id="L716">        }</span>
+
+        public void insert(int length)
+        {
+<span class="nc" id="L720">            throw new UnsupportedOperationException(&quot;use a SimpleByteWriter if you need to insert&quot;);</span>
+        }
+
+        public int position()
+        {
+<span class="nc" id="L725">            return _position;</span>
+        }
+
+        public void position(int newPosition)
+        {
+<span class="nc" id="L730">            throw new UnsupportedOperationException(&quot;use a SimpleByteWriter if you need to set your position&quot;);</span>
+        }
+
+        public void remove(int length)
+        {
+<span class="nc" id="L735">            throw new UnsupportedOperationException(&quot;use a SimpleByteWriter if you need to remove bytes&quot;);</span>
+        }
+
+        @Override
+        public void write(int b) throws IOException
+        {
+<span class="nc" id="L741">            write((byte)b);</span>
+<span class="nc" id="L742">        }</span>
+
+        public void write(byte b) throws IOException
+        {
+<span class="nc" id="L746">            checkForSpace(1);</span>
+<span class="nc" id="L747">            _simple_writer.write(b);</span>
+<span class="nc" id="L748">            _position++;</span>
+<span class="nc" id="L749">        }</span>
+
+        // cloned from SimpleByteBuffer as we need to check the
+        // length and this may require flushing more often than
+        // the default writeDecimal supports.
+        public int writeDecimal(BigDecimal value) throws IOException
+        {
+<span class="nc" id="L756">            int returnlen = _simple_writer.writeDecimal(value, this);</span>
+<span class="nc" id="L757">            return returnlen;</span>
+        }
+
+        public int writeFloat(double value) throws IOException
+        {
+<span class="nc" id="L762">            checkForSpace(MAX_FLOAT_BINARY_LENGTH);</span>
+<span class="nc" id="L763">            int returnlen = _simple_writer.writeFloat(value);</span>
+<span class="nc" id="L764">            return returnlen;</span>
+        }
+
+        public int writeIonInt(long value, int len) throws IOException
+        {
+<span class="nc" id="L769">            checkForSpace(len);</span>
+<span class="nc" id="L770">            int returnlen = _simple_writer.writeIonInt(value, len);</span>
+<span class="nc" id="L771">            return returnlen;</span>
+        }
+
+        public int writeIonInt(int value, int len) throws IOException
+        {
+<span class="nc" id="L776">            checkForSpace(len);</span>
+<span class="nc" id="L777">            int returnlen = _simple_writer.writeIonInt(value, len);</span>
+<span class="nc" id="L778">            return returnlen;</span>
+        }
+
+        public int writeString(String value) throws IOException
+        {
+<span class="nc" id="L783">            int returnlen = _simple_writer.writeString(value, this);</span>
+<span class="nc" id="L784">            return returnlen;</span>
+        }
+
+        public void writeTypeDesc(int typeDescByte) throws IOException
+        {
+<span class="nc" id="L789">            checkForSpace(1);</span>
+<span class="nc" id="L790">            _simple_writer.writeTypeDesc(typeDescByte);</span>
+<span class="nc" id="L791">        }</span>
+
+        public int writeTypeDescWithLength(int typeid, int lenOfLength,
+                                           int valueLength) throws IOException
+        {
+<span class="nc" id="L796">            checkForSpace(1 + MAX_UINT7_BINARY_LENGTH);</span>
+<span class="nc" id="L797">            int returnlen = _simple_writer.writeTypeDescWithLength(typeid, lenOfLength, valueLength);</span>
+<span class="nc" id="L798">            return returnlen;</span>
+        }
+
+        public int writeTypeDescWithLength(int typeid, int valueLength) throws IOException
+        {
+<span class="nc" id="L803">            checkForSpace(1 + MAX_UINT7_BINARY_LENGTH);</span>
+<span class="nc" id="L804">            int returnlen = _simple_writer.writeTypeDescWithLength(typeid, valueLength);</span>
+<span class="nc" id="L805">            return returnlen;</span>
+        }
+
+        public int writeVarInt(long value, int len, boolean forceZeroWrite)
+            throws IOException
+        {
+<span class="nc" id="L811">            checkForSpace(len);</span>
+<span class="nc" id="L812">            int returnlen = _simple_writer.writeVarInt(value, len, forceZeroWrite);</span>
+<span class="nc" id="L813">            return returnlen;</span>
+        }
+
+        public int writeVarInt(int value, int len, boolean forceZeroWrite)
+            throws IOException
+        {
+<span class="nc" id="L819">            checkForSpace(len);</span>
+<span class="nc" id="L820">            int returnlen = _simple_writer.writeVarInt(value, len, forceZeroWrite);</span>
+<span class="nc" id="L821">            return returnlen;</span>
+        }
+
+        public int writeVarUInt(int value, int len, boolean forceZeroWrite)
+            throws IOException
+        {
+<span class="nc" id="L827">            checkForSpace(len);</span>
+<span class="nc" id="L828">            int returnlen = _simple_writer.writeVarUInt(value, len, forceZeroWrite);</span>
+<span class="nc" id="L829">            return returnlen;</span>
+        }
+
+        public int writeVarUInt(long value, int len, boolean forceZeroWrite)
+            throws IOException
+        {
+<span class="nc" id="L835">            checkForSpace(len);</span>
+<span class="nc" id="L836">            int returnlen = _simple_writer.writeVarUInt(value, len, forceZeroWrite);</span>
+<span class="nc" id="L837">            return returnlen;</span>
+        }
+    }
+
+<span class="nc bnc" id="L841" title="All 2 branches missed.">    static final class SimpleByteWriter extends OutputStream implements ByteWriter</span>
+    {
+        private static final int _ib_FLOAT64_LEN         =    8;
+<span class="nc" id="L844">        private static final Double DOUBLE_POS_ZERO = Double.valueOf(0.0);</span>
+
+        SimpleByteBuffer _buffer;
+        int              _position;
+
+<span class="nc" id="L849">        SimpleByteWriter(SimpleByteBuffer bytebuffer) {</span>
+<span class="nc" id="L850">            _buffer = bytebuffer;</span>
+<span class="nc" id="L851">            _position = bytebuffer._start;</span>
+<span class="nc" id="L852">        }</span>
+
+        protected void flushTo(OutputStream userOutput) throws IOException {
+<span class="nc" id="L855">            _buffer.writeBytes(userOutput);</span>
+<span class="nc" id="L856">            _position = 0;</span>
+<span class="nc" id="L857">        }</span>
+
+        public int position()
+        {
+<span class="nc" id="L861">            return _position - _buffer._start;</span>
+        }
+
+        public void position(int newPosition)
+        {
+<span class="nc bnc" id="L866" title="All 2 branches missed.">            if (newPosition &lt; 0) {</span>
+<span class="nc" id="L867">                throw new IllegalArgumentException(&quot;position must be non-negative&quot;);</span>
+            }
+<span class="nc" id="L869">            int pos = newPosition + _buffer._start;</span>
+<span class="nc bnc" id="L870" title="All 2 branches missed.">            if (pos &gt; _buffer._eob) {</span>
+<span class="nc" id="L871">               throw new IllegalArgumentException(&quot;position is past end of buffer&quot;);</span>
+            }
+<span class="nc" id="L873">            _position = pos;</span>
+<span class="nc" id="L874">        }</span>
+
+        public void insert(int length)
+        {
+<span class="nc bnc" id="L878" title="All 2 branches missed.">            if (length &lt; 0) {</span>
+<span class="nc" id="L879">                throw new IllegalArgumentException(&quot;insert length must be non negative&quot;);</span>
+            }
+<span class="nc" id="L881">            int remaining = _buffer._eob - _position;</span>
+<span class="nc" id="L882">            System.arraycopy(_buffer._bytes, _position, _buffer._bytes, _position + length, remaining);</span>
+<span class="nc" id="L883">            _buffer._eob += length;</span>
+<span class="nc" id="L884">        }</span>
+
+        public void remove(int length)
+        {
+<span class="nc bnc" id="L888" title="All 2 branches missed.">            if (length &lt; 0) {</span>
+<span class="nc" id="L889">                throw new IllegalArgumentException(&quot;remove length must be non negative&quot;);</span>
+            }
+<span class="nc" id="L891">            int remaining = _buffer._eob - _position;</span>
+<span class="nc" id="L892">            System.arraycopy(_buffer._bytes, _position + length, _buffer._bytes, _position, remaining);</span>
+<span class="nc" id="L893">            _buffer._eob -= length;</span>
+<span class="nc" id="L894">        }</span>
+
+        @Override
+        final public void write(int arg0)
+            throws IOException
+        {
+<span class="nc" id="L900">            write((byte)arg0);</span>
+<span class="nc" id="L901">        }</span>
+
+        final public void write(byte b)
+        {
+<span class="nc" id="L905">            _buffer._bytes[_position++] = b;</span>
+<span class="nc bnc" id="L906" title="All 2 branches missed.">            if (_position &gt; _buffer._eob) _buffer._eob = _position;</span>
+<span class="nc" id="L907">        }</span>
+
+        @Override
+        public void write(byte[] bytes, int start, int len)
+        {
+<span class="nc bnc" id="L912" title="All 10 branches missed.">            if (bytes == null || start &lt; 0 || start &gt;= bytes.length || len &lt; 0 || start + len &gt; bytes.length) {</span>
+<span class="nc" id="L913">                throw new IllegalArgumentException();</span>
+            }
+
+<span class="nc" id="L916">            System.arraycopy(bytes, start, _buffer._bytes, _position, len);</span>
+<span class="nc" id="L917">            _position += len;</span>
+<span class="nc bnc" id="L918" title="All 2 branches missed.">            if (_position &gt; _buffer._eob) _buffer._eob = _position;</span>
+
+<span class="nc" id="L920">            return;</span>
+        }
+
+        public void writeTypeDesc(int typeDescByte)
+        {
+<span class="nc" id="L925">            write((byte)(typeDescByte &amp; 0xff));</span>
+<span class="nc" id="L926">        }</span>
+
+        public int writeTypeDescWithLength(int typeid, int lenOfLength, int valueLength)
+        {
+<span class="nc" id="L930">            int written_len = 1;</span>
+
+<span class="nc" id="L932">            int td = ((typeid &amp; 0xf) &lt;&lt; 4);</span>
+<span class="nc bnc" id="L933" title="All 2 branches missed.">            if (valueLength &gt;= _Private_IonConstants.lnIsVarLen) {</span>
+<span class="nc" id="L934">                td |= _Private_IonConstants.lnIsVarLen;</span>
+<span class="nc" id="L935">                writeTypeDesc(td);</span>
+<span class="nc" id="L936">                written_len += writeVarUInt(valueLength, lenOfLength, true);</span>
+            }
+            else {
+<span class="nc" id="L939">                td |= (valueLength &amp; 0xf);</span>
+<span class="nc" id="L940">                writeTypeDesc(td);</span>
+            }
+<span class="nc" id="L942">            return written_len;</span>
+        }
+
+        public int writeTypeDescWithLength(int typeid, int valueLength)
+        {
+<span class="nc" id="L947">            int written_len = 1;</span>
+
+<span class="nc" id="L949">            int td = ((typeid &amp; 0xf) &lt;&lt; 4);</span>
+<span class="nc bnc" id="L950" title="All 2 branches missed.">            if (valueLength &gt;= _Private_IonConstants.lnIsVarLen) {</span>
+<span class="nc" id="L951">                td |= _Private_IonConstants.lnIsVarLen;</span>
+<span class="nc" id="L952">                writeTypeDesc(td);</span>
+<span class="nc" id="L953">                int lenOfLength = IonBinary.lenVarUInt(valueLength);</span>
+<span class="nc" id="L954">                written_len += writeVarUInt(valueLength, lenOfLength, true);</span>
+<span class="nc" id="L955">            }</span>
+            else {
+<span class="nc" id="L957">                td |= (valueLength &amp; 0xf);</span>
+<span class="nc" id="L958">                writeTypeDesc(td);</span>
+            }
+<span class="nc" id="L960">            return written_len;</span>
+        }
+
+        public int writeVarInt(int value, int len, boolean force_zero_write)
+        {
+            // int len = 0;
+
+<span class="nc bnc" id="L967" title="All 2 branches missed.">            if (value != 0) {</span>
+<span class="nc" id="L968">                int mask = 0x7F;</span>
+<span class="nc" id="L969">                boolean is_negative = false;</span>
+
+<span class="nc bnc" id="L971" title="All 4 branches missed.">                assert len == IonBinary.lenVarInt(value);</span>
+<span class="nc bnc" id="L972" title="All 4 branches missed.">                if (is_negative = (value &lt; 0)) {</span>
+<span class="nc" id="L973">                    value = -value;</span>
+                }
+
+                // we write the first &quot;byte&quot; separately as it has the sign
+                // changed shift operator from &gt;&gt; to &gt;&gt;&gt;, we don't want to
+                // sign extend, this is only a problem with MIN_VALUE where
+                // negating the value (above) still results in a negative number
+<span class="nc" id="L980">                int b = (byte)((value &gt;&gt;&gt; (7*(len-1))) &amp; mask);</span>
+<span class="nc bnc" id="L981" title="All 2 branches missed.">                if (is_negative)  b |= 0x40; // the sign bit only on the first byte</span>
+<span class="nc bnc" id="L982" title="All 2 branches missed.">                if (len == 1)     b |= 0x80; // the terminator in case the first &quot;byte&quot; is the last</span>
+<span class="nc" id="L983">                write((byte)b);</span>
+
+                // write the rest
+<span class="nc bnc" id="L986" title="All 5 branches missed.">                switch (len) {  // we already wrote 1 byte</span>
+<span class="nc" id="L987">                case 5: write((byte)((value &gt;&gt; (7*3)) &amp; mask));</span>
+<span class="nc" id="L988">                case 4: write((byte)((value &gt;&gt; (7*2)) &amp; mask));</span>
+<span class="nc" id="L989">                case 3: write((byte)((value &gt;&gt; (7*1)) &amp; mask));</span>
+<span class="nc" id="L990">                case 2: write((byte)((value &amp; mask) | 0x80));</span>
+                case 1: // do nothing
+                }
+<span class="nc" id="L993">            }</span>
+<span class="nc bnc" id="L994" title="All 2 branches missed.">            else if (force_zero_write) {</span>
+<span class="nc" id="L995">                write((byte)0x80);</span>
+<span class="nc bnc" id="L996" title="All 4 branches missed.">                assert len == 1;</span>
+
+            }
+            else {
+<span class="nc bnc" id="L1000" title="All 4 branches missed.">                assert len == 0;</span>
+            }
+<span class="nc" id="L1002">            return len;</span>
+        }
+
+        public int writeVarInt(int value, boolean force_zero_write)
+        {
+<span class="nc" id="L1007">            int len = IonBinary.lenVarInt(value);</span>
+<span class="nc" id="L1008">            len = writeVarInt(value, len, force_zero_write);</span>
+<span class="nc" id="L1009">            return len;</span>
+        }
+
+        public int writeVarUInt(int value, int len, boolean force_zero_write)
+        {
+<span class="nc" id="L1014">            int mask = 0x7F;</span>
+<span class="nc bnc" id="L1015" title="All 2 branches missed.">            if (value &lt; 0) {</span>
+<span class="nc" id="L1016">                throw new IllegalArgumentException(&quot;signed int where unsigned (&gt;= 0) was expected&quot;);</span>
+            }
+<span class="nc bnc" id="L1018" title="All 4 branches missed.">            assert len == IonBinary.lenVarUInt(value);</span>
+
+<span class="nc bnc" id="L1020" title="All 7 branches missed.">            switch (len - 1) {</span>
+<span class="nc" id="L1021">            case 4: write((byte)((value &gt;&gt; (7*4)) &amp; mask));</span>
+<span class="nc" id="L1022">            case 3: write((byte)((value &gt;&gt; (7*3)) &amp; mask));</span>
+<span class="nc" id="L1023">            case 2: write((byte)((value &gt;&gt; (7*2)) &amp; mask));</span>
+<span class="nc" id="L1024">            case 1: write((byte)((value &gt;&gt; (7*1)) &amp; mask));</span>
+<span class="nc" id="L1025">            case 0: write((byte)((value &amp; mask) | 0x80L));</span>
+<span class="nc" id="L1026">                    break;</span>
+            case -1: // or 0
+<span class="nc bnc" id="L1028" title="All 2 branches missed.">                if (force_zero_write) {</span>
+<span class="nc" id="L1029">                    write((byte)0x80);</span>
+<span class="nc" id="L1030">                    len = 1;</span>
+                }
+                break;
+            }
+<span class="nc" id="L1034">            return len;</span>
+        }
+
+        public int writeVarUInt(int value, boolean force_zero_write)
+        {
+<span class="nc" id="L1039">            int len = IonBinary.lenVarUInt(value);</span>
+<span class="nc" id="L1040">            len = writeVarUInt(value, len, force_zero_write);</span>
+<span class="nc" id="L1041">            return len;</span>
+        }
+
+        public int writeIonInt(int value, int len)
+        {
+<span class="nc" id="L1046">            return writeIonInt((long)value, len);</span>
+        }
+
+        public int writeIonInt(long value, int len)
+        {
+            // we shouldn't be writing out 0's as an Ion int value
+<span class="nc bnc" id="L1052" title="All 2 branches missed.">            if (value == 0) {</span>
+<span class="nc bnc" id="L1053" title="All 4 branches missed.">                assert len == 0;</span>
+<span class="nc" id="L1054">                return len;  // aka 0</span>
+            }
+
+            // figure out how many we have bytes we have to write out
+<span class="nc" id="L1058">            long mask = 0xffL;</span>
+<span class="nc bnc" id="L1059" title="All 2 branches missed.">            boolean is_negative = (value &lt; 0);</span>
+
+<span class="nc bnc" id="L1061" title="All 4 branches missed.">            assert len == IonBinary.lenIonInt(value);</span>
+
+<span class="nc bnc" id="L1063" title="All 2 branches missed.">            if (is_negative) {</span>
+<span class="nc" id="L1064">                value = -value;</span>
+                // note for Long.MIN_VALUE the negation returns
+                // itself as a value, but that's also the correct
+                // &quot;positive&quot; value to write out anyway, so it
+                // all works out
+            }
+
+            // write the rest
+<span class="nc bnc" id="L1072" title="All 9 branches missed.">            switch (len) {  // we already wrote 1 byte</span>
+<span class="nc" id="L1073">            case 8: write((byte)((value &gt;&gt; (8*7)) &amp; mask));</span>
+<span class="nc" id="L1074">            case 7: write((byte)((value &gt;&gt; (8*6)) &amp; mask));</span>
+<span class="nc" id="L1075">            case 6: write((byte)((value &gt;&gt; (8*5)) &amp; mask));</span>
+<span class="nc" id="L1076">            case 5: write((byte)((value &gt;&gt; (8*4)) &amp; mask));</span>
+<span class="nc" id="L1077">            case 4: write((byte)((value &gt;&gt; (8*3)) &amp; mask));</span>
+<span class="nc" id="L1078">            case 3: write((byte)((value &gt;&gt; (8*2)) &amp; mask));</span>
+<span class="nc" id="L1079">            case 2: write((byte)((value &gt;&gt; (8*1)) &amp; mask));</span>
+<span class="nc" id="L1080">            case 1: write((byte)(value &amp; mask));</span>
+            }
+
+<span class="nc" id="L1083">            return len;</span>
+        }
+
+        public int writeVarInt(long value, int len, boolean forceZeroWrite)
+        {
+            //int len = 0;
+
+<span class="nc bnc" id="L1090" title="All 2 branches missed.">            if (value != 0) {</span>
+<span class="nc" id="L1091">                long mask = 0x7fL;</span>
+<span class="nc bnc" id="L1092" title="All 4 branches missed.">                assert len == IonBinary.lenInt(value);</span>
+                int b;
+<span class="nc bnc" id="L1094" title="All 2 branches missed.">                if (value &lt; 0) {</span>
+<span class="nc" id="L1095">                    value = -value;</span>
+                    // we write the first &quot;byte&quot; separately as it has the sign
+                    // and we have to deal with the oddball MIN_VALUE case
+<span class="nc bnc" id="L1098" title="All 2 branches missed.">                    if (value == Long.MIN_VALUE) {</span>
+                        // we use the shift without sign extension as this
+                        // represents a positive value (even though it's neg)
+<span class="nc" id="L1101">                        b = (byte)((value &gt;&gt;&gt; (7*len)) &amp; mask);</span>
+                        // len must be greater than 1 so we don't need to set the high bit
+                    }
+                    else {
+                        // here, and hereafter, we don't care about sign extension
+<span class="nc" id="L1106">                        b = (byte)((value &gt;&gt;&gt; (7*len)) &amp; mask);</span>
+<span class="nc bnc" id="L1107" title="All 2 branches missed.">                        if (len == 1) b |= 0x80; // the terminator in case the first &quot;byte&quot; is the last</span>
+                    }
+                    // we don't worry about stepping on a data bit here as
+                    // we have extra bits at the max size and below that we've
+                    // already taken the sign bit into account
+<span class="nc" id="L1112">                    b |= 0x40; // the sign bit</span>
+<span class="nc" id="L1113">                    write((byte)b);</span>
+                }
+                else {
+                    // we write the first &quot;byte&quot; separately as it has the sign
+<span class="nc" id="L1117">                    b = (byte)((value &gt;&gt;&gt; (7*len)) &amp; mask);</span>
+<span class="nc bnc" id="L1118" title="All 2 branches missed.">                    if (len == 1) b |= 0x80; // the terminator in case the first &quot;byte&quot; is the last</span>
+<span class="nc" id="L1119">                    write((byte)b);</span>
+                }
+
+                // write the rest
+<span class="nc bnc" id="L1123" title="All 11 branches missed.">                switch (len - 1) {  // we already wrote 1 byte</span>
+<span class="nc" id="L1124">                case 9: write((byte)((value &gt;&gt;&gt; (7*9)) &amp; mask));</span>
+<span class="nc" id="L1125">                case 8: write((byte)((value &gt;&gt; (7*8)) &amp; mask));</span>
+<span class="nc" id="L1126">                case 7: write((byte)((value &gt;&gt; (7*7)) &amp; mask));</span>
+<span class="nc" id="L1127">                case 6: write((byte)((value &gt;&gt; (7*6)) &amp; mask));</span>
+<span class="nc" id="L1128">                case 5: write((byte)((value &gt;&gt; (7*5)) &amp; mask));</span>
+<span class="nc" id="L1129">                case 4: write((byte)((value &gt;&gt; (7*4)) &amp; mask));</span>
+<span class="nc" id="L1130">                case 3: write((byte)((value &gt;&gt; (7*3)) &amp; mask));</span>
+<span class="nc" id="L1131">                case 2: write((byte)((value &gt;&gt; (7*2)) &amp; mask));</span>
+<span class="nc" id="L1132">                case 1: write((byte)((value &gt;&gt; (7*1)) &amp; mask));</span>
+<span class="nc" id="L1133">                case 0: write((byte)((value &amp; mask) | 0x80L));</span>
+                }
+<span class="nc" id="L1135">            }</span>
+<span class="nc bnc" id="L1136" title="All 2 branches missed.">            else if (forceZeroWrite) {</span>
+<span class="nc" id="L1137">                write((byte)0x80);</span>
+<span class="nc bnc" id="L1138" title="All 4 branches missed.">                assert len == 1;</span>
+            }
+            else {
+<span class="nc bnc" id="L1141" title="All 4 branches missed.">                assert len == 0;</span>
+            }
+<span class="nc" id="L1143">            return len;</span>
+        }
+
+        public int writeVarUInt(long value, int len, boolean force_zero_write)
+        {
+<span class="nc" id="L1148">            int mask = 0x7F;</span>
+<span class="nc bnc" id="L1149" title="All 4 branches missed.">            assert len == IonBinary.lenVarUInt(value);</span>
+<span class="nc bnc" id="L1150" title="All 4 branches missed.">            assert value &gt; 0;</span>
+
+<span class="nc bnc" id="L1152" title="All 12 branches missed.">            switch (len - 1) {</span>
+<span class="nc" id="L1153">            case 9: write((byte)((value &gt;&gt; (7*9)) &amp; mask));</span>
+<span class="nc" id="L1154">            case 8: write((byte)((value &gt;&gt; (7*8)) &amp; mask));</span>
+<span class="nc" id="L1155">            case 7: write((byte)((value &gt;&gt; (7*7)) &amp; mask));</span>
+<span class="nc" id="L1156">            case 6: write((byte)((value &gt;&gt; (7*6)) &amp; mask));</span>
+<span class="nc" id="L1157">            case 5: write((byte)((value &gt;&gt; (7*5)) &amp; mask));</span>
+<span class="nc" id="L1158">            case 4: write((byte)((value &gt;&gt; (7*4)) &amp; mask));</span>
+<span class="nc" id="L1159">            case 3: write((byte)((value &gt;&gt; (7*3)) &amp; mask));</span>
+<span class="nc" id="L1160">            case 2: write((byte)((value &gt;&gt; (7*2)) &amp; mask));</span>
+<span class="nc" id="L1161">            case 1: write((byte)((value &gt;&gt; (7*1)) &amp; mask));</span>
+<span class="nc" id="L1162">            case 0: write((byte)((value &amp; mask) | 0x80L));</span>
+<span class="nc" id="L1163">                    break;</span>
+            case -1: // or len == 0
+<span class="nc bnc" id="L1165" title="All 2 branches missed.">                if (force_zero_write) {</span>
+<span class="nc" id="L1166">                    write((byte)0x80);</span>
+<span class="nc bnc" id="L1167" title="All 4 branches missed.">                    assert len == 1;</span>
+                }
+                else {
+<span class="nc bnc" id="L1170" title="All 4 branches missed.">                    assert len == 0;</span>
+                }
+                break;
+            }
+<span class="nc" id="L1174">            return len;</span>
+        }
+
+        public int writeULong(long value, int lenToWrite) throws IOException
+        {
+<span class="nc bnc" id="L1179" title="All 9 branches missed.">            switch (lenToWrite) {</span>
+<span class="nc" id="L1180">            case 8: write((byte)((value &gt;&gt; 56) &amp; 0xffL));</span>
+<span class="nc" id="L1181">            case 7: write((byte)((value &gt;&gt; 48) &amp; 0xffL));</span>
+<span class="nc" id="L1182">            case 6: write((byte)((value &gt;&gt; 40) &amp; 0xffL));</span>
+<span class="nc" id="L1183">            case 5: write((byte)((value &gt;&gt; 32) &amp; 0xffL));</span>
+<span class="nc" id="L1184">            case 4: write((byte)((value &gt;&gt; 24) &amp; 0xffL));</span>
+<span class="nc" id="L1185">            case 3: write((byte)((value &gt;&gt; 16) &amp; 0xffL));</span>
+<span class="nc" id="L1186">            case 2: write((byte)((value &gt;&gt;  8) &amp; 0xffL));</span>
+<span class="nc" id="L1187">            case 1: write((byte)((value &gt;&gt;  0) &amp; 0xffL));</span>
+            }
+<span class="nc" id="L1189">            return lenToWrite;</span>
+        }
+
+        public int writeFloat(double value) throws IOException
+        {
+<span class="nc bnc" id="L1194" title="All 2 branches missed.">            if (Double.valueOf(value).equals(DOUBLE_POS_ZERO))</span>
+            {
+                // pos zero special case
+<span class="nc" id="L1197">                return 0;</span>
+            }
+
+            // TODO write &quot;custom&quot; serialization or verify that
+            //      the java routine is doing the right thing
+<span class="nc" id="L1202">            long dBits = Double.doubleToRawLongBits(value);</span>
+<span class="nc" id="L1203">            return this.writeULong(dBits, _ib_FLOAT64_LEN);</span>
+        }
+
+        public int writeDecimal(BigDecimal value) throws IOException
+        {
+<span class="nc" id="L1208">            int returnlen = writeDecimal(value, null);</span>
+<span class="nc" id="L1209">            return returnlen;</span>
+        }
+
+        // this is a private version that supports both the buffer write
+        // and the output to the user stream.  This is slower (since there
+        // are extra tests, an extra call, and an extra paramenter), but
+        // it avoids duplicating this code.  And decimals are generally
+        // expensive anyway.
+        private int writeDecimal(BigDecimal value, UserByteWriter userWriter) throws IOException
+        {
+<span class="nc" id="L1219">            int returnlen = 0;</span>
+            // we only write out the '0' value as the nibble 0
+<span class="nc bnc" id="L1221" title="All 4 branches missed.">            if (value != null &amp;&amp; !BigDecimal.ZERO.equals(value)) {</span>
+                // otherwise we do it the hard way ....
+<span class="nc" id="L1223">                BigInteger mantissa = value.unscaledValue();</span>
+
+<span class="nc bnc" id="L1225" title="All 2 branches missed.">                boolean isNegative = (mantissa.compareTo(BigInteger.ZERO) &lt; 0);</span>
+<span class="nc bnc" id="L1226" title="All 2 branches missed.">                if (isNegative) {</span>
+<span class="nc" id="L1227">                    mantissa = mantissa.negate();</span>
+                }
+
+<span class="nc" id="L1230">                byte[] bits  = mantissa.toByteArray();</span>
+<span class="nc" id="L1231">                int    scale = value.scale();</span>
+
+                // Ion stores exponent, BigDecimal uses the negation &quot;scale&quot;
+<span class="nc" id="L1234">                int exponent = -scale;</span>
+<span class="nc bnc" id="L1235" title="All 2 branches missed.">                if (userWriter != null) {</span>
+<span class="nc" id="L1236">                    returnlen += userWriter.writeIonInt(exponent, IonBinary.lenVarUInt(exponent));</span>
+                }
+                else {
+<span class="nc" id="L1239">                    returnlen += this.writeIonInt(exponent, IonBinary.lenVarUInt(exponent));</span>
+                }
+
+                // If the first bit is set, we can't use it for the sign,
+                // and we need to write an extra byte to hold it.
+<span class="nc bnc" id="L1244" title="All 2 branches missed.">                boolean needExtraByteForSign = ((bits[0] &amp; 0x80) != 0);</span>
+<span class="nc bnc" id="L1245" title="All 2 branches missed.">                if (needExtraByteForSign)</span>
+                {
+<span class="nc bnc" id="L1247" title="All 2 branches missed.">                    if (userWriter != null) {</span>
+<span class="nc bnc" id="L1248" title="All 2 branches missed.">                        userWriter.write((byte)(isNegative ? 0x80 : 0x00));</span>
+                    }
+                    else {
+<span class="nc bnc" id="L1251" title="All 2 branches missed.">                        this.write((byte)(isNegative ? 0x80 : 0x00));</span>
+                    }
+<span class="nc" id="L1253">                    returnlen++;</span>
+                }
+<span class="nc bnc" id="L1255" title="All 2 branches missed.">                else if (isNegative)</span>
+                {
+<span class="nc" id="L1257">                    bits[0] |= 0x80;</span>
+                }
+                // if we have a userWriter to write to, we really don't care about
+                // the value in our local buffer.
+<span class="nc bnc" id="L1261" title="All 2 branches missed.">                if (userWriter != null) {</span>
+<span class="nc" id="L1262">                    userWriter.write(bits, 0, bits.length);</span>
+                }
+                else {
+<span class="nc" id="L1265">                    this.write(bits, 0, bits.length);</span>
+                }
+<span class="nc" id="L1267">                returnlen += bits.length;</span>
+            }
+<span class="nc" id="L1269">            return returnlen;</span>
+        }
+
+        public int writeTimestamp(Timestamp di)
+        throws IOException
+        {
+<span class="nc bnc" id="L1275" title="All 2 branches missed.">            if (di == null) return 0;</span>
+
+<span class="nc" id="L1277">            int returnlen = 0;</span>
+<span class="nc" id="L1278">            Precision precision = di.getPrecision();</span>
+
+<span class="nc" id="L1280">            Integer offset = di.getLocalOffset();</span>
+<span class="nc bnc" id="L1281" title="All 2 branches missed.">            if (offset == null) {</span>
+                // TODO don't use magic numbers!
+<span class="nc" id="L1283">                this.write((byte)(0xff &amp; (0x80 | 0x40))); // negative 0 (no timezone)</span>
+<span class="nc" id="L1284">                returnlen ++;</span>
+            }
+            else {
+<span class="nc" id="L1287">                int value = offset.intValue();</span>
+<span class="nc" id="L1288">                returnlen += this.writeVarInt(value, true);</span>
+            }
+
+            // now the date - year, month, day as varUint7's
+            // if we have a non-null value we have at least the date
+<span class="nc bnc" id="L1293" title="All 2 branches missed.">            if (precision.includes(Precision.YEAR)) {</span>
+<span class="nc" id="L1294">                returnlen += this.writeVarUInt(di.getZYear(), true);</span>
+            }
+<span class="nc bnc" id="L1296" title="All 2 branches missed.">            if (precision.includes(Precision.MONTH)) {</span>
+<span class="nc" id="L1297">                returnlen += this.writeVarUInt(di.getZMonth(), true);</span>
+            }
+<span class="nc bnc" id="L1299" title="All 2 branches missed.">            if (precision.includes(Precision.DAY)) {</span>
+<span class="nc" id="L1300">                returnlen += this.writeVarUInt(di.getZDay(), true);</span>
+            }
+
+            // now the time part
+<span class="nc bnc" id="L1304" title="All 2 branches missed.">            if (precision.includes(Precision.MINUTE)) {</span>
+<span class="nc" id="L1305">                returnlen += this.writeVarUInt(di.getZHour(), true);</span>
+<span class="nc" id="L1306">                returnlen += this.writeVarUInt(di.getZMinute(), true);</span>
+            }
+<span class="nc bnc" id="L1308" title="All 2 branches missed.">            if (precision.includes(Precision.SECOND)) {</span>
+<span class="nc" id="L1309">                returnlen += this.writeVarUInt(di.getZSecond(), true);</span>
+<span class="nc" id="L1310">                BigDecimal fraction = di.getZFractionalSecond();</span>
+<span class="nc bnc" id="L1311" title="All 2 branches missed.">                if (fraction != null) {</span>
+                    // and, finally, any fractional component that is known
+<span class="nc" id="L1313">                    returnlen += this.writeDecimal(di.getZFractionalSecond());</span>
+                }
+            }
+<span class="nc" id="L1316">            return returnlen;</span>
+        }
+
+        final public int writeString(String value) throws IOException
+        {
+<span class="nc" id="L1321">            int returnlen = writeString(value, null);</span>
+<span class="nc" id="L1322">            return returnlen;</span>
+        }
+
+        final private int writeString(String value, UserByteWriter userWriter) throws IOException
+        {
+<span class="nc" id="L1327">            int len = 0;</span>
+
+<span class="nc bnc" id="L1329" title="All 2 branches missed.">            for (int ii=0; ii&lt;value.length(); ii++) {</span>
+<span class="nc" id="L1330">                int c = value.charAt(ii);</span>
+<span class="nc bnc" id="L1331" title="All 2 branches missed.">                if (c &gt; 127) {</span>
+<span class="nc bnc" id="L1332" title="All 4 branches missed.">                    if (c &gt;= 0xD800 &amp;&amp; c &lt;= 0xDFFF) {</span>
+<span class="nc bnc" id="L1333" title="All 2 branches missed.">                        if (_Private_IonConstants.isHighSurrogate(c)) {</span>
+<span class="nc" id="L1334">                            ii++;</span>
+                            // houston we have a high surrogate (let's hope it has a partner
+<span class="nc bnc" id="L1336" title="All 2 branches missed.">                            if (ii &gt;= value.length()) {</span>
+<span class="nc" id="L1337">                                throw new IonException(&quot;invalid string, unpaired high surrogate character&quot;);</span>
+                            }
+<span class="nc" id="L1339">                            int c2 = value.charAt(ii);</span>
+<span class="nc bnc" id="L1340" title="All 2 branches missed.">                            if (!_Private_IonConstants.isLowSurrogate(c2)) {</span>
+<span class="nc" id="L1341">                                throw new IonException(&quot;invalid string, unpaired high surrogate character&quot;);</span>
+                            }
+<span class="nc" id="L1343">                            c = _Private_IonConstants.makeUnicodeScalar(c, c2);</span>
+<span class="nc" id="L1344">                        }</span>
+<span class="nc bnc" id="L1345" title="All 2 branches missed.">                        else if (_Private_IonConstants.isLowSurrogate(c)) {</span>
+                            // it's a loner low surrogate - that's an error
+<span class="nc" id="L1347">                            throw new IonException(&quot;invalid string, unpaired low surrogate character&quot;);</span>
+                        }
+                        // from 0xE000 up the _writeUnicodeScalar will check for us
+                    }
+<span class="nc" id="L1351">                    c = IonBinary.makeUTF8IntFromScalar(c);</span>
+                }
+
+                // write it here - try to test userWriter as little as possible
+<span class="nc bnc" id="L1355" title="All 2 branches missed.">                if (userWriter == null) {</span>
+                    for (;;) {
+<span class="nc" id="L1357">                        write((byte)(c &amp; 0xff));</span>
+<span class="nc" id="L1358">                        len++;</span>
+<span class="nc bnc" id="L1359" title="All 2 branches missed.">                        if ((c &amp; 0xffffff00) == 0) {</span>
+<span class="nc" id="L1360">                            break;</span>
+                        }
+<span class="nc" id="L1362">                        c = c &gt;&gt;&gt; 8;</span>
+                    }
+                }
+                else {
+                    for (;;) {
+<span class="nc" id="L1367">                        userWriter.write((byte)(c &amp; 0xff));</span>
+<span class="nc" id="L1368">                        len++;</span>
+<span class="nc bnc" id="L1369" title="All 2 branches missed.">                        if ((c &amp; 0xffffff00) == 0) {</span>
+<span class="nc" id="L1370">                            break;</span>
+                        }
+<span class="nc" id="L1372">                        c = c &gt;&gt;&gt; 8;</span>
+                    }
+                }
+            }
+<span class="nc" id="L1376">            return len;</span>
+        }
+        void throwUTF8Exception() throws IOException
+        {
+<span class="nc" id="L1380">            throwException(&quot;Invalid UTF-8 character encounter in a string at pos &quot; + this.position());</span>
+<span class="nc" id="L1381">        }</span>
+        void throwException(String msg) throws IOException {
+<span class="nc" id="L1383">            throw new IOException(msg);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

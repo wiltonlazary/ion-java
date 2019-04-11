@@ -1,0 +1,1448 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonReaderTextRawX.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl</a> &gt; <span class="el_source">IonReaderTextRawX.java</span></div><h1>IonReaderTextRawX.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl;
+
+import static com.amazon.ion.SymbolTable.UNKNOWN_SYMBOL_ID;
+import static com.amazon.ion.impl.IonTokenConstsX.TOKEN_CLOSE_BRACE;
+import static com.amazon.ion.impl.IonTokenConstsX.TOKEN_CLOSE_PAREN;
+import static com.amazon.ion.impl.IonTokenConstsX.TOKEN_CLOSE_SQUARE;
+
+import com.amazon.ion.IonException;
+import com.amazon.ion.IonTextReader;
+import com.amazon.ion.IonType;
+import com.amazon.ion.SymbolTable;
+import com.amazon.ion.SymbolToken;
+import com.amazon.ion.UnknownSymbolException;
+import com.amazon.ion.impl.UnifiedSavePointManagerX.SavePoint;
+import com.amazon.ion.impl._Private_ScalarConversions.AS_TYPE;
+import com.amazon.ion.impl._Private_ScalarConversions.ValueVariant;
+import java.io.IOException;
+import java.math.BigInteger;
+import java.util.Iterator;
+
+/**
+ * Reader implementation that reads the token stream and validates
+ * the Ion grammar.  This does not care about system values.  It
+ * does not materialize values or convert them.  It does mark values
+ * in the UnifiedInputStream if they might be field names or annotations
+ * since it does populate these properties directly. Otherwise it
+ * accepts the TextRawToken's assessment of the type of the next
+ * token, which is based on as few characters as possible, typically
+ * 1 but generally less than 5.
+ *
+ * This is called by the {@link IonReaderTextSystemX}, which in turn is most
+ * often called by the {@link IonReaderTextUserX}.  One of these two (system
+ * reader or user reader) should be invoked by the user for reading text Ion
+ * data.  This class is not intended for general use.
+ *
+ * This reader scan skip values and in doing so it does not
+ * materialize the contents and it does not validate the contents.
+ * TODO amzn/ion-java/issues/7 We may want to make validation on skip optional.
+ *
+ * This manages the value buffer (_v ValueVariant) and the lob
+ * content (_lob_*) which is cached in some cases.  It's main
+ * job however is recognizing the correct order of the input
+ * tokens.  This is done in parse_to_next_value (called by hasNext).
+ *
+ * The current state is represented by an int (whose value should
+ * be one of the values of the STATE_* constants).  The legal
+ * transitions are stored in TransitionActions and TransitionActions2.
+ * The first (TransitionActions) is a two dimensional array whose
+ * dimensions are state and input token. The value stored is an
+ * int that represents the action to be taken (ACTION_*).  The
+ * second copy of this data (TransitionActions2) is a one dimensional
+ * array built from the first and manually dereferenced in the
+ * parse_to_next_value method.  This turns out to be a significant
+ * performance gain (&lt;sigh&gt;).  Logically these are the same.
+ *
+ */
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">abstract class IonReaderTextRawX</span>
+    implements IonTextReader
+{
+    public abstract BigInteger bigIntegerValue();
+
+//              static final boolean _object_parser           = false;
+              static final boolean _debug                   = false;
+    private   static final int     DEFAULT_STACK_DEPTH      = 10;
+    protected static final int     UNKNOWN_SIZE             = -1;
+    private   static final int     DEFAULT_ANNOTATION_COUNT =  5;
+
+    static final int STATE_BEFORE_ANNOTATION_DATAGRAM     =  0;
+    static final int STATE_BEFORE_ANNOTATION_CONTAINED    =  1;
+    static final int STATE_BEFORE_ANNOTATION_SEXP         =  2;
+    static final int STATE_BEFORE_FIELD_NAME              =  3;
+    static final int STATE_BEFORE_VALUE_CONTENT           =  4;
+    static final int STATE_BEFORE_VALUE_CONTENT_SEXP      =  5;
+    static final int STATE_IN_LONG_STRING                 =  6;
+    static final int STATE_IN_CLOB_DOUBLE_QUOTED_CONTENT  =  7;
+    static final int STATE_IN_CLOB_TRIPLE_QUOTED_CONTENT  =  8;
+    static final int STATE_IN_BLOB_CONTENT                =  9;
+    static final int STATE_AFTER_VALUE_CONTENTS           = 10;
+    static final int STATE_EOF                            = 11;
+    static final int STATE_MAX                            = 11;
+    private final String get_state_name(int state) {
+<span class="pc bpc" id="L97" title="7 of 13 branches missed.">        switch(state) {</span>
+<span class="fc" id="L98">        case STATE_BEFORE_ANNOTATION_DATAGRAM:    return &quot;STATE_BEFORE_ANNOTATION_DATAGRAM&quot;;</span>
+<span class="fc" id="L99">        case STATE_BEFORE_ANNOTATION_CONTAINED:   return &quot;STATE_BEFORE_ANNOTATION_CONTAINED&quot;;</span>
+<span class="fc" id="L100">        case STATE_BEFORE_ANNOTATION_SEXP:        return &quot;STATE_BEFORE_ANNOTATION_SEXP&quot;;</span>
+<span class="fc" id="L101">        case STATE_BEFORE_FIELD_NAME:             return &quot;STATE_BEFORE_FIELD_NAME&quot;;</span>
+<span class="fc" id="L102">        case STATE_BEFORE_VALUE_CONTENT:          return &quot;STATE_BEFORE_VALUE_CONTENT&quot;;</span>
+<span class="nc" id="L103">        case STATE_BEFORE_VALUE_CONTENT_SEXP:     return &quot;STATE_BEFORE_VALUE_CONTENT_SEXP&quot;;</span>
+<span class="nc" id="L104">        case STATE_IN_LONG_STRING:                return &quot;STATE_IN_LONG_STRING&quot;;</span>
+<span class="nc" id="L105">        case STATE_IN_CLOB_DOUBLE_QUOTED_CONTENT: return &quot;STATE_IN_CLOB_DOUBLE_QUOTED_CONTENT&quot;;</span>
+<span class="nc" id="L106">        case STATE_IN_CLOB_TRIPLE_QUOTED_CONTENT: return &quot;STATE_IN_CLOB_TRIPLE_QUOTED_CONTENT&quot;;</span>
+<span class="nc" id="L107">        case STATE_IN_BLOB_CONTENT:               return &quot;STATE_IN_BLOB_CONTENT&quot;;</span>
+<span class="fc" id="L108">        case STATE_AFTER_VALUE_CONTENTS:          return &quot;STATE_AFTER_VALUE_CONTENTS&quot;;</span>
+<span class="nc" id="L109">        case STATE_EOF:                           return &quot;STATE_EOF&quot;;</span>
+<span class="nc" id="L110">        default:                                  return &quot;&lt;invalid state: &quot;+Integer.toString(state)+&quot;&gt;&quot;;</span>
+        }
+    }
+
+    static final int ACTION_NOT_DEFINED          =  0;
+    static final int ACTION_LOAD_FIELD_NAME      =  1;
+    static final int ACTION_LOAD_ANNOTATION      =  2;
+    static final int ACTION_START_STRUCT         =  3;
+    static final int ACTION_START_LIST           =  4;
+    static final int ACTION_START_SEXP           =  5;
+    static final int ACTION_START_LOB            =  6;
+    static final int ACTION_LOAD_SCALAR          =  8;
+    static final int ACTION_PLUS_INF             =  9;
+    static final int ACTION_MINUS_INF            = 10;
+    static final int ACTION_EAT_COMMA            = 11; // if this is unnecessary (because load_scalar handle it) we don't need &quot;after_value&quot;
+    static final int ACTION_FINISH_CONTAINER     = 12;
+    static final int ACTION_FINISH_LOB           = 13;
+    static final int ACTION_FINISH_DATAGRAM      = 14;
+    static final int ACTION_EOF                  = 15;
+    static final int ACTION_count                = 16;
+    @SuppressWarnings(&quot;unused&quot;)
+    private final String get_action_name(int action) {
+<span class="nc bnc" id="L132" title="All 16 branches missed.">        switch(action) {</span>
+<span class="nc" id="L133">        case ACTION_NOT_DEFINED:        return &quot;ACTION_DO_NOTHING&quot;;</span>
+<span class="nc" id="L134">        case ACTION_LOAD_FIELD_NAME:    return &quot;ACTION_LOAD_FIELD_NAME&quot;;</span>
+<span class="nc" id="L135">        case ACTION_LOAD_ANNOTATION:    return &quot;ACTION_LOAD_ANNOTATION&quot;;</span>
+<span class="nc" id="L136">        case ACTION_START_STRUCT:       return &quot;ACTION_START_STRUCT&quot;;</span>
+<span class="nc" id="L137">        case ACTION_START_LIST:         return &quot;ACTION_START_LIST&quot;;</span>
+<span class="nc" id="L138">        case ACTION_START_SEXP:         return &quot;ACTION_START_SEXP&quot;;</span>
+<span class="nc" id="L139">        case ACTION_START_LOB:          return &quot;ACTION_START_LOB&quot;;</span>
+<span class="nc" id="L140">        case ACTION_LOAD_SCALAR:        return &quot;ACTION_LOAD_SCALAR&quot;;</span>
+<span class="nc" id="L141">        case ACTION_PLUS_INF:           return &quot;ACTION_PLUS_INF&quot;;</span>
+<span class="nc" id="L142">        case ACTION_MINUS_INF:          return &quot;ACTION_MINUS_INF&quot;;</span>
+<span class="nc" id="L143">        case ACTION_EAT_COMMA:          return &quot;ACTION_EAT_COMMA&quot;;</span>
+<span class="nc" id="L144">        case ACTION_FINISH_CONTAINER:   return &quot;ACTION_FINISH_CONTAINER&quot;;</span>
+<span class="nc" id="L145">        case ACTION_FINISH_LOB:         return &quot;ACTION_FINISH_LOB&quot;;</span>
+<span class="nc" id="L146">        case ACTION_FINISH_DATAGRAM:    return &quot;ACTION_FINISH_DATAGRAM&quot;;</span>
+<span class="nc" id="L147">        case ACTION_EOF:                return &quot;ACTION_EOF&quot;;</span>
+<span class="nc" id="L148">        default:                        return &quot;&lt;unrecognized action: &quot;+Integer.toString(action)+&quot;&gt;&quot;;</span>
+        }
+    }
+
+<span class="fc" id="L152">    static final int[][] TransitionActions = makeTransitionActionArray();</span>
+    static final int[][] makeTransitionActionArray()
+    {
+<span class="fc" id="L155">        int[][] actions = new int[STATE_MAX + 1][IonTokenConstsX.TOKEN_MAX + 1];</span>
+
+<span class="fc" id="L157">        actions[STATE_BEFORE_ANNOTATION_DATAGRAM][IonTokenConstsX.TOKEN_EOF]                = ACTION_FINISH_DATAGRAM;</span>
+<span class="fc" id="L158">        actions[STATE_BEFORE_ANNOTATION_DATAGRAM][IonTokenConstsX.TOKEN_UNKNOWN_NUMERIC]    = ACTION_LOAD_SCALAR;</span>
+<span class="fc" id="L159">        actions[STATE_BEFORE_ANNOTATION_DATAGRAM][IonTokenConstsX.TOKEN_INT]                = ACTION_LOAD_SCALAR;</span>
+<span class="fc" id="L160">        actions[STATE_BEFORE_ANNOTATION_DATAGRAM][IonTokenConstsX.TOKEN_BINARY]             = ACTION_LOAD_SCALAR;</span>
+<span class="fc" id="L161">        actions[STATE_BEFORE_ANNOTATION_DATAGRAM][IonTokenConstsX.TOKEN_HEX]                = ACTION_LOAD_SCALAR;</span>
+<span class="fc" id="L162">        actions[STATE_BEFORE_ANNOTATION_DATAGRAM][IonTokenConstsX.TOKEN_DECIMAL]            = ACTION_LOAD_SCALAR;</span>
+<span class="fc" id="L163">        actions[STATE_BEFORE_ANNOTATION_DATAGRAM][IonTokenConstsX.TOKEN_FLOAT]              = ACTION_LOAD_SCALAR;</span>
+<span class="fc" id="L164">        actions[STATE_BEFORE_ANNOTATION_DATAGRAM][IonTokenConstsX.TOKEN_FLOAT_INF]          = ACTION_PLUS_INF;</span>
+<span class="fc" id="L165">        actions[STATE_BEFORE_ANNOTATION_DATAGRAM][IonTokenConstsX.TOKEN_FLOAT_MINUS_INF]    = ACTION_MINUS_INF;</span>
+<span class="fc" id="L166">        actions[STATE_BEFORE_ANNOTATION_DATAGRAM][IonTokenConstsX.TOKEN_TIMESTAMP]          = ACTION_LOAD_SCALAR;</span>
+<span class="fc" id="L167">        actions[STATE_BEFORE_ANNOTATION_DATAGRAM][IonTokenConstsX.TOKEN_STRING_DOUBLE_QUOTE]= ACTION_LOAD_SCALAR;</span>
+<span class="fc" id="L168">        actions[STATE_BEFORE_ANNOTATION_DATAGRAM][IonTokenConstsX.TOKEN_STRING_TRIPLE_QUOTE]= ACTION_LOAD_SCALAR;</span>
+<span class="fc" id="L169">        actions[STATE_BEFORE_ANNOTATION_DATAGRAM][IonTokenConstsX.TOKEN_SYMBOL_IDENTIFIER]  = ACTION_LOAD_ANNOTATION;</span>
+<span class="fc" id="L170">        actions[STATE_BEFORE_ANNOTATION_DATAGRAM][IonTokenConstsX.TOKEN_SYMBOL_QUOTED]      = ACTION_LOAD_ANNOTATION;</span>
+<span class="fc" id="L171">        actions[STATE_BEFORE_ANNOTATION_DATAGRAM][IonTokenConstsX.TOKEN_OPEN_PAREN]         = ACTION_START_SEXP;</span>
+<span class="fc" id="L172">        actions[STATE_BEFORE_ANNOTATION_DATAGRAM][IonTokenConstsX.TOKEN_OPEN_BRACE]         = ACTION_START_STRUCT;</span>
+<span class="fc" id="L173">        actions[STATE_BEFORE_ANNOTATION_DATAGRAM][IonTokenConstsX.TOKEN_OPEN_SQUARE]        = ACTION_START_LIST;</span>
+<span class="fc" id="L174">        actions[STATE_BEFORE_ANNOTATION_DATAGRAM][IonTokenConstsX.TOKEN_OPEN_DOUBLE_BRACE]  = ACTION_START_LOB;</span>
+
+        // both before_annotation and after_annotation are essentially the same as
+        // BOF (after_annotation can't accept EOF as valid however)
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        for (int ii=0; ii&lt;IonTokenConstsX.TOKEN_MAX+1; ii++) {</span>
+<span class="fc" id="L179">            actions[STATE_BEFORE_ANNOTATION_CONTAINED][ii] = actions[STATE_BEFORE_ANNOTATION_DATAGRAM][ii];</span>
+<span class="fc" id="L180">            actions[STATE_BEFORE_ANNOTATION_SEXP][ii]      = actions[STATE_BEFORE_ANNOTATION_DATAGRAM][ii];</span>
+<span class="fc" id="L181">            actions[STATE_BEFORE_VALUE_CONTENT][ii]        = actions[STATE_BEFORE_ANNOTATION_DATAGRAM][ii];</span>
+<span class="fc" id="L182">            actions[STATE_BEFORE_VALUE_CONTENT_SEXP][ii]   = actions[STATE_BEFORE_ANNOTATION_DATAGRAM][ii];</span>
+        }
+        // now patch up the differences between these 4 states handling of tokens vs before_annotation_datagram
+<span class="fc" id="L185">        actions[STATE_BEFORE_ANNOTATION_CONTAINED][IonTokenConstsX.TOKEN_EOF]            = 0;</span>
+<span class="fc" id="L186">        actions[STATE_BEFORE_ANNOTATION_CONTAINED][IonTokenConstsX.TOKEN_CLOSE_PAREN]    = ACTION_FINISH_CONTAINER;</span>
+<span class="fc" id="L187">        actions[STATE_BEFORE_ANNOTATION_CONTAINED][IonTokenConstsX.TOKEN_CLOSE_BRACE]    = 0;</span>
+<span class="fc" id="L188">        actions[STATE_BEFORE_ANNOTATION_CONTAINED][IonTokenConstsX.TOKEN_CLOSE_SQUARE]   = ACTION_FINISH_CONTAINER;</span>
+
+<span class="fc" id="L190">        actions[STATE_BEFORE_ANNOTATION_SEXP][IonTokenConstsX.TOKEN_EOF]                 = 0;</span>
+<span class="fc" id="L191">        actions[STATE_BEFORE_ANNOTATION_SEXP][IonTokenConstsX.TOKEN_SYMBOL_OPERATOR]     = ACTION_LOAD_SCALAR;</span>
+<span class="fc" id="L192">        actions[STATE_BEFORE_ANNOTATION_SEXP][IonTokenConstsX.TOKEN_DOT]                 = ACTION_LOAD_SCALAR;</span>
+<span class="fc" id="L193">        actions[STATE_BEFORE_ANNOTATION_SEXP][IonTokenConstsX.TOKEN_CLOSE_PAREN]         = ACTION_FINISH_CONTAINER;</span>
+<span class="fc" id="L194">        actions[STATE_BEFORE_ANNOTATION_SEXP][IonTokenConstsX.TOKEN_CLOSE_BRACE]         = ACTION_FINISH_CONTAINER;</span>
+<span class="fc" id="L195">        actions[STATE_BEFORE_ANNOTATION_SEXP][IonTokenConstsX.TOKEN_CLOSE_SQUARE]        = ACTION_FINISH_CONTAINER;</span>
+
+<span class="fc" id="L197">        actions[STATE_BEFORE_VALUE_CONTENT][IonTokenConstsX.TOKEN_EOF]                   = 0;</span>
+<span class="fc" id="L198">        actions[STATE_BEFORE_VALUE_CONTENT][IonTokenConstsX.TOKEN_SYMBOL_IDENTIFIER]     = ACTION_LOAD_SCALAR;</span>
+<span class="fc" id="L199">        actions[STATE_BEFORE_VALUE_CONTENT][IonTokenConstsX.TOKEN_SYMBOL_QUOTED]         = ACTION_LOAD_SCALAR;</span>
+
+<span class="fc" id="L201">        actions[STATE_BEFORE_VALUE_CONTENT_SEXP][IonTokenConstsX.TOKEN_EOF]              = 0;</span>
+<span class="fc" id="L202">        actions[STATE_BEFORE_VALUE_CONTENT_SEXP][IonTokenConstsX.TOKEN_SYMBOL_IDENTIFIER]= ACTION_LOAD_SCALAR;</span>
+<span class="fc" id="L203">        actions[STATE_BEFORE_VALUE_CONTENT_SEXP][IonTokenConstsX.TOKEN_SYMBOL_QUOTED]    = ACTION_LOAD_SCALAR;</span>
+<span class="fc" id="L204">        actions[STATE_BEFORE_VALUE_CONTENT_SEXP][IonTokenConstsX.TOKEN_SYMBOL_OPERATOR]  = ACTION_LOAD_SCALAR;</span>
+
+<span class="fc" id="L206">        actions[STATE_BEFORE_FIELD_NAME][IonTokenConstsX.TOKEN_EOF]                      = 0;</span>
+<span class="fc" id="L207">        actions[STATE_BEFORE_FIELD_NAME][IonTokenConstsX.TOKEN_SYMBOL_IDENTIFIER]        = ACTION_LOAD_FIELD_NAME;</span>
+<span class="fc" id="L208">        actions[STATE_BEFORE_FIELD_NAME][IonTokenConstsX.TOKEN_SYMBOL_QUOTED]            = ACTION_LOAD_FIELD_NAME;</span>
+<span class="fc" id="L209">        actions[STATE_BEFORE_FIELD_NAME][IonTokenConstsX.TOKEN_STRING_DOUBLE_QUOTE]      = ACTION_LOAD_FIELD_NAME;</span>
+<span class="fc" id="L210">        actions[STATE_BEFORE_FIELD_NAME][IonTokenConstsX.TOKEN_STRING_TRIPLE_QUOTE]      = ACTION_LOAD_FIELD_NAME;</span>
+<span class="fc" id="L211">        actions[STATE_BEFORE_FIELD_NAME][IonTokenConstsX.TOKEN_CLOSE_PAREN]              = ACTION_FINISH_CONTAINER;</span>
+<span class="fc" id="L212">        actions[STATE_BEFORE_FIELD_NAME][IonTokenConstsX.TOKEN_CLOSE_BRACE]              = ACTION_FINISH_CONTAINER;</span>
+<span class="fc" id="L213">        actions[STATE_BEFORE_FIELD_NAME][IonTokenConstsX.TOKEN_CLOSE_SQUARE]             = ACTION_FINISH_CONTAINER;</span>
+
+         // after a value we'll either see a separator (like ',')
+         // or a containers closing token. If we're not in a container
+         // (i.e. we're at the top level) then this isn't the state we
+         // should be in.  We'll be in STATE_BEFORE_ANNOTATION_DATAGRAM
+<span class="fc" id="L219">         actions[STATE_AFTER_VALUE_CONTENTS][IonTokenConstsX.TOKEN_COMMA]                = ACTION_EAT_COMMA;</span>
+<span class="fc" id="L220">         actions[STATE_AFTER_VALUE_CONTENTS][IonTokenConstsX.TOKEN_CLOSE_PAREN]          = ACTION_FINISH_CONTAINER;</span>
+<span class="fc" id="L221">         actions[STATE_AFTER_VALUE_CONTENTS][IonTokenConstsX.TOKEN_CLOSE_BRACE]          = ACTION_FINISH_CONTAINER;</span>
+<span class="fc" id="L222">         actions[STATE_AFTER_VALUE_CONTENTS][IonTokenConstsX.TOKEN_CLOSE_SQUARE]         = ACTION_FINISH_CONTAINER;</span>
+
+         // the three &quot;in_&lt;lob&gt;&quot; value states have to be handled
+         // specially, they can only scan forward to the end of
+         // the content on next, or read content for the user otherwise
+<span class="fc" id="L227">         actions[STATE_IN_CLOB_DOUBLE_QUOTED_CONTENT][IonTokenConstsX.TOKEN_CLOSE_BRACE] = ACTION_FINISH_LOB;</span>
+<span class="fc" id="L228">         actions[STATE_IN_CLOB_TRIPLE_QUOTED_CONTENT][IonTokenConstsX.TOKEN_CLOSE_BRACE] = ACTION_FINISH_LOB;</span>
+<span class="fc" id="L229">         actions[STATE_IN_BLOB_CONTENT][IonTokenConstsX.TOKEN_CLOSE_BRACE]               = ACTION_FINISH_LOB;</span>
+
+         // the eof action exists because finishing an unread value can place the scanner just before
+         // the input stream eof and set the current state to eof - in which case we just need to return eof
+<span class="fc bfc" id="L233" title="All 2 branches covered.">         for (int ii=0; ii&lt;IonTokenConstsX.TOKEN_MAX+1; ii++) {</span>
+<span class="fc" id="L234">             actions[STATE_EOF][ii] =  ACTION_EOF;</span>
+         }
+
+<span class="fc" id="L237">         return actions;</span>
+    }
+
+<span class="fc" id="L240">    static final int[] TransitionActions2 = makeTransition2ActionArray();</span>
+    static int[] makeTransition2ActionArray() {
+<span class="fc" id="L242">        int   s, s_count = STATE_MAX + 1;</span>
+<span class="fc" id="L243">        int   t, t_count = IonTokenConstsX.TOKEN_MAX + 1;</span>
+<span class="fc" id="L244">        int[] a = new int[s_count * t_count];</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        for (s = 0; s &lt; s_count; s++) {</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">            for (t=0; t &lt; t_count; t++) {</span>
+<span class="fc" id="L247">                int ii = s * IonTokenConstsX.TOKEN_count + t;</span>
+<span class="fc" id="L248">                a[ii] = TransitionActions[s][t];</span>
+            }
+        }
+<span class="fc" id="L251">        return a;</span>
+    }
+
+    //
+    //  actual class members (preceding values are just parsing
+    //  control constants).
+    //
+
+    IonReaderTextRawTokensX  _scanner;
+
+    boolean             _eof;
+    int                 _state;
+
+<span class="fc" id="L264">    IonType[]           _container_state_stack = new IonType[DEFAULT_STACK_DEPTH];</span>
+    int                 _container_state_top;
+    boolean             _container_is_struct;           // helper bool's set on push and pop and used
+    boolean             _container_prohibits_commas;    // frequently during state transitions actions
+
+    boolean             _has_next_called;
+    IonType             _value_type;
+    int                 _value_keyword;
+    IonType             _null_type;
+    String              _field_name;
+<span class="fc" id="L274">    int                 _field_name_sid = UNKNOWN_SYMBOL_ID;</span>
+    int                 _annotation_count;
+    SymbolToken[]    _annotations;
+
+    boolean             _current_value_save_point_loaded;
+    SavePoint           _current_value_save_point;
+    boolean             _current_value_buffer_loaded;
+    StringBuilder       _current_value_buffer;
+
+<span class="fc" id="L283">    ValueVariant        _v = new ValueVariant();</span>
+
+    long                _value_start_offset;
+    long                _value_start_line;
+    long                _value_start_column;
+    IonType             _nesting_parent;
+
+<span class="fc" id="L290">    enum LOB_STATE { EMPTY, READ, FINISHED }</span>
+    boolean             _lob_value_set;
+    int                 _lob_token;
+    long                _lob_value_position;
+    LOB_STATE           _lob_loaded;
+    byte[]              _lob_bytes;
+    int                 _lob_actual_len;
+
+
+    protected IonReaderTextRawX() {
+<span class="fc" id="L300">        super();</span>
+<span class="fc" id="L301">        _nesting_parent = null;</span>
+<span class="fc" id="L302">    }</span>
+
+
+    /**
+     * @return This implementation always returns null.
+     */
+    public &lt;T&gt; T asFacet(Class&lt;T&gt; facetType)
+    {
+<span class="fc" id="L310">        return null;</span>
+    }
+
+    //========================================================================
+
+    protected final void init_once() {
+<span class="fc" id="L316">        _current_value_buffer = new StringBuilder();</span>
+<span class="fc" id="L317">        _annotations = new SymbolToken[DEFAULT_ANNOTATION_COUNT];</span>
+<span class="fc" id="L318">    }</span>
+
+    protected final void init(UnifiedInputStreamX iis, IonType parent)
+    {
+<span class="fc" id="L322">        init(iis, parent, 1, 1);</span>
+<span class="fc" id="L323">    }</span>
+
+    protected final void init(UnifiedInputStreamX iis
+                             ,IonType parent
+                             ,long start_line
+                             ,long start_column
+    ) {
+
+<span class="pc bpc" id="L331" title="2 of 4 branches missed.">        assert(parent != null);</span>
+<span class="fc" id="L332">        _scanner = new IonReaderTextRawTokensX(iis, start_line, start_column);</span>
+<span class="fc" id="L333">        _value_start_line = start_line;</span>
+<span class="fc" id="L334">        _value_start_column = start_column;</span>
+<span class="fc" id="L335">        _current_value_save_point = iis.savePointAllocate();</span>
+<span class="fc" id="L336">        _lob_loaded = LOB_STATE.EMPTY;</span>
+<span class="fc" id="L337">        int starting_state = get_state_at_container_start(parent);</span>
+<span class="fc" id="L338">        set_state(starting_state);</span>
+<span class="fc" id="L339">        _eof = false;</span>
+<span class="fc" id="L340">        push_container_state(parent);</span>
+<span class="fc" id="L341">    }</span>
+
+    protected final void re_init(UnifiedInputStreamX iis
+                                ,IonType parent
+                                ,long start_line
+                                ,long start_column
+    ) {
+<span class="fc" id="L348">        _state = 0;</span>
+<span class="fc" id="L349">        _container_state_top = 0;</span>
+<span class="fc" id="L350">        _container_is_struct = false;</span>
+<span class="fc" id="L351">        _container_prohibits_commas = false;</span>
+<span class="fc" id="L352">        _has_next_called = false;</span>
+<span class="fc" id="L353">        _value_type = null;</span>
+<span class="fc" id="L354">        _value_keyword = 0;</span>
+<span class="fc" id="L355">        _null_type = null;</span>
+<span class="fc" id="L356">        _field_name = null;</span>
+<span class="fc" id="L357">        _field_name_sid = UNKNOWN_SYMBOL_ID;</span>
+<span class="fc" id="L358">        _annotation_count = 0;</span>
+<span class="fc" id="L359">        _current_value_save_point_loaded = false;</span>
+<span class="fc" id="L360">        _current_value_buffer_loaded = false;</span>
+<span class="fc" id="L361">        _value_start_offset = 0;</span>
+<span class="fc" id="L362">        _lob_value_set = false;</span>
+<span class="fc" id="L363">        _lob_token = 0;</span>
+<span class="fc" id="L364">        _lob_value_position = 0;</span>
+<span class="fc" id="L365">        _lob_bytes = null;</span>
+<span class="fc" id="L366">        _lob_actual_len = 0;</span>
+
+<span class="fc" id="L368">        init(iis, parent, start_line, start_column);</span>
+
+<span class="fc" id="L370">        _nesting_parent = parent;</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">        if (IonType.STRUCT.equals(_nesting_parent)) {</span>
+<span class="fc" id="L372">            _container_is_struct = true;</span>
+        }
+<span class="fc" id="L374">    }</span>
+
+    public void close()
+        throws IOException
+    {
+<span class="fc" id="L379">        _scanner.close();</span>
+<span class="fc" id="L380">    }</span>
+
+    private final void set_state(int new_state) {
+<span class="fc" id="L383">        _state = new_state;</span>
+<span class="fc" id="L384">    }</span>
+    private final int get_state_int() {
+<span class="fc" id="L386">        return _state;</span>
+    }
+    private final String get_state_name() {
+<span class="fc" id="L389">        String name = get_state_name(get_state_int());</span>
+<span class="fc" id="L390">        return name;</span>
+    }
+
+    protected final void clear_current_value_buffer() {
+<span class="fc bfc" id="L394" title="All 2 branches covered.">        if (_current_value_buffer_loaded) {</span>
+<span class="fc" id="L395">            _current_value_buffer.setLength(0);</span>
+<span class="fc" id="L396">            _current_value_buffer_loaded = false;</span>
+        }
+<span class="fc bfc" id="L398" title="All 2 branches covered.">        if (_current_value_save_point_loaded) {</span>
+<span class="fc" id="L399">            _current_value_save_point.clear();</span>
+<span class="fc" id="L400">            _current_value_save_point_loaded = false;</span>
+        }
+<span class="fc" id="L402">    }</span>
+
+    private final void current_value_is_null(IonType null_type)
+    {
+<span class="fc" id="L406">        clear_current_value_buffer();</span>
+<span class="fc" id="L407">        _value_type = _null_type;</span>
+<span class="fc" id="L408">        _v.setValueToNull(null_type);</span>
+<span class="fc" id="L409">        _v.setAuthoritativeType(_Private_ScalarConversions.AS_TYPE.null_value);</span>
+<span class="fc" id="L410">    }</span>
+
+    private final void current_value_is_bool(boolean value)
+    {
+<span class="fc" id="L414">        clear_current_value_buffer();</span>
+<span class="fc" id="L415">        _value_type = IonType.BOOL;</span>
+<span class="fc" id="L416">        _v.setValue(value);</span>
+<span class="fc" id="L417">        _v.setAuthoritativeType(_Private_ScalarConversions.AS_TYPE.boolean_value);</span>
+<span class="fc" id="L418">    }</span>
+
+    private final void set_fieldname(SymbolToken sym) {
+<span class="fc" id="L421">        _field_name = sym.getText();</span>
+<span class="fc" id="L422">        _field_name_sid = sym.getSid();</span>
+<span class="fc" id="L423">    }</span>
+
+    private final void clear_fieldname() {
+<span class="fc" id="L426">        _field_name = null;</span>
+<span class="fc" id="L427">        _field_name_sid = UNKNOWN_SYMBOL_ID;</span>
+<span class="fc" id="L428">    }</span>
+
+    private final void append_annotation(SymbolToken sym) {
+        // empty text is checked by caller
+<span class="fc" id="L432">        int oldlen = _annotations.length;</span>
+<span class="fc bfc" id="L433" title="All 2 branches covered.">        if (_annotation_count &gt;= oldlen) {</span>
+<span class="fc" id="L434">            int newlen = oldlen * 2;</span>
+<span class="fc" id="L435">            SymbolToken[] temp = new SymbolToken[newlen];</span>
+<span class="fc" id="L436">            System.arraycopy(_annotations, 0, temp, 0, oldlen);</span>
+<span class="fc" id="L437">            _annotations = temp;</span>
+        }
+<span class="fc" id="L439">        _annotations[_annotation_count++] = sym;</span>
+<span class="fc" id="L440">    }</span>
+
+    private final void clear_annotation_list() {
+<span class="fc" id="L443">        _annotation_count = 0;</span>
+<span class="fc" id="L444">    }</span>
+
+    /**
+     * this looks forward to see if there is an upcoming value
+     * if there is it returns true.  It may have to clean up
+     * any value that's partially complete (for example a
+     * collection whose annotation has been read and loaded
+     * but the user has chosen not to step into the collection).
+     * @return true if more data remains, false on eof
+     */
+    public boolean hasNext()
+    {
+<span class="fc" id="L456">        boolean has_next = has_next_raw_value();</span>
+<span class="fc" id="L457">        return has_next;</span>
+    }
+    protected final boolean has_next_raw_value() {
+<span class="pc bpc" id="L460" title="1 of 4 branches missed.">        if (!_has_next_called &amp;&amp; !_eof) {</span>
+            try {
+<span class="fc" id="L462">                finish_value(null);</span>
+<span class="fc" id="L463">                clear_value();</span>
+<span class="fc" id="L464">                parse_to_next_value();</span>
+            }
+<span class="fc" id="L466">            catch (IOException e) {</span>
+<span class="fc" id="L467">                throw new IonException(e);</span>
+<span class="fc" id="L468">            }</span>
+<span class="fc" id="L469">            _has_next_called = true;</span>
+        }
+<span class="fc bfc" id="L471" title="All 2 branches covered.">        return (_eof != true);</span>
+    }
+
+    /**
+     * returns the type of the next value in the stream.
+     * it calls hasNext to assure that the value has been properly
+     * started, since hasNext prepares a value as a side effect of
+     * determining whether or not a value is pending.
+     * A NoSuchElementException is thrown if there are not values remaining.
+     * Once called if there is a value available it's contents can
+     * be accessed through the other public API's (such as getLong()).
+     * @return type of the next value, or null if there is none.
+     */
+    public IonType next()
+    {
+<span class="fc bfc" id="L486" title="All 2 branches covered.">        if (!hasNext()) {</span>
+<span class="fc" id="L487">            return null;</span>
+        }
+<span class="pc bpc" id="L489" title="1 of 4 branches missed.">        if (_value_type == null &amp;&amp; _scanner.isUnfinishedToken()) {</span>
+            try {
+<span class="fc" id="L491">                token_contents_load(_scanner.getToken());</span>
+            }
+<span class="nc" id="L493">            catch (IOException e) {</span>
+<span class="nc" id="L494">                throw new IonException(e);</span>
+<span class="fc" id="L495">            }</span>
+        }
+<span class="fc" id="L497">        _has_next_called = false;</span>
+<span class="fc" id="L498">        return _value_type;</span>
+    }
+    private final void finish_and_save_value() throws IOException
+    {
+<span class="pc bpc" id="L502" title="1 of 2 branches missed.">        if (!_current_value_save_point_loaded) {</span>
+<span class="fc" id="L503">            _scanner.save_point_start(_current_value_save_point);</span>
+<span class="fc" id="L504">            finish_value(_current_value_save_point);</span>
+<span class="fc" id="L505">            _current_value_save_point_loaded = true;</span>
+        }
+<span class="fc" id="L507">    }</span>
+    private final void finish_value(SavePoint sp) throws IOException
+    {
+<span class="fc bfc" id="L510" title="All 2 branches covered.">        if (_scanner.isUnfinishedToken()) {</span>
+<span class="pc bpc" id="L511" title="1 of 4 branches missed.">            if (sp != null &amp;&amp; _value_type != null) {</span>
+<span class="nc bnc" id="L512" title="All 2 branches missed.">                switch (_value_type) {</span>
+                case STRUCT:
+                case SEXP:
+                case LIST:
+<span class="nc" id="L516">                    sp = null;</span>
+<span class="nc" id="L517">                    break;</span>
+                default:
+                    break;
+                }
+            }
+<span class="fc" id="L522">            _scanner.finish_token(sp);</span>
+
+<span class="fc" id="L524">            int new_state = get_state_after_value();</span>
+<span class="fc" id="L525">            set_state(new_state);</span>
+        }
+<span class="fc" id="L527">        _has_next_called = false;</span>
+<span class="fc" id="L528">    }</span>
+    private final void clear_value()
+    {
+<span class="fc" id="L531">        _value_type = null;</span>
+<span class="fc" id="L532">        _null_type = null;</span>
+<span class="pc bpc" id="L533" title="1 of 2 branches missed.">        if (_lob_value_set) {</span>
+<span class="nc" id="L534">            _lob_value_set = false;</span>
+<span class="nc" id="L535">            _lob_value_position = 0;</span>
+        }
+<span class="fc bfc" id="L537" title="All 2 branches covered.">        if (!LOB_STATE.EMPTY.equals(_lob_loaded)) {</span>
+<span class="fc" id="L538">            _lob_actual_len = -1;</span>
+<span class="fc" id="L539">            _lob_bytes = null;</span>
+<span class="fc" id="L540">            _lob_loaded = LOB_STATE.EMPTY;</span>
+        }
+<span class="fc" id="L542">        clear_current_value_buffer();</span>
+<span class="fc" id="L543">        clear_annotation_list();</span>
+<span class="fc" id="L544">        clear_fieldname();</span>
+<span class="fc" id="L545">        _v.clear();</span>
+<span class="fc" id="L546">        _value_start_offset = -1;</span>
+<span class="fc" id="L547">    }</span>
+
+    private final void set_container_flags(IonType t) {
+<span class="pc bpc" id="L550" title="1 of 5 branches missed.">        switch (t) {</span>
+        case LIST:
+<span class="fc" id="L552">            _container_is_struct = false;</span>
+<span class="fc" id="L553">            _container_prohibits_commas = false;</span>
+<span class="fc" id="L554">            break;</span>
+        case SEXP:
+<span class="fc" id="L556">            _container_is_struct = false;</span>
+<span class="fc" id="L557">            _container_prohibits_commas = true;</span>
+<span class="fc" id="L558">            break;</span>
+        case STRUCT:
+<span class="fc" id="L560">            _container_is_struct = true;</span>
+<span class="fc" id="L561">            _container_prohibits_commas = false;</span>
+<span class="fc" id="L562">            break;</span>
+        case DATAGRAM:
+<span class="fc" id="L564">            _container_is_struct = false;</span>
+<span class="fc" id="L565">            _container_prohibits_commas = true;</span>
+<span class="fc" id="L566">            break;</span>
+        default:
+<span class="nc" id="L568">            throw new IllegalArgumentException(&quot;type must be a container, not a &quot;+t.toString());</span>
+        }
+<span class="fc" id="L570">    }</span>
+
+    private int get_state_after_value()
+    {
+        int state_after_scalar;
+<span class="pc bpc" id="L575" title="1 of 4 branches missed.">        switch(getContainerType()) {</span>
+        case LIST:
+        case STRUCT:
+<span class="fc" id="L578">            state_after_scalar = STATE_AFTER_VALUE_CONTENTS;</span>
+<span class="fc" id="L579">            break;</span>
+        case SEXP:
+<span class="fc" id="L581">            state_after_scalar = STATE_BEFORE_ANNOTATION_SEXP;</span>
+<span class="fc" id="L582">            break;</span>
+        case DATAGRAM:
+<span class="fc" id="L584">            state_after_scalar = STATE_BEFORE_ANNOTATION_DATAGRAM;</span>
+<span class="fc" id="L585">            break;</span>
+        default:
+<span class="nc" id="L587">            String message = &quot;invalid container type encountered during parsing &quot;</span>
+<span class="nc" id="L588">                           + getContainerType()</span>
+<span class="nc" id="L589">                           + _scanner.input_position();</span>
+<span class="nc" id="L590">            throw new IonException(message);</span>
+        }
+<span class="fc bfc" id="L592" title="All 4 branches covered.">        if (_nesting_parent != null &amp;&amp; getDepth() == 0) {</span>
+<span class="fc" id="L593">            state_after_scalar = STATE_EOF;</span>
+        }
+<span class="fc" id="L595">        return state_after_scalar;</span>
+    }
+    private final int get_state_after_annotation() {
+        int state_after_annotation;
+<span class="pc bpc" id="L599" title="2 of 4 branches missed.">        switch(get_state_int()) {</span>
+        case STATE_AFTER_VALUE_CONTENTS:
+<span class="nc" id="L601">            IonType container = top_state();</span>
+<span class="nc bnc" id="L602" title="All 3 branches missed.">            switch(container) {</span>
+            case STRUCT:
+            case LIST:
+            case DATAGRAM:
+<span class="nc" id="L606">                state_after_annotation = STATE_BEFORE_VALUE_CONTENT;</span>
+<span class="nc" id="L607">                break;</span>
+            case SEXP:
+<span class="nc" id="L609">                state_after_annotation = STATE_BEFORE_VALUE_CONTENT_SEXP;</span>
+<span class="nc" id="L610">                break;</span>
+            default:
+<span class="nc" id="L612">                String message = &quot;invalid container type encountered during parsing &quot;</span>
+                    + container
+<span class="nc" id="L614">                    + _scanner.input_position();</span>
+<span class="nc" id="L615">                throw new IonException(message);</span>
+            }
+<span class="nc" id="L617">            break;</span>
+        case STATE_BEFORE_ANNOTATION_DATAGRAM:
+        case STATE_BEFORE_ANNOTATION_CONTAINED:
+<span class="fc" id="L620">            state_after_annotation = STATE_BEFORE_VALUE_CONTENT;</span>
+<span class="fc" id="L621">            break;</span>
+        case STATE_BEFORE_ANNOTATION_SEXP:
+<span class="fc" id="L623">            state_after_annotation = STATE_BEFORE_VALUE_CONTENT_SEXP;</span>
+<span class="fc" id="L624">            break;</span>
+        default:
+<span class="nc" id="L626">            String message = &quot;invalid state encountered during parsing before the value &quot;</span>
+<span class="nc" id="L627">                + get_state_name()</span>
+<span class="nc" id="L628">                + _scanner.input_position();</span>
+<span class="nc" id="L629">            throw new IonException(message);</span>
+        }
+<span class="fc" id="L631">        return state_after_annotation;</span>
+    }
+
+    private final int get_state_after_container() {
+<span class="fc" id="L635">        IonType container = top_state();</span>
+<span class="fc" id="L636">        int new_state = get_state_after_container(container);</span>
+<span class="fc" id="L637">        return new_state;</span>
+    }
+
+    private final int get_state_after_container(int token) {
+<span class="fc" id="L641">        IonType container = top_state();</span>
+
+<span class="pc bpc" id="L643" title="1 of 4 branches missed.">        switch(container) {</span>
+            case STRUCT:
+<span class="fc" id="L645">                check_container_close(container, TOKEN_CLOSE_BRACE, token);</span>
+<span class="fc" id="L646">                break;</span>
+            case LIST:
+<span class="fc" id="L648">                check_container_close(container, TOKEN_CLOSE_SQUARE, token);</span>
+<span class="fc" id="L649">                break;</span>
+            case SEXP:
+<span class="fc" id="L651">                check_container_close(container, TOKEN_CLOSE_PAREN, token);</span>
+<span class="fc" id="L652">                break;</span>
+            case DATAGRAM:
+                // We shouldn't get here.  Fall through.
+            default:
+<span class="nc" id="L656">                String message = &quot;invalid container type encountered during parsing &quot;</span>
+                    + container
+<span class="nc" id="L658">                    + _scanner.input_position();</span>
+<span class="nc" id="L659">                throw new IonException(message);</span>
+        }
+
+<span class="fc" id="L662">        int new_state = get_state_after_container(container);</span>
+<span class="fc" id="L663">        return new_state;</span>
+    }
+
+    private final int get_state_after_container(IonType container) {
+        int new_state;
+<span class="pc bpc" id="L668" title="1 of 2 branches missed.">        if (container == null) {</span>
+<span class="nc" id="L669">            new_state = STATE_BEFORE_ANNOTATION_DATAGRAM;</span>
+        }
+        else {
+<span class="pc bpc" id="L672" title="1 of 4 branches missed.">            switch(container) {</span>
+                case STRUCT:
+                case LIST:
+<span class="fc" id="L675">                    new_state = STATE_AFTER_VALUE_CONTENTS;</span>
+<span class="fc" id="L676">                    break;</span>
+                case SEXP:
+<span class="fc" id="L678">                    new_state = STATE_BEFORE_ANNOTATION_SEXP;</span>
+<span class="fc" id="L679">                    break;</span>
+                case DATAGRAM:
+<span class="fc" id="L681">                    new_state = STATE_BEFORE_ANNOTATION_DATAGRAM;</span>
+<span class="fc" id="L682">                    break;</span>
+                default:
+<span class="nc" id="L684">                    String message = &quot;invalid container type encountered during parsing &quot;</span>
+                        + container
+<span class="nc" id="L686">                        + _scanner.input_position();</span>
+<span class="nc" id="L687">                    throw new IonException(message);</span>
+            }
+<span class="fc bfc" id="L689" title="All 4 branches covered.">            if (_nesting_parent != null &amp;&amp; getDepth() == 0) {</span>
+<span class="fc" id="L690">                new_state = STATE_EOF;</span>
+            }
+        }
+<span class="fc" id="L693">        return new_state;</span>
+    }
+
+    private final void check_container_close(IonType container, int expectedToken, int actualToken)
+    {
+<span class="fc bfc" id="L698" title="All 2 branches covered.">        if (actualToken != expectedToken) {</span>
+<span class="fc" id="L699">            String message = container.toString().toLowerCase() + &quot; closed by &quot;</span>
+<span class="fc" id="L700">                + IonTokenConstsX.describeToken(actualToken)</span>
+<span class="fc" id="L701">                + _scanner.input_position();</span>
+<span class="fc" id="L702">            throw new IonException(message);</span>
+        }
+<span class="fc" id="L704">    }</span>
+
+    private final int get_state_at_container_start(IonType container) {
+        int new_state;
+<span class="pc bpc" id="L708" title="1 of 2 branches missed.">        if (container == null) {</span>
+<span class="nc" id="L709">            new_state = STATE_BEFORE_ANNOTATION_DATAGRAM;</span>
+        }
+        else {
+<span class="pc bpc" id="L712" title="1 of 5 branches missed.">            switch (container) {</span>
+            case STRUCT:
+<span class="fc" id="L714">                new_state = STATE_BEFORE_FIELD_NAME;</span>
+<span class="fc" id="L715">                break;</span>
+            case LIST:
+<span class="fc" id="L717">                new_state = STATE_BEFORE_ANNOTATION_CONTAINED;</span>
+<span class="fc" id="L718">                break;</span>
+            case SEXP:
+<span class="fc" id="L720">                new_state = STATE_BEFORE_ANNOTATION_SEXP;</span>
+<span class="fc" id="L721">                break;</span>
+            case DATAGRAM:
+<span class="fc" id="L723">                new_state = STATE_BEFORE_ANNOTATION_DATAGRAM;</span>
+<span class="fc" id="L724">                break;</span>
+            default:
+<span class="nc" id="L726">                String message = &quot;invalid container type encountered during parsing &quot;</span>
+                    + container
+<span class="nc" id="L728">                    + _scanner.input_position();</span>
+<span class="nc" id="L729">                throw new IonException(message);</span>
+            }
+        }
+<span class="fc" id="L732">        return new_state;</span>
+    }
+
+
+    private final SymbolToken parseSymbolToken(String context,
+                                                  StringBuilder sb,
+                                                  int t)
+        throws IOException
+    {
+        String text;
+        int sid;
+
+<span class="fc bfc" id="L744" title="All 2 branches covered.">        if (t == IonTokenConstsX.TOKEN_SYMBOL_IDENTIFIER) {</span>
+<span class="fc" id="L745">            int kw = IonTokenConstsX.keyword(sb, 0, sb.length());</span>
+<span class="fc bfc" id="L746" title="All 3 branches covered.">            switch (kw) {</span>
+                case IonTokenConstsX.KEYWORD_FALSE:
+                case IonTokenConstsX.KEYWORD_TRUE:
+                case IonTokenConstsX.KEYWORD_NULL:
+                case IonTokenConstsX.KEYWORD_NAN:
+                    // keywords are not ok unless they're quoted
+<span class="fc" id="L752">                    String reason =</span>
+                    &quot;Cannot use unquoted keyword &quot; +
+<span class="fc" id="L754">                        sb.toString() + &quot; as &quot; + context;</span>
+<span class="nc" id="L755">                    parse_error(reason);</span>
+                case IonTokenConstsX.KEYWORD_sid:
+<span class="fc" id="L757">                    text = null;</span>
+<span class="fc" id="L758">                    sid = IonTokenConstsX.decodeSid(sb);</span>
+<span class="fc" id="L759">                    break;</span>
+                default:
+<span class="fc" id="L761">                    text = sb.toString();</span>
+<span class="fc" id="L762">                    sid = UNKNOWN_SYMBOL_ID;</span>
+                    break;
+            }
+<span class="fc" id="L765">        }</span>
+        else {
+<span class="fc" id="L767">            text = sb.toString();</span>
+<span class="fc" id="L768">            sid = UNKNOWN_SYMBOL_ID;</span>
+        }
+
+<span class="fc" id="L771">        return new SymbolTokenImpl(text, sid);</span>
+    }
+
+
+    protected final void parse_to_next_value() throws IOException
+    {
+        int t;
+        int action, temp_state;
+<span class="fc" id="L779">        boolean trailing_whitespace = false;  // TODO: there's a better way to do this</span>
+        StringBuilder sb;
+
+        // FIXME: check depth and type before doing anything further
+        //        if we're on a collection and at the correct depth
+        //        we need to skip over the contents of the collection
+        //        before doing any more parsing
+
+        // we'll need a token to get started here
+        // we'll also remember where we were when we started if the
+        // user later wants to get a span over this value.  In the
+        // case where we just before a comma, after the comma we'll
+        // reset this offset since for the span the comma isn't part
+        // of the span when it's hoisted
+<span class="fc" id="L793">        _value_start_offset = _scanner.getStartingOffset();</span>
+<span class="fc" id="L794">        _value_start_line   = _scanner.getLineNumber();</span>
+<span class="fc" id="L795">        _value_start_column = _scanner.getLineOffset();</span>
+
+<span class="fc" id="L797">        t = _scanner.nextToken();</span>
+
+        for (;;) {
+<span class="fc" id="L800">            int idx = get_state_int() * IonTokenConstsX.TOKEN_count + t;</span>
+<span class="fc" id="L801">            action = TransitionActions2[idx];</span>
+            // this used to be (but the 2d array is 9072ms vs 8786ms
+            // timing, 3% of total file parse time!):
+            // action = TransitionActions[get_state_int()][t];
+<span class="pc bpc" id="L805" title="2 of 16 branches missed.">            switch (action) {</span>
+            case ACTION_NOT_DEFINED:
+                {
+                    // TODO why would we get here?
+<span class="fc" id="L809">                    boolean span_eof = false;</span>
+
+<span class="pc bpc" id="L811" title="1 of 2 branches missed.">                    if (_nesting_parent != null) {</span>
+<span class="nc bnc" id="L812" title="All 4 branches missed.">                        switch (_nesting_parent) {</span>
+                            case LIST:
+<span class="nc bnc" id="L814" title="All 2 branches missed.">                                if (t == IonTokenConstsX.TOKEN_CLOSE_SQUARE) {</span>
+<span class="nc" id="L815">                                    span_eof = true;</span>
+                                }
+                                break;
+                            case SEXP:
+<span class="nc bnc" id="L819" title="All 2 branches missed.">                                if (t == IonTokenConstsX.TOKEN_CLOSE_PAREN){</span>
+<span class="nc" id="L820">                                    span_eof = true;</span>
+                                }
+                                break;
+                            case STRUCT:
+<span class="nc bnc" id="L824" title="All 2 branches missed.">                                if (t == IonTokenConstsX.TOKEN_CLOSE_BRACE) {</span>
+<span class="nc" id="L825">                                    span_eof = true;</span>
+                                }
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+<span class="pc bpc" id="L832" title="1 of 2 branches missed.">                    if (span_eof != true) {</span>
+<span class="fc" id="L833">                        String message = &quot;invalid syntax [state:&quot;</span>
+<span class="fc" id="L834">                                       + get_state_name()</span>
+                                       + &quot; on token:&quot;
+<span class="fc" id="L836">                                       +IonTokenConstsX.getTokenName(t)</span>
+                                       +&quot;]&quot;;
+<span class="nc" id="L838">                        parse_error(message);</span>
+                    }
+<span class="nc" id="L840">                    set_state(STATE_EOF);</span>
+<span class="nc" id="L841">                    _eof = true;</span>
+<span class="nc" id="L842">                    return;</span>
+                }
+            case ACTION_EOF:
+<span class="fc" id="L845">                set_state(STATE_EOF);</span>
+<span class="fc" id="L846">                _eof = true;</span>
+<span class="fc" id="L847">                return;</span>
+            case ACTION_LOAD_FIELD_NAME:
+            {
+<span class="pc bpc" id="L850" title="1 of 2 branches missed.">                if (!is_in_struct_internal()) {</span>
+<span class="nc" id="L851">                    throw new IllegalStateException(&quot;field names have to be in structs&quot;);</span>
+                }
+                //finish_value(_current_value_save_point);
+<span class="fc" id="L854">                finish_and_save_value();</span>
+
+<span class="fc" id="L856">                sb = token_contents_load(t);</span>
+
+<span class="fc" id="L858">                SymbolToken sym = parseSymbolToken(&quot;a field name&quot;, sb, t);</span>
+<span class="fc" id="L859">                set_fieldname(sym);</span>
+<span class="fc" id="L860">                clear_current_value_buffer();</span>
+
+<span class="fc" id="L862">                t = _scanner.nextToken();</span>
+<span class="fc bfc" id="L863" title="All 2 branches covered.">                if (t != IonTokenConstsX.TOKEN_COLON) {</span>
+<span class="fc" id="L864">                    String message = &quot;field name must be followed by a colon, not a &quot;</span>
+<span class="fc" id="L865">                                   + IonTokenConstsX.getTokenName(t);</span>
+<span class="nc" id="L866">                    parse_error(message);</span>
+                }
+<span class="fc" id="L868">                _scanner.tokenIsFinished();</span>
+<span class="fc" id="L869">                set_state(STATE_BEFORE_ANNOTATION_CONTAINED);</span>
+<span class="fc" id="L870">                t = _scanner.nextToken();</span>
+<span class="fc" id="L871">                break;</span>
+            }
+            case ACTION_LOAD_ANNOTATION:
+            {
+<span class="fc" id="L875">                sb = token_contents_load(t);</span>
+
+<span class="fc" id="L877">                trailing_whitespace = _scanner.skip_whitespace();</span>
+<span class="fc bfc" id="L878" title="All 2 branches covered.">                if (!_scanner.skipDoubleColon()) {</span>
+                    // unnecessary: set_current_value(sp);
+                    // this will &quot;loop around&quot; to ACTION_LOAD_SCALAR
+                    // since this is necessarily a symbol of one
+                    // sort of another
+<span class="fc" id="L883">                    temp_state = get_state_after_annotation();</span>
+<span class="fc" id="L884">                    set_state(temp_state);</span>
+<span class="fc" id="L885">                    break;</span>
+                }
+
+                // We have an annotation!
+<span class="fc" id="L889">                SymbolToken sym = parseSymbolToken(&quot;an annotation&quot;, sb, t);</span>
+<span class="fc" id="L890">                append_annotation(sym);</span>
+<span class="fc" id="L891">                clear_current_value_buffer();</span>
+
+                // Consumed the annotation, move on.
+                // note: that peekDoubleColon() consumed the two colons
+                // so nextToken won't see them
+<span class="fc" id="L896">                t = _scanner.nextToken();</span>
+<span class="fc bfc" id="L897" title="All 2 branches covered.">                switch(t) {</span>
+                case IonTokenConstsX.TOKEN_SYMBOL_IDENTIFIER:
+                case IonTokenConstsX.TOKEN_SYMBOL_QUOTED:
+                    // This may be another annotation, so stay in this state
+                    // and come around the horn again to check it out.
+<span class="fc" id="L902">                    break;</span>
+                default:
+                    // we leave the error handling to the transition
+<span class="fc" id="L905">                    temp_state = get_state_after_annotation();</span>
+<span class="fc" id="L906">                    set_state(temp_state);</span>
+<span class="fc" id="L907">                    break;</span>
+                }
+                break;
+            }
+            case ACTION_START_STRUCT:
+<span class="fc" id="L912">                _value_type = IonType.STRUCT;</span>
+<span class="fc" id="L913">                temp_state = STATE_BEFORE_FIELD_NAME;</span>
+<span class="fc" id="L914">                set_state(temp_state);</span>
+<span class="fc" id="L915">                return;</span>
+            case ACTION_START_LIST:
+<span class="fc" id="L917">                _value_type = IonType.LIST;</span>
+<span class="fc" id="L918">                temp_state = STATE_BEFORE_ANNOTATION_CONTAINED;</span>
+<span class="fc" id="L919">                set_state(temp_state);</span>
+<span class="fc" id="L920">                return;</span>
+            case ACTION_START_SEXP:
+<span class="fc" id="L922">                _value_type = IonType.SEXP;</span>
+<span class="fc" id="L923">                temp_state = STATE_BEFORE_ANNOTATION_SEXP;</span>
+<span class="fc" id="L924">                set_state(temp_state);</span>
+<span class="fc" id="L925">                return;</span>
+            case ACTION_START_LOB:
+<span class="fc bfc" id="L927" title="All 3 branches covered.">                switch (_scanner.peekLobStartPunctuation()) {</span>
+                case IonTokenConstsX.TOKEN_STRING_DOUBLE_QUOTE:
+<span class="fc" id="L929">                    set_state(STATE_IN_CLOB_DOUBLE_QUOTED_CONTENT);</span>
+<span class="fc" id="L930">                    _lob_token = IonTokenConstsX.TOKEN_STRING_DOUBLE_QUOTE;</span>
+<span class="fc" id="L931">                    _value_type = IonType.CLOB;</span>
+<span class="fc" id="L932">                    break;</span>
+                case IonTokenConstsX.TOKEN_STRING_TRIPLE_QUOTE:
+<span class="fc" id="L934">                    set_state(STATE_IN_CLOB_TRIPLE_QUOTED_CONTENT);</span>
+<span class="fc" id="L935">                    _lob_token = IonTokenConstsX.TOKEN_STRING_TRIPLE_QUOTE;</span>
+<span class="fc" id="L936">                    _value_type = IonType.CLOB;</span>
+<span class="fc" id="L937">                    break;</span>
+                default:
+<span class="fc" id="L939">                    set_state(STATE_IN_BLOB_CONTENT);</span>
+<span class="fc" id="L940">                    _lob_token = IonTokenConstsX.TOKEN_OPEN_DOUBLE_BRACE;</span>
+<span class="fc" id="L941">                    _value_type = IonType.BLOB;</span>
+                    break;
+                }
+<span class="fc" id="L944">                return;</span>
+            case ACTION_LOAD_SCALAR:
+<span class="fc bfc" id="L946" title="All 2 branches covered.">                if (t == IonTokenConstsX.TOKEN_SYMBOL_IDENTIFIER) {</span>
+<span class="fc" id="L947">                    sb = token_contents_load(t);</span>
+<span class="fc" id="L948">                    _value_keyword = IonTokenConstsX.keyword(sb, 0, sb.length());</span>
+<span class="fc bfc" id="L949" title="All 6 branches covered.">                    switch (_value_keyword) {</span>
+                    case IonTokenConstsX.KEYWORD_NULL:
+                    {
+<span class="fc bfc" id="L952" title="All 2 branches covered.">                        int kwt = trailing_whitespace ? IonTokenConstsX.KEYWORD_none : _scanner.peekNullTypeSymbol();</span>
+<span class="pc bpc" id="L953" title="1 of 15 branches missed.">                        switch (kwt) {</span>
+<span class="fc" id="L954">                        case IonTokenConstsX.KEYWORD_NULL:      _null_type = IonType.NULL;       break;</span>
+<span class="fc" id="L955">                        case IonTokenConstsX.KEYWORD_BOOL:      _null_type = IonType.BOOL;       break;</span>
+<span class="fc" id="L956">                        case IonTokenConstsX.KEYWORD_INT:       _null_type = IonType.INT;        break;</span>
+<span class="fc" id="L957">                        case IonTokenConstsX.KEYWORD_FLOAT:     _null_type = IonType.FLOAT;      break;</span>
+<span class="fc" id="L958">                        case IonTokenConstsX.KEYWORD_DECIMAL:   _null_type = IonType.DECIMAL;    break;</span>
+<span class="fc" id="L959">                        case IonTokenConstsX.KEYWORD_TIMESTAMP: _null_type = IonType.TIMESTAMP;  break;</span>
+<span class="fc" id="L960">                        case IonTokenConstsX.KEYWORD_SYMBOL:    _null_type = IonType.SYMBOL;     break;</span>
+<span class="fc" id="L961">                        case IonTokenConstsX.KEYWORD_STRING:    _null_type = IonType.STRING;     break;</span>
+<span class="fc" id="L962">                        case IonTokenConstsX.KEYWORD_BLOB:      _null_type = IonType.BLOB;       break;</span>
+<span class="fc" id="L963">                        case IonTokenConstsX.KEYWORD_CLOB:      _null_type = IonType.CLOB;       break;</span>
+<span class="fc" id="L964">                        case IonTokenConstsX.KEYWORD_LIST:      _null_type = IonType.LIST;       break;</span>
+<span class="fc" id="L965">                        case IonTokenConstsX.KEYWORD_SEXP:      _null_type = IonType.SEXP;       break;</span>
+<span class="fc" id="L966">                        case IonTokenConstsX.KEYWORD_STRUCT:    _null_type = IonType.STRUCT;     break;</span>
+<span class="fc" id="L967">                        case IonTokenConstsX.KEYWORD_none:      _null_type = IonType.NULL;       break; // this happens when there isn't a '.' otherwise peek throws the error or returns none</span>
+<span class="nc" id="L968">                        default: parse_error(&quot;invalid keyword id (&quot;+kwt+&quot;) encountered while parsing a null&quot;);</span>
+                        }
+                        // at this point we've consumed a dot '.' and it's preceding whitespace
+                        // clear_value();
+<span class="fc" id="L972">                        current_value_is_null(_null_type);</span>
+                        // set to null_type in above call: _value_type = IonType.NULL;
+<span class="fc" id="L974">                        break;</span>
+                    }
+                    case IonTokenConstsX.KEYWORD_TRUE:
+<span class="fc" id="L977">                        _value_type = IonType.BOOL;</span>
+<span class="fc" id="L978">                        current_value_is_bool(true);</span>
+<span class="fc" id="L979">                        break;</span>
+                    case IonTokenConstsX.KEYWORD_FALSE:
+<span class="fc" id="L981">                        _value_type = IonType.BOOL;</span>
+<span class="fc" id="L982">                        current_value_is_bool(false);</span>
+<span class="fc" id="L983">                        break;</span>
+                    case IonTokenConstsX.KEYWORD_NAN:
+<span class="fc" id="L985">                        _value_type = IonType.FLOAT;</span>
+<span class="fc" id="L986">                        clear_current_value_buffer();</span>
+<span class="fc" id="L987">                        _v.setValue(Double.NaN);</span>
+<span class="fc" id="L988">                        _v.setAuthoritativeType(AS_TYPE.double_value);</span>
+<span class="fc" id="L989">                        break;</span>
+                    case IonTokenConstsX.KEYWORD_sid:
+                    {
+<span class="fc" id="L992">                        int sid = IonTokenConstsX.decodeSid(sb);</span>
+<span class="fc" id="L993">                        _v.setValue(sid);</span>
+<span class="fc" id="L994">                        _v.setAuthoritativeType(AS_TYPE.int_value);</span>
+                    }
+                    default:
+                        // We don't care about any other 'keywords'
+<span class="fc" id="L998">                        _value_type = IonType.SYMBOL;</span>
+<span class="fc" id="L999">                        break;</span>
+                    }
+                }
+<span class="fc bfc" id="L1002" title="All 2 branches covered.">                else if (t == IonTokenConstsX.TOKEN_DOT) {</span>
+<span class="fc" id="L1003">                    _value_type = IonType.SYMBOL;</span>
+<span class="fc" id="L1004">                    clear_current_value_buffer();</span>
+<span class="fc" id="L1005">                    _v.setValue(&quot;.&quot;);</span>
+<span class="fc" id="L1006">                    _v.setAuthoritativeType(AS_TYPE.string_value);</span>
+                }
+                else {
+                    // if it's not a symbol we just look at the token type
+<span class="fc" id="L1010">                    _value_type = IonTokenConstsX.ion_type_of_scalar(t);</span>
+                }
+<span class="fc" id="L1012">                int state_after_scalar = get_state_after_value();</span>
+<span class="fc" id="L1013">                set_state(state_after_scalar);</span>
+<span class="fc" id="L1014">                return;</span>
+            case ACTION_PLUS_INF:
+<span class="fc" id="L1016">                _value_type = IonType.FLOAT;</span>
+<span class="fc" id="L1017">                clear_current_value_buffer();</span>
+<span class="fc" id="L1018">                _v.setValue(Double.POSITIVE_INFINITY);</span>
+<span class="fc" id="L1019">                _v.setAuthoritativeType(AS_TYPE.double_value);</span>
+<span class="fc" id="L1020">                state_after_scalar = get_state_after_value();</span>
+<span class="fc" id="L1021">                set_state(state_after_scalar);</span>
+<span class="fc" id="L1022">                return;</span>
+            case ACTION_MINUS_INF:
+<span class="fc" id="L1024">                _value_type = IonType.FLOAT;</span>
+<span class="fc" id="L1025">                clear_current_value_buffer();</span>
+<span class="fc" id="L1026">                _v.setValue(Double.NEGATIVE_INFINITY);</span>
+<span class="fc" id="L1027">                _v.setAuthoritativeType(AS_TYPE.double_value);</span>
+<span class="fc" id="L1028">                state_after_scalar = get_state_after_value();</span>
+<span class="fc" id="L1029">                set_state(state_after_scalar);</span>
+<span class="fc" id="L1030">                return;</span>
+            case ACTION_EAT_COMMA:
+<span class="pc bpc" id="L1032" title="1 of 2 branches missed.">                if (_container_prohibits_commas) {</span>
+<span class="nc" id="L1033">                    parse_error(&quot;commas aren't used to separate values in &quot;+getContainerType().toString());</span>
+                }
+<span class="fc" id="L1035">                int new_state = STATE_BEFORE_ANNOTATION_CONTAINED;</span>
+<span class="fc bfc" id="L1036" title="All 2 branches covered.">                if (_container_is_struct) {</span>
+<span class="fc" id="L1037">                    new_state = STATE_BEFORE_FIELD_NAME;</span>
+                }
+<span class="fc" id="L1039">                set_state(new_state);</span>
+<span class="fc" id="L1040">                _scanner.tokenIsFinished();</span>
+                // when we eat a comma we need to reset the current
+                // value start used to define a span, since the comma
+                // isn't part of the span when it's hoisted
+<span class="fc" id="L1044">                _value_start_offset = _scanner.getStartingOffset();</span>
+<span class="fc" id="L1045">                t = _scanner.nextToken();</span>
+<span class="fc" id="L1046">                break;</span>
+            case ACTION_FINISH_CONTAINER:
+<span class="fc" id="L1048">                new_state = get_state_after_container(t);</span>
+<span class="fc" id="L1049">                set_state(new_state);</span>
+<span class="fc" id="L1050">                _eof = true;</span>
+<span class="fc" id="L1051">                return;</span>
+            case ACTION_FINISH_LOB:
+<span class="nc" id="L1053">                state_after_scalar = get_state_after_value();</span>
+<span class="nc" id="L1054">                set_state(state_after_scalar);</span>
+<span class="nc" id="L1055">                return;</span>
+            case ACTION_FINISH_DATAGRAM:
+<span class="pc bpc" id="L1057" title="1 of 2 branches missed.">                if (getDepth() != 0) {</span>
+<span class="nc" id="L1058">                    parse_error(&quot;state failure end of datagram encounterd with a non-container stack&quot;);</span>
+                }
+<span class="fc" id="L1060">                set_state(STATE_EOF);</span>
+<span class="fc" id="L1061">                _eof = true;</span>
+<span class="fc" id="L1062">                return;</span>
+<span class="nc" id="L1063">            default: parse_error(&quot;unexpected token encountered: &quot;+IonTokenConstsX.getTokenName(t));</span>
+            }
+<span class="fc" id="L1065">        }</span>
+    }
+
+    protected final StringBuilder token_contents_load(int token_type) throws IOException
+    {
+<span class="fc" id="L1070">        StringBuilder sb = _current_value_buffer;</span>
+        boolean       clob_chars_only;
+        int           c;
+
+<span class="fc bfc" id="L1074" title="All 2 branches covered.">        if (_current_value_buffer_loaded) {</span>
+<span class="fc" id="L1075">            return sb;</span>
+        }
+<span class="fc bfc" id="L1077" title="All 2 branches covered.">        else if (_current_value_save_point_loaded) {</span>
+<span class="pc bpc" id="L1078" title="3 of 6 branches missed.">            assert(!_scanner.isUnfinishedToken() &amp;&amp; !_current_value_save_point.isClear());</span>
+            // _scanner.load_save_point_contents( _current_value_save_point, sb);
+
+<span class="fc" id="L1081">            _scanner.save_point_activate(_current_value_save_point);</span>
+<span class="pc bpc" id="L1082" title="2 of 6 branches missed.">            switch (token_type) {</span>
+            default:
+<span class="nc" id="L1084">                _scanner.load_raw_characters(sb);</span>
+<span class="nc" id="L1085">                break;</span>
+            case IonTokenConstsX.TOKEN_SYMBOL_IDENTIFIER:
+<span class="fc" id="L1087">                _scanner.load_symbol_identifier(sb);</span>
+<span class="fc" id="L1088">                _value_type = IonType.SYMBOL;</span>
+<span class="fc" id="L1089">                break;</span>
+            case IonTokenConstsX.TOKEN_SYMBOL_OPERATOR:
+<span class="nc" id="L1091">                _scanner.load_symbol_operator(sb);</span>
+<span class="nc" id="L1092">                _value_type = IonType.SYMBOL;</span>
+<span class="nc" id="L1093">                break;</span>
+            case IonTokenConstsX.TOKEN_SYMBOL_QUOTED:
+<span class="pc bpc" id="L1095" title="1 of 2 branches missed.">                clob_chars_only = (IonType.CLOB == _value_type);</span>
+<span class="fc" id="L1096">                _scanner.load_single_quoted_string(sb, clob_chars_only);</span>
+<span class="fc" id="L1097">                _value_type = IonType.SYMBOL;</span>
+<span class="fc" id="L1098">                break;</span>
+            case IonTokenConstsX.TOKEN_STRING_DOUBLE_QUOTE:
+<span class="pc bpc" id="L1100" title="1 of 2 branches missed.">                clob_chars_only = (IonType.CLOB == _value_type);</span>
+<span class="fc" id="L1101">                _scanner.load_double_quoted_string(sb, clob_chars_only);</span>
+<span class="fc" id="L1102">                _value_type = IonType.STRING;</span>
+<span class="fc" id="L1103">                break;</span>
+            case IonTokenConstsX.TOKEN_STRING_TRIPLE_QUOTE:
+<span class="pc bpc" id="L1105" title="1 of 2 branches missed.">                clob_chars_only = (IonType.CLOB == _value_type);</span>
+<span class="fc" id="L1106">                _scanner.load_triple_quoted_string(sb, clob_chars_only);</span>
+<span class="fc" id="L1107">                _value_type = IonType.STRING;</span>
+                break;
+            }
+<span class="fc" id="L1110">            _scanner.save_point_deactivate(_current_value_save_point);</span>
+<span class="fc" id="L1111">            _current_value_buffer_loaded = true;</span>
+        }
+        else {
+<span class="fc" id="L1114">            _scanner.save_point_start(_current_value_save_point);</span>
+<span class="pc bpc" id="L1115" title="1 of 7 branches missed.">            switch (token_type) {</span>
+            case IonTokenConstsX.TOKEN_UNKNOWN_NUMERIC:
+            case IonTokenConstsX.TOKEN_INT:
+            case IonTokenConstsX.TOKEN_BINARY:
+            case IonTokenConstsX.TOKEN_HEX:
+            case IonTokenConstsX.TOKEN_FLOAT:
+            case IonTokenConstsX.TOKEN_DECIMAL:
+            case IonTokenConstsX.TOKEN_TIMESTAMP:
+<span class="fc" id="L1123">                _value_type = _scanner.load_number(sb);</span>
+<span class="fc" id="L1124">                break;</span>
+            case IonTokenConstsX.TOKEN_SYMBOL_IDENTIFIER:
+<span class="fc" id="L1126">                _scanner.load_symbol_identifier(sb);</span>
+<span class="fc" id="L1127">                _value_type = IonType.SYMBOL;</span>
+<span class="fc" id="L1128">                break;</span>
+            case IonTokenConstsX.TOKEN_SYMBOL_OPERATOR:
+<span class="fc" id="L1130">                _scanner.load_symbol_operator(sb);</span>
+<span class="fc" id="L1131">                _value_type = IonType.SYMBOL;</span>
+<span class="fc" id="L1132">                break;</span>
+            case IonTokenConstsX.TOKEN_SYMBOL_QUOTED:
+<span class="pc bpc" id="L1134" title="1 of 2 branches missed.">                clob_chars_only = (IonType.CLOB == _value_type);</span>
+<span class="fc" id="L1135">                c = _scanner.load_single_quoted_string(sb, clob_chars_only);</span>
+<span class="pc bpc" id="L1136" title="1 of 2 branches missed.">                if (c == UnifiedInputStreamX.EOF) {</span>
+                    //String message = &quot;EOF encountered before closing single quote&quot;;
+                    //parse_error(message);
+<span class="nc" id="L1139">                    _scanner.unexpected_eof();</span>
+                }
+<span class="fc" id="L1141">                _value_type = IonType.SYMBOL;</span>
+<span class="fc" id="L1142">                break;</span>
+            case IonTokenConstsX.TOKEN_STRING_DOUBLE_QUOTE:
+<span class="pc bpc" id="L1144" title="1 of 2 branches missed.">                clob_chars_only = (IonType.CLOB == _value_type);</span>
+<span class="fc" id="L1145">                c = _scanner.load_double_quoted_string(sb, clob_chars_only);</span>
+<span class="fc bfc" id="L1146" title="All 2 branches covered.">                if (c == UnifiedInputStreamX.EOF) {</span>
+                    // String message = &quot;EOF encountered before closing single quote&quot;;
+                    // parse_error(message);
+<span class="nc" id="L1149">                    _scanner.unexpected_eof();</span>
+                }
+<span class="fc" id="L1151">                _value_type = IonType.STRING;</span>
+<span class="fc" id="L1152">                break;</span>
+            case IonTokenConstsX.TOKEN_STRING_TRIPLE_QUOTE:
+<span class="pc bpc" id="L1154" title="1 of 2 branches missed.">                clob_chars_only = (IonType.CLOB == _value_type);</span>
+<span class="fc" id="L1155">                c = _scanner.load_triple_quoted_string(sb, clob_chars_only);</span>
+<span class="fc bfc" id="L1156" title="All 2 branches covered.">                if (c == UnifiedInputStreamX.EOF) {</span>
+                    //String message = &quot;EOF encountered before closing single quote&quot;;
+                    //parse_error(message);
+<span class="nc" id="L1159">                    _scanner.unexpected_eof();</span>
+                }
+<span class="fc" id="L1161">                _value_type = IonType.STRING;</span>
+<span class="fc" id="L1162">                break;</span>
+            default:
+<span class="nc" id="L1164">                String message = &quot;unexpected token &quot;</span>
+<span class="nc" id="L1165">                               + IonTokenConstsX.getTokenName(token_type)</span>
+                               + &quot; encountered&quot;;
+<span class="nc" id="L1167">                throw new IonException(message);</span>
+            }
+<span class="fc" id="L1169">            _current_value_save_point.markEnd();</span>
+<span class="fc" id="L1170">            _current_value_save_point_loaded = true;</span>
+<span class="fc" id="L1171">            _current_value_buffer_loaded = true;</span>
+<span class="fc" id="L1172">            tokenValueIsFinished();</span>
+        }
+<span class="fc" id="L1174">        return sb;</span>
+    }
+
+    /**
+     * called by super classes to tell us that the
+     * current token has been consumed.
+     */
+    protected void tokenValueIsFinished()
+    {
+<span class="fc" id="L1183">        _scanner.tokenIsFinished();</span>
+<span class="fc bfc" id="L1184" title="All 4 branches covered.">        if (IonType.BLOB.equals(_value_type) || IonType.CLOB.equals(_value_type))</span>
+        {
+<span class="fc" id="L1186">            int state_after_scalar = get_state_after_value();</span>
+<span class="fc" id="L1187">            set_state(state_after_scalar);</span>
+        }
+<span class="fc" id="L1189">    }</span>
+
+    private final void push_container_state(IonType newContainer)
+    {
+<span class="fc" id="L1193">        int oldlen = _container_state_stack.length;</span>
+<span class="fc bfc" id="L1194" title="All 2 branches covered.">        if (_container_state_top &gt;= oldlen) {</span>
+<span class="fc" id="L1195">            int newlen = oldlen * 2;</span>
+<span class="fc" id="L1196">            IonType[] temp = new IonType[newlen];</span>
+<span class="fc" id="L1197">            System.arraycopy(_container_state_stack, 0, temp, 0, oldlen);</span>
+<span class="fc" id="L1198">            _container_state_stack = temp;</span>
+        }
+<span class="fc" id="L1200">        set_container_flags(newContainer);</span>
+<span class="fc" id="L1201">        _container_state_stack[_container_state_top++] = newContainer;</span>
+<span class="fc" id="L1202">    }</span>
+
+    private final void pop_container_state() {
+<span class="fc" id="L1205">        _container_state_top--;</span>
+<span class="fc" id="L1206">        set_container_flags(top_state());</span>
+<span class="fc" id="L1207">        _eof = false;</span>
+<span class="fc" id="L1208">        _has_next_called = false;</span>
+
+<span class="fc" id="L1210">        int new_state = get_state_after_container();</span>
+<span class="fc" id="L1211">        set_state(new_state);</span>
+<span class="fc" id="L1212">    }</span>
+
+    private final IonType top_state() {
+<span class="fc" id="L1215">        int top = _container_state_top - 1;</span>
+<span class="fc" id="L1216">        IonType top_container = _container_state_stack[top];</span>
+<span class="fc" id="L1217">        return top_container;</span>
+    }
+
+    public IonType getType()
+    {
+<span class="fc" id="L1222">        return _value_type;</span>
+    }
+    // externally we're if we're in a hoisted struct
+    // we're not really in a struct, we at the top level
+    public boolean isInStruct()
+    {
+<span class="fc" id="L1228">        boolean in_struct = false;</span>
+<span class="fc" id="L1229">        IonType container = getContainerType();</span>
+<span class="fc bfc" id="L1230" title="All 2 branches covered.">        if (IonType.STRUCT.equals(container)) {</span>
+<span class="fc bfc" id="L1231" title="All 2 branches covered.">            if (getDepth() &gt; 0) {</span>
+<span class="fc" id="L1232">                in_struct = true;</span>
+            }
+            else {
+<span class="pc bpc" id="L1235" title="2 of 4 branches missed.">                assert(IonType.STRUCT.equals(_nesting_parent) == true);</span>
+            }
+        }
+<span class="fc" id="L1238">        return in_struct;</span>
+    }
+    // internally (really only in parse_to_next()) we care
+    // about being in a struct even if it's a hoisted container
+    // since the hoisted values will still have a field name we
+    // have to ignore
+    private boolean is_in_struct_internal()
+    {
+<span class="fc" id="L1246">        boolean in_struct = false;</span>
+<span class="fc" id="L1247">        IonType container = getContainerType();</span>
+<span class="fc bfc" id="L1248" title="All 2 branches covered.">        if (IonType.STRUCT.equals(container)) {</span>
+<span class="fc" id="L1249">            in_struct = true;</span>
+        }
+<span class="fc" id="L1251">        return in_struct;</span>
+    }
+    public IonType getContainerType()
+    {
+<span class="pc bpc" id="L1255" title="1 of 2 branches missed.">        if (_container_state_top == 0) return IonType.DATAGRAM;</span>
+<span class="fc" id="L1256">        return _container_state_stack[_container_state_top - 1];</span>
+    }
+    public int getDepth()
+    {
+<span class="fc" id="L1260">        int depth = _container_state_top;</span>
+<span class="pc bpc" id="L1261" title="1 of 2 branches missed.">        if (depth &gt; 0) {</span>
+<span class="fc" id="L1262">int debugging_depth = depth;</span>
+<span class="fc" id="L1263">            IonType top_type = _container_state_stack[0];</span>
+<span class="fc bfc" id="L1264" title="All 2 branches covered.">            if (_nesting_parent == null) {</span>
+<span class="pc bpc" id="L1265" title="1 of 2 branches missed.">                if (IonType.DATAGRAM.equals(top_type)) {</span>
+<span class="fc" id="L1266">                    depth--;</span>
+                }
+            }
+            else {
+<span class="pc bpc" id="L1270" title="1 of 2 branches missed.">                if (_nesting_parent.equals(top_type)) {</span>
+<span class="fc" id="L1271">                    depth--;</span>
+                }
+            }
+<span class="pc bpc" id="L1274" title="1 of 2 branches missed.">if (depth == debugging_depth) {</span>
+<span class="nc" id="L1275">    System.err.println(&quot;so here's a case where we didn't subtract 1&quot;);</span>
+}
+        }
+<span class="fc" id="L1278">        return depth;</span>
+    }
+
+    public String getFieldName()
+    {
+        // For hoisting
+<span class="nc bnc" id="L1284" title="All 4 branches missed.">        if (getDepth() == 0 &amp;&amp; is_in_struct_internal()) return null;</span>
+
+<span class="nc" id="L1286">        String name = _field_name;</span>
+<span class="nc bnc" id="L1287" title="All 4 branches missed.">        if (name == null &amp;&amp; _field_name_sid &gt; 0)</span>
+        {
+<span class="nc" id="L1289">            throw new UnknownSymbolException(_field_name_sid);</span>
+        }
+<span class="nc" id="L1291">        return name;</span>
+    }
+
+    final String getRawFieldName()
+    {
+        // For hoisting
+<span class="fc bfc" id="L1297" title="All 4 branches covered.">        if (getDepth() == 0 &amp;&amp; is_in_struct_internal()) return null;</span>
+<span class="fc" id="L1298">        return _field_name;</span>
+    }
+
+    public int getFieldId()
+    {
+        // For hoisting
+<span class="fc bfc" id="L1304" title="All 4 branches covered.">        if (getDepth() == 0 &amp;&amp; is_in_struct_internal()) return UNKNOWN_SYMBOL_ID;</span>
+<span class="fc" id="L1305">        return _field_name_sid;</span>
+    }
+
+    public SymbolToken getFieldNameSymbol()
+    {
+        // For hoisting
+<span class="fc bfc" id="L1311" title="All 4 branches covered.">        if (getDepth() == 0 &amp;&amp; is_in_struct_internal()) return null;</span>
+
+<span class="fc" id="L1313">        String name = _field_name;</span>
+<span class="fc" id="L1314">        int sid = getFieldId();</span>
+<span class="fc bfc" id="L1315" title="All 4 branches covered.">        if (name == null &amp;&amp; sid == UNKNOWN_SYMBOL_ID) return null;</span>
+<span class="fc" id="L1316">        return new SymbolTokenImpl(name, sid);</span>
+    }
+
+    public Iterator&lt;String&gt; iterateTypeAnnotations()
+    {
+<span class="fc" id="L1321">        return _Private_Utils.stringIterator(getTypeAnnotations());</span>
+    }
+
+    public String[] getTypeAnnotations()
+    {
+<span class="fc" id="L1326">        return _Private_Utils.toStrings(_annotations, _annotation_count);</span>
+    }
+
+
+    public void stepIn()
+    {
+<span class="pc bpc" id="L1332" title="2 of 4 branches missed.">        if (_value_type == null || _eof) {</span>
+<span class="nc" id="L1333">            throw new IllegalStateException();</span>
+        }
+<span class="pc bpc" id="L1335" title="1 of 2 branches missed.">        switch (_value_type) {</span>
+        case STRUCT:
+        case LIST:
+        case SEXP:
+<span class="fc" id="L1339">            break;</span>
+        default:
+<span class="nc" id="L1341">            throw new IllegalStateException();</span>
+        }
+
+<span class="fc" id="L1344">        int new_state = get_state_at_container_start(_value_type);</span>
+<span class="fc" id="L1345">        set_state(new_state);</span>
+
+<span class="fc" id="L1347">        push_container_state(_value_type);</span>
+
+<span class="fc" id="L1349">        _scanner.tokenIsFinished();</span>
+        try {
+<span class="fc" id="L1351">            finish_value(null);</span>
+        }
+<span class="nc" id="L1353">        catch (IOException e) {</span>
+<span class="nc" id="L1354">            throw new IonException(e);</span>
+<span class="fc" id="L1355">        }</span>
+<span class="fc bfc" id="L1356" title="All 2 branches covered.">        if (_v.isNull()) {</span>
+<span class="fc" id="L1357">            _eof = true;</span>
+<span class="fc" id="L1358">            _has_next_called = true;  // there are no contents in a null container</span>
+        }
+
+<span class="fc" id="L1361">        _value_type = null;</span>
+
+        if (_debug) System.out.println(&quot;stepInto() new depth: &quot;+getDepth());
+<span class="fc" id="L1364">    }</span>
+    public void stepOut()
+    {
+<span class="fc bfc" id="L1367" title="All 2 branches covered.">        if (getDepth() &lt; 1) {</span>
+<span class="fc" id="L1368">            throw new IllegalStateException(IonMessages.CANNOT_STEP_OUT);</span>
+        }
+        try {
+<span class="fc" id="L1371">            finish_value(null);</span>
+<span class="pc bpc" id="L1372" title="2 of 5 branches missed.">            switch (getContainerType()) {</span>
+            case STRUCT:
+<span class="fc bfc" id="L1374" title="All 2 branches covered.">                if (!_eof) _scanner.skip_over_struct();</span>
+                break;
+            case LIST:
+<span class="fc bfc" id="L1377" title="All 2 branches covered.">                if (!_eof) _scanner.skip_over_list();</span>
+                break;
+            case SEXP:
+<span class="fc bfc" id="L1380" title="All 2 branches covered.">                if (!_eof) _scanner.skip_over_sexp();</span>
+                break;
+            case DATAGRAM:
+<span class="nc" id="L1383">                break;</span>
+            default:
+<span class="nc" id="L1385">                throw new IllegalStateException();</span>
+            }
+        }
+<span class="nc" id="L1388">        catch (IOException e) {</span>
+<span class="nc" id="L1389">            throw new IonException(e);</span>
+<span class="fc" id="L1390">        }</span>
+<span class="fc" id="L1391">        pop_container_state();</span>
+<span class="fc" id="L1392">        _scanner.tokenIsFinished();</span>
+        try {
+<span class="fc" id="L1394">            finish_value(null);</span>
+        }
+<span class="nc" id="L1396">        catch (IOException e) {</span>
+<span class="nc" id="L1397">            throw new IonException(e);</span>
+<span class="fc" id="L1398">        }</span>
+
+<span class="fc" id="L1400">        clear_value();</span>
+
+        if (_debug) System.out.println(&quot;stepOUT() new depth: &quot;+getDepth());
+<span class="fc" id="L1403">    }</span>
+
+    //
+    // symbol related code that is inactive in this parser
+    //
+    public SymbolTable getSymbolTable()
+    {
+<span class="fc" id="L1410">        return null;</span>
+    }
+
+    //
+    // helper classes
+    //
+
+    public static class IonReaderTextParsingException extends IonException {
+        private static final long serialVersionUID = 1L;
+
+        IonReaderTextParsingException(String msg) {
+<span class="fc" id="L1421">            super(msg);</span>
+<span class="fc" id="L1422">        }</span>
+        IonReaderTextParsingException(Exception e) {
+<span class="nc" id="L1424">            super(e);</span>
+<span class="nc" id="L1425">        }</span>
+        IonReaderTextParsingException(String msg, Exception e) {
+<span class="fc" id="L1427">            super(msg, e);</span>
+<span class="fc" id="L1428">        }</span>
+    }
+
+    protected final void parse_error(String reason) {
+<span class="fc" id="L1432">        String message =</span>
+                &quot;Syntax error&quot;
+<span class="fc" id="L1434">              + _scanner.input_position()</span>
+              + &quot;: &quot;
+              + reason;
+<span class="fc" id="L1437">        throw new IonReaderTextParsingException(message);</span>
+    }
+    protected final void parse_error(Exception e) {
+<span class="fc" id="L1440">        String message =</span>
+                &quot;Syntax error at &quot;
+<span class="fc" id="L1442">              + _scanner.input_position()</span>
+              + &quot;: &quot;
+<span class="fc" id="L1444">              + e.getLocalizedMessage();</span>
+<span class="fc" id="L1445">        throw new IonReaderTextParsingException(message, e);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

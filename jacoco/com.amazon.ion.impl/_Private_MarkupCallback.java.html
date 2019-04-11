@@ -1,0 +1,353 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>_Private_MarkupCallback.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl</a> &gt; <span class="el_source">_Private_MarkupCallback.java</span></div><h1>_Private_MarkupCallback.java</h1><pre class="source lang-java linenums">
+/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl;
+
+import com.amazon.ion.IonType;
+import com.amazon.ion.SymbolToken;
+
+import com.amazon.ion.system.IonTextWriterBuilder;
+import com.amazon.ion.util._Private_FastAppendable;
+import java.io.IOException;
+
+/**
+ * NOT FOR APPLICATION USE!
+ *
+ *
+ * Callback for giving users the ability to inject markup into their Ion
+ * documents.
+ * &lt;p&gt;
+ * Customers who want to inject markup into their Ion documents will need to
+ * extend {@link _Private_MarkupCallback}, implement {@link _Private_CallbackBuilder} to build new
+ * instances, and pass an instance of their {@link _Private_CallbackBuilder} into
+ * {@link IonTextWriterBuilder#setCallbackBuilder(_Private_CallbackBuilder)} or
+ * {@link IonTextWriterBuilder#withCallbackBuilder(_Private_CallbackBuilder)}
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * Note: It is only necessary for subclasses to implement methods they're using
+ * to inject markup.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * When all method are called, they are called with (at least) an
+ * {@link IonType} that represents either the type of data being written or the
+ * container type that the writer is writing, or currently inside.
+ * before/afterFieldName and before/afterEachAnnotation get, respectively, the
+ * field name and annotation that is being written. Methods can use
+ * {@link #myAppendable} access the output stream.
+ * &lt;/p&gt;
+ * &lt;h3&gt;Example Calls&lt;/h3&gt;
+ * &lt;p&gt;
+ * Here are some example call patterns, using the following syntax to show where
+ * calls will be executed (whitespace is used to increase readability):
+ *
+ * &lt;pre&gt;
+ * &amp;lt;methodName TYPE&amp;gt;
+ * &lt;/pre&gt;
+ *
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * Input:
+ *
+ * &lt;pre&gt;
+ * { cookies:&quot;Chocolate Chip&quot; }
+ * &lt;/pre&gt;
+ *
+ * Output:
+ *
+ * &lt;pre&gt;
+ * &amp;lt;beforeData STRUCT&amp;gt;{&amp;lt;afterStepIn STRUCT&amp;gt;
+ *     &amp;lt;beforeFieldName STRING &quot;cookies&quot;&amp;gt; cookies &amp;lt;afterFieldName STRING &quot;cookies&quot;&amp;gt;:&amp;lt;beforeData STRING&amp;gt; &quot;Chocolate Chip&quot; &amp;lt;afterData STRING&amp;gt;
+ * &amp;lt;beforeStepOut STRUCT&amp;gt;}&amp;lt;afterData STRUCT&amp;gt;
+ * &lt;/pre&gt;
+ *
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * Input:
+ *
+ * &lt;pre&gt;
+ * anno1::anno2::{
+ *   fname:&quot;John&quot;,
+ *   lname:&quot;Smith&quot;,
+ *   age:32.785
+ * }
+ * &lt;/pre&gt;
+ *
+ * Output:
+ *
+ * &lt;pre&gt;
+ * &amp;lt;beforeAnnotations STRUCT&amp;gt;
+ *   &amp;lt;beforeEachAnnotation STRUCT &quot;anno1&quot;&amp;gt;anno1&amp;lt;afterEachAnnotation STRUCT &quot;anno1&quot;&amp;gt;::
+ *   &amp;lt;beforeEachAnnotation STRUCT &quot;anno2&quot;&amp;gt;anno2&amp;lt;afterEachAnnotation STRUCT &quot;anno2&quot;&amp;gt;::
+ * &amp;lt;afterAnnotations STRUCT&amp;gt;
+ * &amp;lt;beforeData STRUCT&amp;gt;{&amp;lt;afterStepIn STRUCT&amp;gt;
+ *     &amp;lt;beforeFieldName STRING &quot;fname&quot;&amp;gt;fname&amp;lt;afterFieldName STRING &quot;fname&quot;&amp;gt;:&amp;lt;beforeData STRING&amp;gt;&quot;John&quot;&amp;lt;afterData STRING&amp;gt;&amp;lt;beforeSeparator STRUCT&amp;gt;,&amp;lt;afterSeparator STRUCT&amp;gt;
+ *     &amp;lt;beforeFieldName STRING &quot;lname&quot;&amp;gt;lname&amp;lt;afterFieldName STRING &quot;lname&quot;&amp;gt;:&amp;lt;beforeData STRING&amp;gt;&quot;Smith&quot;&amp;lt;afterData STRING&amp;gt;&amp;lt;beforeSeparator STRUCT&amp;gt;,&amp;lt;afterSeparator STRUCT&amp;gt;
+ *     &amp;lt;beforeFieldName DECIMAL &quot;age&quot;&amp;gt;age&amp;lt;afterFieldName DECIMAL &quot;age&quot;&amp;gt;:&amp;lt;beforeData DECIMAL&amp;gt;32.785&amp;lt;afterData DECIMAL&amp;gt;
+ * &amp;lt;beforeStepOut STRUCT&amp;gt;}&amp;lt;afterData STRUCT&amp;gt;
+ * &lt;/pre&gt;
+ *
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * Input:
+ *
+ * &lt;pre&gt;
+ * (where (field (this) result) (== (field (curr) majorVersionString) &quot;1.0&quot;))
+ * &lt;/pre&gt;
+ *
+ * Output:
+ *
+ * &lt;pre&gt;
+ * &amp;lt;beforeData SEXP&amp;gt;(&amp;lt;afterStepIn SEXP&amp;gt;
+ *     &amp;lt;beforeData SYMBOL&amp;gt;where&amp;lt;afterData SYMBOL&amp;gt;&amp;lt;beforeSeparator SEXP&amp;gt; &amp;lt;afterSeparator SEXP&amp;gt;
+ *     &amp;lt;beforeData SEXP&amp;gt;(&amp;lt;afterStepIn SEXP&amp;gt;
+ *         &amp;lt;beforeData SYMBOL&amp;gt;field&amp;lt;afterData SYMBOL&amp;gt;&amp;lt;beforeSeparator SEXP&amp;gt; &amp;lt;afterSeparator SEXP&amp;gt;
+ *         &amp;lt;beforeData SEXP&amp;gt;(&amp;lt;afterStepIn SEXP&amp;gt;
+ *             &amp;lt;beforeData SYMBOL&amp;gt;this&amp;lt;afterData SYMBOL&amp;gt;
+ *         &amp;lt;beforeStepOut SEXP&amp;gt;)&amp;lt;afterData SEXP&amp;gt;&amp;lt;beforeSeparator SEXP&amp;gt; &amp;lt;afterSeparator SEXP&amp;gt;
+ *         &amp;lt;beforeData SYMBOL&amp;gt;result&amp;lt;afterData SYMBOL&amp;gt;
+ *     &amp;lt;beforeStepOut SEXP&amp;gt;)&amp;lt;afterData SEXP&amp;gt;&amp;lt;beforeSeparator SEXP&amp;gt; &amp;lt;afterSeparator SEXP&amp;gt;
+ *     &amp;lt;beforeData SEXP&amp;gt;(&amp;lt;afterStepIn SEXP&amp;gt;
+ *         &amp;lt;beforeData SYMBOL&amp;gt;==&amp;lt;afterData SYMBOL&amp;gt;&amp;lt;beforeSeparator SEXP&amp;gt; &amp;lt;afterSeparator SEXP&amp;gt;
+ *         &amp;lt;beforeData SEXP&amp;gt;(&amp;lt;afterStepIn SEXP&amp;gt;
+ *             &amp;lt;beforeData SYMBOL&amp;gt;field&amp;lt;afterData SYMBOL&amp;gt;&amp;lt;beforeSeparator SEXP&amp;gt; &amp;lt;afterSeparator SEXP&amp;gt;
+ *             &amp;lt;beforeData SEXP&amp;gt;(&amp;lt;afterStepIn SEXP&amp;gt;
+ *                 &amp;lt;beforeData SYMBOL&amp;gt;curr&amp;lt;afterData SYMBOL&amp;gt;
+ *             &amp;lt;beforeStepOut SEXP&amp;gt;)&amp;lt;afterData SEXP&amp;gt;&amp;lt;beforeSeparator SEXP&amp;gt; &amp;lt;afterSeparator SEXP&amp;gt;
+ *             &amp;lt;beforeData SYMBOL&amp;gt;majorVersionString&amp;lt;afterData SYMBOL&amp;gt;
+ *         &amp;lt;beforeStepOut SEXP&amp;gt;)&amp;lt;afterData SEXP&amp;gt;&amp;lt;beforeSeparator SEXP&amp;gt; &amp;lt;afterSeparator SEXP&amp;gt;
+ *         &amp;lt;beforeData STRING&amp;gt;&quot;1.0&quot;&amp;lt;afterData STRING&amp;gt;
+ *     &amp;lt;beforeStepOut SEXP&amp;gt;)&amp;lt;afterData SEXP&amp;gt;
+ * &amp;lt;beforeStepOut SEXP&amp;gt;)&amp;lt;afterData SEXP&amp;gt;
+ * &lt;/pre&gt;
+ *
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * Input:
+ *
+ * &lt;pre&gt;
+ * 1 5 &quot;Cheesecake&quot; 3.2 true null 'baby tigers' 47e1
+ * &lt;/pre&gt;
+ *
+ * Output:
+ *
+ * &lt;pre&gt;
+ * &amp;lt;beforeData INT&amp;gt;1&amp;lt;afterData INT&amp;gt;&amp;lt;beforeSeparator DATAGRAM&amp;gt; &amp;lt;afterSeparator DATAGRAM&amp;gt;
+ * &amp;lt;beforeData INT&amp;gt;5&amp;lt;afterData INT&amp;gt;&amp;lt;beforeSeparator DATAGRAM&amp;gt; &amp;lt;afterSeparator DATAGRAM&amp;gt;
+ * &amp;lt;beforeData STRING&amp;gt;&quot;Cheesecake&quot;&amp;lt;afterData STRING&amp;gt;&amp;lt;beforeSeparator DATAGRAM&amp;gt; &amp;lt;afterSeparator DATAGRAM&amp;gt;
+ * &amp;lt;beforeData DECIMAL&amp;gt;3.2&amp;lt;afterData DECIMAL&amp;gt;&amp;lt;beforeSeparator DATAGRAM&amp;gt; &amp;lt;afterSeparator DATAGRAM&amp;gt;
+ * &amp;lt;beforeData BOOL&amp;gt;true&amp;lt;afterData BOOL&amp;gt;&amp;lt;beforeSeparator DATAGRAM&amp;gt; &amp;lt;afterSeparator DATAGRAM&amp;gt;
+ * &amp;lt;beforeData NULL&amp;gt;null&amp;lt;afterData NULL&amp;gt;&amp;lt;beforeSeparator DATAGRAM&amp;gt; &amp;lt;afterSeparator DATAGRAM&amp;gt;
+ * &amp;lt;beforeData SYMBOL&amp;gt;'baby tigers'&amp;lt;afterData SYMBOL&amp;gt;&amp;lt;beforeSeparator DATAGRAM&amp;gt; &amp;lt;afterSeparator DATAGRAM&amp;gt;
+ * &amp;lt;beforeData FLOAT&amp;gt;470.0e0&amp;lt;afterData FLOAT&amp;gt;
+ * &lt;/pre&gt;
+ *
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * Input:
+ *
+ * &lt;pre&gt;
+ * [true, 3.4, 3d6, 2.3e8, &quot;string&quot;, '''multi-''' '''string''',Symbol, 'qSymbol',
+ *     {{&quot;clob data&quot;}}, {{YmxvYiBkYXRh}}, 1970-06-06, null.struct]
+ * &lt;/pre&gt;
+ *
+ * Output:
+ *
+ * &lt;pre&gt;
+ * &amp;lt;beforeData LIST&amp;gt;[&amp;lt;afterStepIn LIST&amp;gt;
+ *     &amp;lt;beforeData BOOL&amp;gt;true&amp;lt;afterData BOOL&amp;gt;&amp;lt;beforeSeparator LIST&amp;gt;,&amp;lt;afterSeparator LIST&amp;gt;
+ *     &amp;lt;beforeData DECIMAL&amp;gt;3.4&amp;lt;afterData DECIMAL&amp;gt;&amp;lt;beforeSeparator LIST&amp;gt;,&amp;lt;afterSeparator LIST&amp;gt;
+ *     &amp;lt;beforeData DECIMAL&amp;gt;3d6&amp;lt;afterData DECIMAL&amp;gt;&amp;lt;beforeSeparator LIST&amp;gt;,&amp;lt;afterSeparator LIST&amp;gt;
+ *     &amp;lt;beforeData FLOAT&amp;gt;2.3E8&amp;lt;afterData FLOAT&amp;gt;&amp;lt;beforeSeparator LIST&amp;gt;,&amp;lt;afterSeparator LIST&amp;gt;
+ *     &amp;lt;beforeData STRING&amp;gt;&quot;string&quot;&amp;lt;afterData STRING&amp;gt;&amp;lt;beforeSeparator LIST&amp;gt;,&amp;lt;afterSeparator LIST&amp;gt;
+ *     &amp;lt;beforeData STRING&amp;gt;&quot;multi-string&quot;&amp;lt;afterData STRING&amp;gt;&amp;lt;beforeSeparator LIST&amp;gt;,&amp;lt;afterSeparator LIST&amp;gt;
+ *     &amp;lt;beforeData SYMBOL&amp;gt;Symbol&amp;lt;afterData SYMBOL&amp;gt;&amp;lt;beforeSeparator LIST&amp;gt;,&amp;lt;afterSeparator LIST&amp;gt;
+ *     &amp;lt;beforeData SYMBOL&amp;gt;qSymbol&amp;lt;afterData SYMBOL&amp;gt;&amp;lt;beforeSeparator LIST&amp;gt;,&amp;lt;afterSeparator LIST&amp;gt;
+ *     &amp;lt;beforeData CLOB&amp;gt;{{&quot;clob data&quot;}}&amp;lt;afterData CLOB&amp;gt;&amp;lt;beforeSeparator LIST&amp;gt;,&amp;lt;afterSeparator LIST&amp;gt;
+ *     &amp;lt;beforeData BLOB&amp;gt;{{YmxvYiBkYXRh}}&amp;lt;afterData BLOB&amp;gt;&amp;lt;beforeSeparator LIST&amp;gt;,&amp;lt;afterSeparator LIST&amp;gt;
+ *     &amp;lt;beforeData TIMESTAMP&amp;gt;1970-06-06&amp;lt;afterData TIMESTAMP&amp;gt;&amp;lt;beforeSeparator LIST&amp;gt;,&amp;lt;afterSeparator LIST&amp;gt;
+ *     &amp;lt;beforeData NULL&amp;gt;null.struct&amp;lt;afterData NULL&amp;gt;
+ * &amp;lt;beforeStepOut LIST&amp;gt;]&amp;lt;afterData LIST&amp;gt;
+ * &lt;/pre&gt;
+ */
+public abstract class _Private_MarkupCallback
+{
+    private final _Private_FastAppendable myAppendable;
+
+    public _Private_MarkupCallback(_Private_FastAppendable appendable)
+<span class="fc" id="L190">    {</span>
+<span class="fc" id="L191">        this.myAppendable = appendable;</span>
+<span class="fc" id="L192">    }</span>
+
+    /**
+     * Gets the {@link _Private_FastAppendable} that IonWriter will use to write its
+     * output.
+     */
+    public final _Private_FastAppendable getAppendable()
+    {
+<span class="fc" id="L200">        return myAppendable;</span>
+    }
+
+    /**
+     * Callback to be executed before an Ion value is written. If iType is a
+     * container type, this is executed before the container's opening
+     * delimiter. To write data after the opening delimiter use
+     * {@link #afterStepIn(IonType)}.
+     * @param iType
+     *            The type of data that will be written.
+     */
+    public void beforeValue(IonType iType)
+        throws IOException
+    {
+<span class="nc" id="L214">    }</span>
+
+    /**
+     * Callback to be executed after an Ion value is written. If iType is a
+     * container type, this is executed after the container's closing delimiter.
+     * To write data before the closing delimiter, use
+     * {@link #beforeStepOut(IonType)}.
+     * @param iType
+     *            The type of data that was written.
+     */
+    public void afterValue(IonType iType)
+        throws IOException
+    {
+<span class="fc" id="L227">    }</span>
+
+    /**
+     * Callback to be executed before a field name is written.
+     * @param iType
+     *            The type of data in the field name's corresponding value.
+     * @param name
+     *            The field name that is being written.
+     */
+    public void beforeFieldName(IonType iType, SymbolToken name)
+        throws IOException
+    {
+<span class="nc" id="L239">    }</span>
+
+    /**
+     * Callback to be executed after a field name is written.
+     * @param iType
+     *            The type of data in the field name's corresponding value.
+     * @param name
+     *            The field name that is being written.
+     */
+    public void afterFieldName(IonType iType, SymbolToken name)
+        throws IOException
+    {
+<span class="nc" id="L251">    }</span>
+
+    /**
+     * Callback to be executed after the opening delimiter of a container is
+     * written. To write data before the opening delimiter, use
+     * {@link #beforeValue(IonType)}.
+     * @param containerType
+     *            The type of container that was just stepped into.
+     */
+    public void afterStepIn(IonType containerType)
+        throws IOException
+    {
+<span class="nc" id="L263">    }</span>
+
+    /**
+     * Callback to be executed before the closing delimiter of a container is
+     * written. To write data after the closing delimiter, use
+     * {@link #afterValue(IonType)}.
+     * @param containerType
+     *            The type of container that is about to be stepped out of.
+     */
+    public void beforeStepOut(IonType containerType)
+        throws IOException
+    {
+<span class="nc" id="L275">    }</span>
+
+    /**
+     * Callback to be executed before a separator is written. Called after the
+     * data has been written, and before the separator. It is called when inside
+     * all container types, including Sexp, and when not inside a container. It
+     * is not called after the last element in a container.
+     * @param containerType
+     *            The type of container the writer is currently in. When writing
+     *            top-level values, the type is DATAGRAM.
+     */
+    public void beforeSeparator(IonType containerType)
+        throws IOException
+    {
+<span class="nc" id="L289">    }</span>
+
+    /**
+     * Callback to be executed after a separator has been written. Called just
+     * after the separator is written. It is called when inside all container
+     * types, including Sexp, and when not inside a container. It is not called
+     * after the last element in a container.
+     * @param containerType
+     *            The type of container the writer is currently in. When writing
+     *            top-level values, the type is DATAGRAM.
+     */
+    public void afterSeparator(IonType containerType)
+        throws IOException
+    {
+<span class="nc" id="L303">    }</span>
+
+    /**
+     * Callback to be executed before annotations are written. It is executed
+     * once per set of annotations.
+     * @param iType
+     *            The type of the data whose annotations are being written.
+     */
+    public void beforeAnnotations(IonType iType)
+        throws IOException
+    {
+<span class="nc" id="L314">    }</span>
+
+    /**
+     * Callback to be executed after annotations are written. It is executed
+     * once per set of annotations.
+     * @param iType
+     *            The type of the data whose annotations are being written.
+     */
+    public void afterAnnotations(IonType iType)
+        throws IOException
+    {
+<span class="nc" id="L325">    }</span>
+
+    /**
+     * Callback to be executed before each annotation is written. It is executed
+     * once per annotation.
+     * @param iType
+     *            The type of the data whose annotation is being written.
+     * @param annotation
+     *            The annotation that is being written.
+     */
+    public void beforeEachAnnotation(IonType iType, SymbolToken annotation)
+        throws IOException
+    {
+<span class="nc" id="L338">    }</span>
+
+    /**
+     * Callback to be executed after each annotation is written. It is executed
+     * once per annotation, before the delimiter.
+     * @param iType
+     *            The type of the data whose annotation is being written.
+     * @param annotation
+     *            The annotation that is being written.
+     */
+    public void afterEachAnnotation(IonType iType, SymbolToken annotation)
+        throws IOException
+    {
+<span class="nc" id="L351">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

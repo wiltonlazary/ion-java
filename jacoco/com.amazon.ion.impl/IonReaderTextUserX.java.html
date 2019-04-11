@@ -1,0 +1,437 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonReaderTextUserX.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl</a> &gt; <span class="el_source">IonReaderTextUserX.java</span></div><h1>IonReaderTextUserX.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl;
+
+import static com.amazon.ion.SystemSymbols.ION_1_0;
+import static com.amazon.ion.SystemSymbols.ION_SYMBOL_TABLE;
+
+import com.amazon.ion.IonCatalog;
+import com.amazon.ion.IonType;
+import com.amazon.ion.OffsetSpan;
+import com.amazon.ion.SeekableReader;
+import com.amazon.ion.Span;
+import com.amazon.ion.SpanProvider;
+import com.amazon.ion.SymbolTable;
+import com.amazon.ion.SymbolToken;
+import com.amazon.ion.TextSpan;
+import com.amazon.ion.UnknownSymbolException;
+import com.amazon.ion.UnsupportedIonVersionException;
+import java.util.regex.Pattern;
+
+/**
+ *    The text user reader add support for symbols and recognizes,
+ *    and consumes (and processes), the system values $ion_1_0 and
+ *    local symbol tables (tagged with $ion_symbol_table).
+ *
+ *    Should this materialize and &quot;symbolate&quot; all the symbol
+ *    values as they come through?  - No.
+ *
+ *    Probably if we want the symbol id's to be the same for this
+ *    reader as it is for other variants.  Hmmm, that's expensive
+ *    when you don't need it (which is most of the time).
+ *
+ *    This will not auto-populate a symbol table.  In the event
+ *    a symbol is a '$&lt;digits&gt;' symbol id symbol this will return
+ *    that value.  If the string is present in the current symbol
+ *    table it will return the id, which would be true if the
+ *    symbol is a system symbol or if there is a local symbol
+ *    table in the input stream.  Otherwise it return the
+ *    undefined symbol value.
+ *
+ */
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">class IonReaderTextUserX</span>
+    extends IonReaderTextSystemX
+    implements _Private_ReaderWriter
+{
+<span class="fc" id="L59">    private static final Pattern ION_VERSION_MARKER_REGEX = Pattern.compile(&quot;^\\$ion_[0-9]+_[0-9]+$&quot;);</span>
+
+    /**
+     * This is the physical start-of-stream offset when this reader was created.
+     * It must be subtracted from the logical offsets exposed by
+     * {@link OffsetSpan}s.
+     */
+    private final int _physical_start_offset;
+    private final _Private_LocalSymbolTableFactory _lstFactory;
+
+    // IonSystem   _system; now in IonReaderTextSystemX where it could be null
+    IonCatalog  _catalog;
+    SymbolTable _symbols;
+
+
+    protected IonReaderTextUserX(IonCatalog catalog,
+                                 _Private_LocalSymbolTableFactory lstFactory,
+                                 UnifiedInputStreamX uis,
+                                 int physicalStartOffset)
+    {
+<span class="fc" id="L79">        super(uis);</span>
+<span class="fc" id="L80">        _symbols = _system_symtab;</span>
+<span class="fc" id="L81">        _physical_start_offset = physicalStartOffset;</span>
+<span class="fc" id="L82">        _catalog = catalog;</span>
+<span class="fc" id="L83">        _lstFactory = lstFactory;</span>
+<span class="fc" id="L84">    }</span>
+
+    protected IonReaderTextUserX(IonCatalog catalog,
+                                 _Private_LocalSymbolTableFactory lstFactory,
+                                 UnifiedInputStreamX uis) {
+<span class="fc" id="L89">        this(catalog, lstFactory, uis, 0);</span>
+<span class="fc" id="L90">    }</span>
+
+    /**
+     * this looks forward to see if there is an upcoming value
+     * and if there is it returns true.  It may have to clean up
+     * any value that's partially complete (for example a
+     * collection whose annotation has been read and loaded
+     * but the use has chosen not to step into the collection).
+     *
+     * The user reader variant of hasNext also looks for system
+     * values to process.  System values are the Ion version
+     * marker ($ion_1_0) and local symbol tables.  If either of
+     * these is encountered the symbol table processing will be
+     * handled and the value will be &quot;skipped&quot;.
+     *
+     * @return true if more data remains, false on eof
+     */
+    @Override
+    public boolean hasNext()
+    {
+<span class="fc" id="L110">        boolean has_next = has_next_user_value();</span>
+<span class="fc" id="L111">        return has_next;</span>
+    }
+    private final boolean has_next_user_value()
+    {
+        // clear out our previous value
+<span class="fc" id="L116">        clear_system_value_stack();</span>
+
+        // changed to 'while' since consumed
+        // values will not be counted
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        while (!_has_next_called)</span>
+        {
+            // first move to the next value regardless of whether
+            // it's a system value or a user value
+<span class="fc" id="L124">            has_next_raw_value();</span>
+
+            // system values are only at the datagram level
+            // we don't care about them if they're buried
+            // down in some other value - note that _value_type
+            // will be null at eof and on as yet undetermined
+            // numeric types (which are never system values)
+<span class="fc bfc" id="L131" title="All 6 branches covered.">            if (_value_type != null &amp;&amp; !isNullValue() &amp;&amp; IonType.DATAGRAM.equals(getContainerType())) {</span>
+<span class="fc bfc" id="L132" title="All 3 branches covered.">                switch (_value_type) {</span>
+                case STRUCT:
+<span class="fc bfc" id="L134" title="All 4 branches covered.">                    if (_annotation_count &gt; 0 &amp;&amp; ION_SYMBOL_TABLE.equals(_annotations[0].getText())) {</span>
+<span class="fc" id="L135">                        _symbols = _lstFactory.newLocalSymtab(_catalog,</span>
+                                                              this,
+                                                              true);
+<span class="fc" id="L138">                        push_symbol_table(_symbols);</span>
+<span class="fc" id="L139">                        _has_next_called = false;</span>
+                    }
+                    break;
+                case SYMBOL:
+<span class="fc bfc" id="L143" title="All 2 branches covered.">                    if (_annotation_count == 0)</span>
+                    {
+                        // $ion_1_0 is read as an IVM only if it is not annotated
+<span class="fc" id="L146">                        String version = symbolValue().getText();</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">                        if (isIonVersionMarker(version))</span>
+                        {
+<span class="fc bfc" id="L149" title="All 2 branches covered.">                            if (ION_1_0.equals(version))</span>
+                            {
+<span class="fc bfc" id="L151" title="All 2 branches covered.">                                if (_value_keyword != IonTokenConstsX.KEYWORD_sid)</span>
+                                {
+<span class="fc" id="L153">                                    symbol_table_reset();</span>
+<span class="fc" id="L154">                                    push_symbol_table(_system_symtab);</span>
+                                }
+<span class="fc" id="L156">                                _has_next_called = false;</span>
+                            }
+                            else
+                            {
+<span class="fc" id="L160">                                throw new UnsupportedIonVersionException(version);</span>
+                            }
+                        }
+<span class="fc" id="L163">                    }</span>
+                    break;
+                default:
+<span class="fc" id="L166">                    break;</span>
+                }
+            }
+        }
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        return (_eof != true);</span>
+    }
+
+    private static boolean isIonVersionMarker(String text)
+    {
+<span class="fc bfc" id="L175" title="All 4 branches covered.">        return text != null &amp;&amp; ION_VERSION_MARKER_REGEX.matcher(text).matches();</span>
+    }
+
+    private final void symbol_table_reset()
+    {
+<span class="fc" id="L180">        IonType t = next();</span>
+<span class="pc bpc" id="L181" title="2 of 4 branches missed.">        assert( IonType.SYMBOL.equals(t) );</span>
+<span class="fc" id="L182">        _symbols = _system_symtab;</span>
+<span class="fc" id="L183">        return;</span>
+    }
+
+    private void validateSymbolToken(SymbolToken symbol) {
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        if (symbol != null) {</span>
+<span class="fc bfc" id="L188" title="All 4 branches covered.">            if (symbol.getText() == null &amp;&amp; symbol.getSid() &gt; getSymbolTable().getMaxId()) {</span>
+<span class="fc" id="L189">                throw new UnknownSymbolException(symbol.getSid());</span>
+            }
+        }
+<span class="fc" id="L192">    }</span>
+
+    @Override
+    public SymbolToken[] getTypeAnnotationSymbols() {
+<span class="fc" id="L196">        SymbolToken[] annotations = super.getTypeAnnotationSymbols();</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        for (SymbolToken annotation : annotations) {</span>
+<span class="fc" id="L198">            validateSymbolToken(annotation);</span>
+        }
+<span class="fc" id="L200">        return annotations;</span>
+    }
+
+    @Override
+    public final SymbolToken getFieldNameSymbol() {
+<span class="fc" id="L205">        SymbolToken fieldName = super.getFieldNameSymbol();</span>
+<span class="fc" id="L206">        validateSymbolToken(fieldName);</span>
+<span class="fc" id="L207">        return fieldName;</span>
+    }
+
+    @Override
+    public final SymbolToken symbolValue() {
+<span class="fc" id="L212">        SymbolToken symbol = super.symbolValue();</span>
+<span class="fc" id="L213">        validateSymbolToken(symbol);</span>
+<span class="fc" id="L214">        return symbol;</span>
+    }
+
+    @Override
+    public SymbolTable getSymbolTable()
+    {
+<span class="fc" id="L220">        return _symbols;</span>
+    }
+
+
+    //
+    //  This code handles the skipped symbol table
+    //  support - it is cloned in IonReaderTreeUserX
+    //  and IonReaderBinaryUserX
+    //
+    //  SO ANY FIXES HERE WILL BE NEEDED IN THOSE
+    //  TWO LOCATIONS AS WELL.
+    //
+<span class="fc" id="L232">    private int _symbol_table_top = 0;</span>
+<span class="fc" id="L233">    private SymbolTable[] _symbol_table_stack = new SymbolTable[3]; // 3 is rare, IVM followed by a local sym tab with open content</span>
+    private void clear_system_value_stack()
+    {
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        while (_symbol_table_top &gt; 0) {</span>
+<span class="fc" id="L237">            _symbol_table_top--;</span>
+<span class="fc" id="L238">            _symbol_table_stack[_symbol_table_top] = null;</span>
+        }
+<span class="fc" id="L240">    }</span>
+    private void push_symbol_table(SymbolTable symbols)
+    {
+<span class="pc bpc" id="L243" title="2 of 4 branches missed.">        assert(symbols != null);</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        if (_symbol_table_top &gt;= _symbol_table_stack.length) {</span>
+<span class="nc" id="L245">            int new_len = _symbol_table_stack.length * 2;</span>
+<span class="nc" id="L246">            SymbolTable[] temp = new SymbolTable[new_len];</span>
+<span class="nc" id="L247">            System.arraycopy(_symbol_table_stack, 0, temp, 0, _symbol_table_stack.length);</span>
+<span class="nc" id="L248">            _symbol_table_stack = temp;</span>
+        }
+<span class="fc" id="L250">        _symbol_table_stack[_symbol_table_top++] = symbols;</span>
+<span class="fc" id="L251">    }</span>
+    @Override
+    public SymbolTable pop_passed_symbol_table()
+    {
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        if (_symbol_table_top &lt;= 0) {</span>
+<span class="fc" id="L256">            return null;</span>
+        }
+<span class="fc" id="L258">        _symbol_table_top--;</span>
+<span class="fc" id="L259">        SymbolTable symbols = _symbol_table_stack[_symbol_table_top];</span>
+<span class="fc" id="L260">        _symbol_table_stack[_symbol_table_top] = null;</span>
+<span class="fc" id="L261">        return symbols;</span>
+    }
+
+
+    private static final class IonReaderTextSpan
+        extends DowncastingFaceted
+        implements Span, TextSpan, OffsetSpan
+    {
+        private final UnifiedDataPageX _data_page;
+        private final IonType          _container_type;
+
+        private final long             _start_offset;
+        private final long             _start_line;
+        private final long             _start_column;
+
+        IonReaderTextSpan(IonReaderTextUserX reader)
+<span class="fc" id="L277">        {</span>
+            // TODO: convert _start_char_offset from a long and data page
+            //       to be an abstract reference into the Unified* data source
+
+<span class="fc" id="L281">            UnifiedInputStreamX current_stream = reader._scanner.getSourceStream();</span>
+            //
+            // TODO: this page isn't safe, except where we have only a single
+            //       page of buffered input Which is the case for the time
+            //       being.  Later, when this is stream aware, this needs to change.
+<span class="fc" id="L286">            _data_page = current_stream._buffer.getCurrentPage();</span>
+<span class="fc" id="L287">            _container_type = reader.getContainerType();</span>
+
+<span class="fc" id="L289">            _start_offset = reader._value_start_offset - reader._physical_start_offset;</span>
+<span class="fc" id="L290">            _start_line   = reader._value_start_line;</span>
+<span class="fc" id="L291">            _start_column = reader._value_start_column;</span>
+<span class="fc" id="L292">        }</span>
+
+        public long getStartLine()
+        {
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">            if (_start_line &lt; 1) {</span>
+<span class="nc" id="L297">                throw new IllegalStateException(&quot;not positioned on a reader&quot;);</span>
+            }
+<span class="fc" id="L299">            return _start_line;</span>
+        }
+
+        public long getStartColumn()
+        {
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">            if (_start_column &lt; 0) {</span>
+<span class="nc" id="L305">                throw new IllegalStateException(&quot;not positioned on a reader&quot;);</span>
+            }
+<span class="fc" id="L307">            return _start_column;</span>
+        }
+
+        public long getFinishLine()
+        {
+<span class="fc" id="L312">            return -1;</span>
+        }
+
+        public long getFinishColumn()
+        {
+<span class="fc" id="L317">            return -1;</span>
+        }
+
+        public long getStartOffset()
+        {
+<span class="fc" id="L322">            return _start_offset;</span>
+        }
+
+        public long getFinishOffset()
+        {
+<span class="fc" id="L327">            return -1;</span>
+        }
+
+        IonType getContainerType() {
+<span class="fc" id="L331">            return _container_type;</span>
+        }
+
+        UnifiedDataPageX getDataPage() {
+<span class="fc" id="L335">            return _data_page;</span>
+        }
+    }
+
+
+    public Span currentSpanImpl()
+    {
+<span class="fc bfc" id="L342" title="All 2 branches covered.">        if (getType() == null) {</span>
+<span class="fc" id="L343">            throw new IllegalStateException(&quot;must be on a value&quot;);</span>
+        }
+<span class="fc" id="L345">        IonReaderTextSpan pos = new IonReaderTextSpan(this);</span>
+<span class="fc" id="L346">        return pos;</span>
+    }
+
+    private void hoistImpl(Span span)
+    {
+<span class="pc bpc" id="L351" title="1 of 2 branches missed.">        if (!(span instanceof IonReaderTextSpan)) {</span>
+<span class="nc" id="L352">            throw new IllegalArgumentException(&quot;position must match the reader&quot;);</span>
+        }
+<span class="fc" id="L354">        IonReaderTextSpan text_span = (IonReaderTextSpan)span;</span>
+
+<span class="fc" id="L356">        UnifiedInputStreamX current_stream = _scanner.getSourceStream();</span>
+<span class="fc" id="L357">        UnifiedDataPageX    curr_page      = text_span.getDataPage();</span>
+<span class="fc" id="L358">        int                 array_offset   = (int)text_span._start_offset + _physical_start_offset;</span>
+<span class="fc" id="L359">        int                 page_limit     = curr_page._page_limit;</span>
+<span class="fc" id="L360">        int                 array_length   = page_limit - array_offset;</span>
+
+        // we're going to cast this value down.  Since we only support
+        // in memory single buffered chars here this is ok.
+<span class="pc bpc" id="L364" title="2 of 4 branches missed.">        assert(text_span.getStartOffset() &lt;= Integer.MAX_VALUE);</span>
+
+        // Now - create a new stream
+        // TODO: this is a pretty expensive way to do this. UnifiedInputStreamX
+        //       needs to have a reset method added that can reset the position
+        //       and length of the input to be some subset of the original source.
+        //       This would avoid a lot of object creation (and wasted destruction.
+        //       But this is a time-to-market solution here.  The change can be
+        //       made as support for streams is added.
+        UnifiedInputStreamX iis;
+<span class="fc bfc" id="L374" title="All 2 branches covered.">        if (current_stream._is_byte_data) {</span>
+<span class="fc" id="L375">            byte[] bytes = current_stream.getByteArray();</span>
+<span class="pc bpc" id="L376" title="2 of 4 branches missed.">            assert(bytes != null);</span>
+<span class="fc" id="L377">            iis = UnifiedInputStreamX.makeStream(</span>
+                                            bytes
+                                          , array_offset
+                                          , array_length
+                                      );
+<span class="fc" id="L382">        }</span>
+        else {
+<span class="fc" id="L384">            char[] chars = current_stream.getCharArray();</span>
+<span class="pc bpc" id="L385" title="2 of 4 branches missed.">            assert(chars != null);</span>
+<span class="fc" id="L386">            iis = UnifiedInputStreamX.makeStream(</span>
+                                            chars
+                                          , array_offset
+                                          , array_length
+                                      );
+        }
+<span class="fc" id="L392">        IonType container = text_span.getContainerType();</span>
+<span class="fc" id="L393">        re_init(iis, container, text_span._start_line, text_span._start_column);</span>
+<span class="fc" id="L394">    }</span>
+
+
+    //========================================================================
+
+
+    @Override
+    public &lt;T&gt; T asFacet(Class&lt;T&gt; facetType)
+    {
+<span class="fc bfc" id="L403" title="All 2 branches covered.">        if (facetType == SpanProvider.class)</span>
+        {
+<span class="fc" id="L405">            return facetType.cast(new SpanProviderFacet());</span>
+        }
+
+<span class="fc bfc" id="L408" title="All 4 branches covered.">        if (facetType == SeekableReader.class &amp;&amp; _scanner.isBufferedInput())</span>
+        {
+<span class="fc" id="L410">            return facetType.cast(new SeekableReaderFacet());</span>
+        }
+
+<span class="fc" id="L413">        return super.asFacet(facetType);</span>
+    }
+
+
+<span class="fc" id="L417">    private class SpanProviderFacet</span>
+        implements SpanProvider
+    {
+        public Span currentSpan()
+        {
+<span class="fc" id="L422">            return currentSpanImpl();</span>
+        }
+    }
+
+
+<span class="fc" id="L427">    private final class SeekableReaderFacet</span>
+        extends SpanProviderFacet
+        implements SeekableReader
+    {
+        public void hoist(Span span)
+        {
+<span class="fc" id="L433">            hoistImpl(span);</span>
+<span class="fc" id="L434">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

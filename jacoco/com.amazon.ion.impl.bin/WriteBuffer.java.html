@@ -1,0 +1,1098 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WriteBuffer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl.bin</a> &gt; <span class="el_source">WriteBuffer.java</span></div><h1>WriteBuffer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl.bin;
+
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * A facade over {@link Block} management and low-level Ion encoding concerns for the {@link IonRawBinaryWriter}.
+ */
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">/*package*/ final class WriteBuffer implements Closeable</span>
+{
+    private final BlockAllocator allocator;
+    private final List&lt;Block&gt; blocks;
+    private Block current;
+    private int index;
+
+    public WriteBuffer(final BlockAllocator allocator)
+<span class="fc" id="L35">    {</span>
+<span class="fc" id="L36">        this.allocator = allocator;</span>
+<span class="fc" id="L37">        this.blocks = new ArrayList&lt;Block&gt;();</span>
+
+        // initial seed of the first block
+<span class="fc" id="L40">        allocateNewBlock();</span>
+
+<span class="fc" id="L42">        this.index = 0;</span>
+<span class="fc" id="L43">        this.current = blocks.get(0);</span>
+<span class="fc" id="L44">    }</span>
+
+    private void allocateNewBlock()
+    {
+<span class="fc" id="L48">        blocks.add(allocator.allocateBlock());</span>
+<span class="fc" id="L49">    }</span>
+
+    /** Returns the block index for the given position. */
+    private int index(final long position)
+    {
+<span class="fc" id="L54">        return (int) (position / allocator.getBlockSize());</span>
+    }
+
+    /** Returns the offset within the block for a given position. */
+    private int offset(final long position)
+    {
+<span class="fc" id="L60">        return (int) (position % allocator.getBlockSize());</span>
+    }
+
+    /** Resets the write buffer to empty. */
+    public void reset()
+    {
+<span class="fc" id="L66">        close();</span>
+<span class="fc" id="L67">        allocateNewBlock();</span>
+<span class="fc" id="L68">        index = 0;</span>
+<span class="fc" id="L69">        current = blocks.get(index);</span>
+<span class="fc" id="L70">    }</span>
+
+    public void close()
+    {
+        // free all the blocks
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        for (final Block block : blocks)</span>
+        {
+<span class="fc" id="L77">            block.close();</span>
+<span class="fc" id="L78">        }</span>
+<span class="fc" id="L79">        blocks.clear();</span>
+
+        // note--we don't explicitly flag that we're closed for efficiency
+<span class="fc" id="L82">    }</span>
+
+    /** Resets the write buffer to a particular point. */
+    public void truncate(final long position)
+    {
+<span class="fc" id="L87">        final int index = index(position);</span>
+<span class="fc" id="L88">        final int offset = offset(position);</span>
+<span class="fc" id="L89">        final Block block = blocks.get(index);</span>
+<span class="fc" id="L90">        this.index = index;</span>
+<span class="fc" id="L91">        block.limit = offset;</span>
+<span class="fc" id="L92">        current = block;</span>
+<span class="fc" id="L93">    }</span>
+
+    /** Returns the amount of capacity left in the current block. */
+    public int remaining()
+    {
+<span class="fc" id="L98">        return current.remaining();</span>
+    }
+
+    /** Returns the logical position in the current block. */
+    public long position()
+    {
+<span class="fc" id="L104">        return (((long) index) * allocator.getBlockSize()) + current.limit;</span>
+    }
+
+    private static final int OCTET_MASK = 0xFF;
+
+    /** Returns the octet at the logical position given. */
+    public int getUInt8At(final long position)
+    {
+<span class="fc" id="L112">        final int index = index(position);</span>
+<span class="fc" id="L113">        final int offset = offset(position);</span>
+<span class="fc" id="L114">        final Block block = blocks.get(index);</span>
+<span class="fc" id="L115">        return block.data[offset] &amp; OCTET_MASK;</span>
+    }
+
+    /** Writes a single octet to the buffer, expanding if necessary. */
+    public void writeByte(final byte octet)
+    {
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (remaining() &lt; 1)</span>
+        {
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">            if (index == blocks.size() - 1)</span>
+            {
+<span class="fc" id="L125">                allocateNewBlock();</span>
+            }
+<span class="fc" id="L127">            index++;</span>
+<span class="fc" id="L128">            current = blocks.get(index);</span>
+        }
+<span class="fc" id="L130">        final Block block = current;</span>
+<span class="fc" id="L131">        block.data[block.limit] = octet;</span>
+<span class="fc" id="L132">        block.limit++;</span>
+<span class="fc" id="L133">    }</span>
+
+    // slow in the sense that we do all kind of block boundary checking
+    private void writeBytesSlow(final byte[] bytes, int off, int len)
+    {
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        while (len &gt; 0)</span>
+        {
+<span class="fc" id="L140">            final Block block = current;</span>
+<span class="fc" id="L141">            final int amount = Math.min(len, block.remaining());</span>
+<span class="fc" id="L142">            System.arraycopy(bytes, off, block.data, block.limit, amount);</span>
+<span class="fc" id="L143">            block.limit += amount;</span>
+<span class="fc" id="L144">            off += amount;</span>
+<span class="fc" id="L145">            len -= amount;</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            if (block.remaining() == 0)</span>
+            {
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                if (index == blocks.size() - 1)</span>
+                {
+<span class="fc" id="L150">                    allocateNewBlock();</span>
+                }
+<span class="fc" id="L152">                index++;</span>
+<span class="fc" id="L153">                current = blocks.get(index);</span>
+            }
+<span class="fc" id="L155">        }</span>
+
+<span class="fc" id="L157">    }</span>
+
+    /** Writes an array of bytes to the buffer expanding if necessary. */
+    public void writeBytes(final byte[] bytes, final int off, final int len)
+    {
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (len &gt; remaining())</span>
+        {
+<span class="fc" id="L164">            writeBytesSlow(bytes, off, len);</span>
+<span class="fc" id="L165">            return;</span>
+        }
+
+<span class="fc" id="L168">        final Block block = current;</span>
+<span class="fc" id="L169">        System.arraycopy(bytes, off, block.data, block.limit, len);</span>
+<span class="fc" id="L170">        block.limit += len;</span>
+<span class="fc" id="L171">    }</span>
+
+    /** Writes an array of bytes to the buffer expanding if necessary, defaulting to the entire array. */
+    public void writeBytes(byte[] bytes)
+    {
+<span class="fc" id="L176">        writeBytes(bytes, 0, bytes.length);</span>
+<span class="fc" id="L177">    }</span>
+
+    // UTF-8 character writing
+
+    private static final char HIGH_SURROGATE_FIRST      = 0xD800;
+    private static final char HIGH_SURROGATE_LAST       = 0xDBFF;
+    private static final char LOW_SURROGATE_FIRST       = 0xDC00;
+    private static final char LOW_SURROGATE_LAST        = 0xDFFF;
+    private static final int  SURROGATE_BASE            = 0x10000;
+    private static final int  BITS_PER_SURROGATE        = 10;
+
+    private static final int  UTF8_FOLLOW_MASK          = 0x3F;
+
+    private static final int  UTF8_FOLLOW_PREFIX_MASK   = 0x80;
+    private static final int  UTF8_2_OCTET_PREFIX_MASK  = 0xC0;
+    private static final int  UTF8_3_OCTET_PREFIX_MASK  = 0xE0;
+    private static final int  UTF8_4_OCTET_PREFIX_MASK  = 0xF0;
+
+    private static final int  UTF8_BITS_PER_FOLLOW_OCTET = 6;
+    private static final int  UTF8_2_OCTET_SHIFT         = 1 * UTF8_BITS_PER_FOLLOW_OCTET;
+    private static final int  UTF8_3_OCTET_SHIFT         = 2 * UTF8_BITS_PER_FOLLOW_OCTET;
+    private static final int  UTF8_4_OCTET_SHIFT         = 3 * UTF8_BITS_PER_FOLLOW_OCTET;
+
+    private static final int UTF8_2_OCTET_MIN_VALUE = 1 &lt;&lt; 7;
+    private static final int UTF8_3_OCTET_MIN_VALUE = 1 &lt;&lt; (5 + (1 * UTF8_BITS_PER_FOLLOW_OCTET));
+
+
+    // slow in the sense that we deal with any kind of UTF-8 sequence and block boundaries
+    private int writeUTF8Slow(final CharSequence chars, int off, int len)
+    {
+<span class="fc" id="L207">        int octets = 0;</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        while (len &gt; 0)</span>
+        {
+<span class="fc" id="L210">            final char ch = chars.charAt(off);</span>
+<span class="pc bpc" id="L211" title="1 of 4 branches missed.">            if (ch &gt;= LOW_SURROGATE_FIRST &amp;&amp; ch &lt;= LOW_SURROGATE_LAST)</span>
+            {
+<span class="fc" id="L213">                throw new IllegalArgumentException(&quot;Unpaired low surrogate: &quot; + (int) ch);</span>
+            }
+<span class="pc bpc" id="L215" title="1 of 4 branches missed.">            if ((ch &gt;= HIGH_SURROGATE_FIRST &amp;&amp; ch &lt;= HIGH_SURROGATE_LAST))</span>
+            {
+                // we need to look ahead in this case
+<span class="fc" id="L218">                off++;</span>
+<span class="fc" id="L219">                len--;</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">                if (len == 0)</span>
+                {
+<span class="fc" id="L222">                    throw new IllegalArgumentException(&quot;Unpaired low surrogate at end of character sequence: &quot; + ch);</span>
+                }
+
+<span class="fc" id="L225">                final int ch2 = chars.charAt(off);</span>
+<span class="pc bpc" id="L226" title="1 of 4 branches missed.">                if (ch2 &lt; LOW_SURROGATE_FIRST || ch2 &gt; LOW_SURROGATE_LAST)</span>
+                {
+<span class="fc" id="L228">                    throw new IllegalArgumentException(&quot;Low surrogate with unpaired high surrogate: &quot; + ch + &quot; + &quot; + ch2);</span>
+                }
+
+                // at this point we have a high and low surrogate
+<span class="fc" id="L232">                final int codepoint = (((ch - HIGH_SURROGATE_FIRST) &lt;&lt; BITS_PER_SURROGATE) | (ch2 - LOW_SURROGATE_FIRST)) + SURROGATE_BASE;</span>
+<span class="fc" id="L233">                writeByte((byte) (UTF8_4_OCTET_PREFIX_MASK | ( codepoint &gt;&gt; UTF8_4_OCTET_SHIFT)                    ));</span>
+<span class="fc" id="L234">                writeByte((byte) (UTF8_FOLLOW_PREFIX_MASK  | ((codepoint &gt;&gt; UTF8_3_OCTET_SHIFT) &amp; UTF8_FOLLOW_MASK)));</span>
+<span class="fc" id="L235">                writeByte((byte) (UTF8_FOLLOW_PREFIX_MASK  | ((codepoint &gt;&gt; UTF8_2_OCTET_SHIFT) &amp; UTF8_FOLLOW_MASK)));</span>
+<span class="fc" id="L236">                writeByte((byte) (UTF8_FOLLOW_PREFIX_MASK  | ( codepoint                        &amp; UTF8_FOLLOW_MASK)));</span>
+
+<span class="fc" id="L238">                octets += 4;</span>
+<span class="fc" id="L239">            }</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">            else if (ch &lt; UTF8_2_OCTET_MIN_VALUE)</span>
+            {
+<span class="fc" id="L242">                writeByte((byte) ch);</span>
+<span class="fc" id="L243">                octets++;</span>
+            }
+<span class="fc bfc" id="L245" title="All 2 branches covered.">            else if (ch &lt; UTF8_3_OCTET_MIN_VALUE)</span>
+            {
+<span class="fc" id="L247">                writeByte((byte) (UTF8_2_OCTET_PREFIX_MASK | (ch &gt;&gt; UTF8_2_OCTET_SHIFT)                    ));</span>
+<span class="fc" id="L248">                writeByte((byte) (UTF8_FOLLOW_PREFIX_MASK  | (ch                        &amp; UTF8_FOLLOW_MASK)));</span>
+<span class="fc" id="L249">                octets += 2;</span>
+            }
+            else
+            {
+<span class="fc" id="L253">                writeByte((byte) (UTF8_3_OCTET_PREFIX_MASK | ( ch &gt;&gt; UTF8_3_OCTET_SHIFT)                    ));</span>
+<span class="fc" id="L254">                writeByte((byte) (UTF8_FOLLOW_PREFIX_MASK  | ((ch &gt;&gt; UTF8_2_OCTET_SHIFT) &amp; UTF8_FOLLOW_MASK)));</span>
+<span class="fc" id="L255">                writeByte((byte) (UTF8_FOLLOW_PREFIX_MASK  | ( ch                        &amp; UTF8_FOLLOW_MASK)));</span>
+<span class="fc" id="L256">                octets += 3;</span>
+            }
+<span class="fc" id="L258">            off++;</span>
+<span class="fc" id="L259">            len--;</span>
+<span class="fc" id="L260">        }</span>
+<span class="fc" id="L261">        return octets;</span>
+    }
+
+    private int writeUTF8UpTo3Byte(final CharSequence chars, int off, int len)
+    {
+        // fast path if we fit in the block assuming optimistically for all three-byte
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        if ((len * 3) &gt; remaining())</span>
+        {
+<span class="nc" id="L269">            return writeUTF8Slow(chars, off, len);</span>
+        }
+
+<span class="fc" id="L272">        final Block block = current;</span>
+<span class="fc" id="L273">        int limit = block.limit;</span>
+<span class="fc" id="L274">        int octets = 0;</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">        while (len &gt; 0)</span>
+        {
+<span class="fc" id="L277">            final char ch = chars.charAt(off);</span>
+<span class="pc bpc" id="L278" title="1 of 4 branches missed.">            if (ch &gt;= LOW_SURROGATE_FIRST &amp;&amp; ch &lt;= LOW_SURROGATE_LAST)</span>
+            {
+<span class="nc" id="L280">                throw new IllegalArgumentException(&quot;Unpaired low surrogate: &quot; + ch);</span>
+            }
+<span class="fc bfc" id="L282" title="All 4 branches covered.">            if ((ch &gt;= HIGH_SURROGATE_FIRST &amp;&amp; ch &lt;= HIGH_SURROGATE_LAST))</span>
+            {
+                // we lost the 3-byte bet
+<span class="fc" id="L285">                break;</span>
+            }
+
+<span class="fc bfc" id="L288" title="All 2 branches covered.">            if (ch &lt; UTF8_2_OCTET_MIN_VALUE)</span>
+            {
+<span class="fc" id="L290">                block.data[limit++] = (byte) ch;</span>
+<span class="fc" id="L291">                octets++;</span>
+            }
+<span class="fc bfc" id="L293" title="All 2 branches covered.">            else if (ch &lt; UTF8_3_OCTET_MIN_VALUE)</span>
+            {
+<span class="fc" id="L295">                block.data[limit++] = (byte) (UTF8_2_OCTET_PREFIX_MASK | (ch &gt;&gt; UTF8_2_OCTET_SHIFT)                    );</span>
+<span class="fc" id="L296">                block.data[limit++] = (byte) (UTF8_FOLLOW_PREFIX_MASK  | (ch                        &amp; UTF8_FOLLOW_MASK));</span>
+<span class="fc" id="L297">                octets += 2;</span>
+            }
+            else
+            {
+<span class="fc" id="L301">                block.data[limit++] = (byte) (UTF8_3_OCTET_PREFIX_MASK | ( ch &gt;&gt; UTF8_3_OCTET_SHIFT)                    );</span>
+<span class="fc" id="L302">                block.data[limit++] = (byte) (UTF8_FOLLOW_PREFIX_MASK  | ((ch &gt;&gt; UTF8_2_OCTET_SHIFT) &amp; UTF8_FOLLOW_MASK));</span>
+<span class="fc" id="L303">                block.data[limit++] = (byte) (UTF8_FOLLOW_PREFIX_MASK  | ( ch                        &amp; UTF8_FOLLOW_MASK));</span>
+<span class="fc" id="L304">                octets += 3;</span>
+            }
+<span class="fc" id="L306">            off++;</span>
+<span class="fc" id="L307">            len--;</span>
+<span class="fc" id="L308">        }</span>
+<span class="fc" id="L309">        block.limit = limit;</span>
+
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        if (len &gt; 0)</span>
+        {
+            // just defer to 'slow' writing for non-BMP characters
+<span class="nc" id="L314">            return octets + writeUTF8Slow(chars, off, len);</span>
+        }
+<span class="fc" id="L316">        return octets;</span>
+    }
+
+    private int writeUTF8UpTo2Byte(final CharSequence chars, int off, int len)
+    {
+        // fast path if we fit in the block assuming optimistically for all two-byte
+<span class="fc bfc" id="L322" title="All 2 branches covered.">        if ((len * 2) &gt; remaining())</span>
+        {
+<span class="fc" id="L324">            return writeUTF8Slow(chars, off, len);</span>
+        }
+
+<span class="fc" id="L327">        final Block block = current;</span>
+<span class="fc" id="L328">        int limit = block.limit;</span>
+<span class="fc" id="L329">        char ch = '\0';</span>
+<span class="fc" id="L330">        int octets = 0;</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">        while (len &gt; 0)</span>
+        {
+<span class="fc" id="L333">            ch = chars.charAt(off);</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">            if (ch &gt;= UTF8_3_OCTET_MIN_VALUE)</span>
+            {
+                // we lost the 2-byte bet
+<span class="fc" id="L337">                break;</span>
+            }
+
+<span class="fc bfc" id="L340" title="All 2 branches covered.">            if (ch &lt; UTF8_2_OCTET_MIN_VALUE)</span>
+            {
+<span class="fc" id="L342">                block.data[limit++] = (byte) ch;</span>
+<span class="fc" id="L343">                octets++;</span>
+            }
+            else
+            {
+<span class="fc" id="L347">                block.data[limit++] = (byte) (UTF8_2_OCTET_PREFIX_MASK | (ch &gt;&gt; UTF8_2_OCTET_SHIFT)                    );</span>
+<span class="fc" id="L348">                block.data[limit++] = (byte) (UTF8_FOLLOW_PREFIX_MASK  | (ch                        &amp; UTF8_FOLLOW_MASK));</span>
+<span class="fc" id="L349">                octets += 2;</span>
+            }
+<span class="fc" id="L351">            off++;</span>
+<span class="fc" id="L352">            len--;</span>
+        }
+<span class="fc" id="L354">        block.limit = limit;</span>
+
+<span class="fc bfc" id="L356" title="All 2 branches covered.">        if (len &gt; 0)</span>
+        {
+<span class="pc bpc" id="L358" title="3 of 4 branches missed.">            if (ch &gt;= LOW_SURROGATE_FIRST &amp;&amp; ch &lt;= LOW_SURROGATE_LAST)</span>
+            {
+<span class="nc" id="L360">                throw new IllegalArgumentException(&quot;Unpaired low surrogate: &quot; + ch);</span>
+            }
+<span class="pc bpc" id="L362" title="1 of 4 branches missed.">            if (ch &gt;= HIGH_SURROGATE_FIRST &amp;&amp; ch &lt;= HIGH_SURROGATE_LAST)</span>
+            {
+                // just defer to 'slow' writing for non-BMP characters
+<span class="fc" id="L365">                return octets + writeUTF8Slow(chars, off, len);</span>
+            }
+
+            // we must be a three byte BMP character
+<span class="fc" id="L369">            return octets + writeUTF8UpTo3Byte(chars, off, len);</span>
+        }
+<span class="fc" id="L371">        return octets;</span>
+    }
+
+    /** Returns the number of octets written. */
+    public int writeUTF8(final CharSequence chars, int off, int len)
+    {
+        // fast path if we fit in the block assuming optimistically for all ASCII
+<span class="fc bfc" id="L378" title="All 2 branches covered.">        if (len &gt; remaining())</span>
+        {
+<span class="fc" id="L380">            return writeUTF8Slow(chars, off, len);</span>
+        }
+<span class="fc" id="L382">        final Block block = current;</span>
+<span class="fc" id="L383">        int limit = block.limit;</span>
+<span class="fc" id="L384">        char ch = '\0';</span>
+<span class="fc" id="L385">        int octets = 0;</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">        while (len &gt; 0)</span>
+        {
+<span class="fc" id="L388">            ch = chars.charAt(off);</span>
+<span class="fc bfc" id="L389" title="All 2 branches covered.">            if (ch &gt;= UTF8_2_OCTET_MIN_VALUE)</span>
+            {
+                // we lost the ASCII bet
+<span class="fc" id="L392">                break;</span>
+            }
+
+<span class="fc" id="L395">            block.data[limit++] = (byte) ch;</span>
+<span class="fc" id="L396">            octets++;</span>
+<span class="fc" id="L397">            off++;</span>
+<span class="fc" id="L398">            len--;</span>
+        }
+<span class="fc" id="L400">        block.limit = limit;</span>
+
+<span class="fc bfc" id="L402" title="All 2 branches covered.">        if (len &gt; 0)</span>
+        {
+<span class="fc bfc" id="L404" title="All 2 branches covered.">            if (ch &lt; UTF8_3_OCTET_MIN_VALUE)</span>
+            {
+<span class="fc" id="L406">                return octets + writeUTF8UpTo2Byte(chars, off, len);</span>
+            }
+<span class="fc bfc" id="L408" title="All 4 branches covered.">            if (ch &gt;= LOW_SURROGATE_FIRST &amp;&amp; ch &lt;= LOW_SURROGATE_LAST)</span>
+            {
+<span class="fc" id="L410">                throw new IllegalArgumentException(&quot;Unpaired low surrogate: &quot; + ch);</span>
+            }
+<span class="fc bfc" id="L412" title="All 4 branches covered.">            if (ch &gt;= HIGH_SURROGATE_FIRST &amp;&amp; ch &lt;= HIGH_SURROGATE_LAST)</span>
+            {
+                // just defer to 'slow' writing for non-BMP characters
+<span class="fc" id="L415">                return octets + writeUTF8Slow(chars, off, len);</span>
+            }
+
+            // we must be a three byte BMP character
+<span class="fc" id="L419">            return octets + writeUTF8UpTo3Byte(chars, off, len);</span>
+        }
+<span class="fc" id="L421">        return octets;</span>
+    }
+
+    /** Returns the number of octets written. */
+    public int writeUTF8(final CharSequence chars)
+    {
+<span class="fc" id="L427">        return writeUTF8(chars, 0, chars.length());</span>
+    }
+
+    // unsigned fixed integer writes -- does not check sign/bounds
+
+    private static final int UINT_2_OCTET_SHIFT = 8 * 1;
+    private static final int UINT_3_OCTET_SHIFT = 8 * 2;
+    private static final int UINT_4_OCTET_SHIFT = 8 * 3;
+    private static final int UINT_5_OCTET_SHIFT = 8 * 4;
+    private static final int UINT_6_OCTET_SHIFT = 8 * 5;
+    private static final int UINT_7_OCTET_SHIFT = 8 * 6;
+    private static final int UINT_8_OCTET_SHIFT = 8 * 7;
+
+
+    public void writeUInt8(long value)
+    {
+<span class="fc" id="L443">        writeByte((byte) value);</span>
+<span class="fc" id="L444">    }</span>
+
+    private void writeUInt16Slow(long value)
+    {
+<span class="fc" id="L448">        writeByte((byte) (value &gt;&gt; UINT_2_OCTET_SHIFT));</span>
+<span class="fc" id="L449">        writeByte((byte) (value                      ));</span>
+<span class="fc" id="L450">    }</span>
+
+    public void writeUInt16(long value)
+    {
+<span class="fc bfc" id="L454" title="All 2 branches covered.">        if (remaining() &lt; 2)</span>
+        {
+<span class="fc" id="L456">            writeUInt16Slow(value);</span>
+<span class="fc" id="L457">            return;</span>
+        }
+
+<span class="fc" id="L460">        final Block block = current;</span>
+<span class="fc" id="L461">        final byte[] data = block.data;</span>
+<span class="fc" id="L462">        int limit = block.limit;</span>
+<span class="fc" id="L463">        data[limit++] = (byte) (value &gt;&gt; UINT_2_OCTET_SHIFT);</span>
+<span class="fc" id="L464">        data[limit++] = (byte) (value                      );</span>
+<span class="fc" id="L465">        block.limit = limit;</span>
+<span class="fc" id="L466">    }</span>
+
+    private void writeUInt24Slow(long value)
+    {
+<span class="fc" id="L470">        writeByte((byte) (value &gt;&gt; UINT_3_OCTET_SHIFT));</span>
+<span class="fc" id="L471">        writeByte((byte) (value &gt;&gt; UINT_2_OCTET_SHIFT));</span>
+<span class="fc" id="L472">        writeByte((byte) (value                      ));</span>
+<span class="fc" id="L473">    }</span>
+
+    public void writeUInt24(long value)
+    {
+<span class="fc bfc" id="L477" title="All 2 branches covered.">        if (remaining() &lt; 3)</span>
+        {
+<span class="fc" id="L479">            writeUInt24Slow(value);</span>
+<span class="fc" id="L480">            return;</span>
+        }
+
+<span class="fc" id="L483">        final Block block = current;</span>
+<span class="fc" id="L484">        final byte[] data = block.data;</span>
+<span class="fc" id="L485">        int limit = block.limit;</span>
+<span class="fc" id="L486">        data[limit++] = (byte) (value &gt;&gt; UINT_3_OCTET_SHIFT);</span>
+<span class="fc" id="L487">        data[limit++] = (byte) (value &gt;&gt; UINT_2_OCTET_SHIFT);</span>
+<span class="fc" id="L488">        data[limit++] = (byte) (value                      );</span>
+<span class="fc" id="L489">        block.limit = limit;</span>
+<span class="fc" id="L490">    }</span>
+
+    private void writeUInt32Slow(long value)
+    {
+<span class="fc" id="L494">        writeByte((byte) (value &gt;&gt; UINT_4_OCTET_SHIFT));</span>
+<span class="fc" id="L495">        writeByte((byte) (value &gt;&gt; UINT_3_OCTET_SHIFT));</span>
+<span class="fc" id="L496">        writeByte((byte) (value &gt;&gt; UINT_2_OCTET_SHIFT));</span>
+<span class="fc" id="L497">        writeByte((byte) (value                      ));</span>
+<span class="fc" id="L498">    }</span>
+
+    public void writeUInt32(long value)
+    {
+<span class="fc bfc" id="L502" title="All 2 branches covered.">        if (remaining() &lt; 4)</span>
+        {
+<span class="fc" id="L504">            writeUInt32Slow(value);</span>
+<span class="fc" id="L505">            return;</span>
+        }
+
+<span class="fc" id="L508">        final Block block = current;</span>
+<span class="fc" id="L509">        final byte[] data = block.data;</span>
+<span class="fc" id="L510">        int limit = block.limit;</span>
+<span class="fc" id="L511">        data[limit++] = (byte) (value &gt;&gt; UINT_4_OCTET_SHIFT);</span>
+<span class="fc" id="L512">        data[limit++] = (byte) (value &gt;&gt; UINT_3_OCTET_SHIFT);</span>
+<span class="fc" id="L513">        data[limit++] = (byte) (value &gt;&gt; UINT_2_OCTET_SHIFT);</span>
+<span class="fc" id="L514">        data[limit++] = (byte) (value                      );</span>
+<span class="fc" id="L515">        block.limit = limit;</span>
+<span class="fc" id="L516">    }</span>
+
+    private void writeUInt40Slow(long value)
+    {
+<span class="fc" id="L520">        writeByte((byte) (value &gt;&gt; UINT_5_OCTET_SHIFT));</span>
+<span class="fc" id="L521">        writeByte((byte) (value &gt;&gt; UINT_4_OCTET_SHIFT));</span>
+<span class="fc" id="L522">        writeByte((byte) (value &gt;&gt; UINT_3_OCTET_SHIFT));</span>
+<span class="fc" id="L523">        writeByte((byte) (value &gt;&gt; UINT_2_OCTET_SHIFT));</span>
+<span class="fc" id="L524">        writeByte((byte) (value                      ));</span>
+<span class="fc" id="L525">    }</span>
+
+    public void writeUInt40(long value)
+    {
+<span class="fc bfc" id="L529" title="All 2 branches covered.">        if (remaining() &lt; 5)</span>
+        {
+<span class="fc" id="L531">            writeUInt40Slow(value);</span>
+<span class="fc" id="L532">            return;</span>
+        }
+
+<span class="fc" id="L535">        final Block block = current;</span>
+<span class="fc" id="L536">        final byte[] data = block.data;</span>
+<span class="fc" id="L537">        int limit = block.limit;</span>
+<span class="fc" id="L538">        data[limit++] = (byte) (value &gt;&gt; UINT_5_OCTET_SHIFT);</span>
+<span class="fc" id="L539">        data[limit++] = (byte) (value &gt;&gt; UINT_4_OCTET_SHIFT);</span>
+<span class="fc" id="L540">        data[limit++] = (byte) (value &gt;&gt; UINT_3_OCTET_SHIFT);</span>
+<span class="fc" id="L541">        data[limit++] = (byte) (value &gt;&gt; UINT_2_OCTET_SHIFT);</span>
+<span class="fc" id="L542">        data[limit++] = (byte) (value                      );</span>
+<span class="fc" id="L543">        block.limit = limit;</span>
+<span class="fc" id="L544">    }</span>
+
+    private void writeUInt48Slow(long value)
+    {
+<span class="fc" id="L548">        writeByte((byte) (value &gt;&gt; UINT_6_OCTET_SHIFT));</span>
+<span class="fc" id="L549">        writeByte((byte) (value &gt;&gt; UINT_5_OCTET_SHIFT));</span>
+<span class="fc" id="L550">        writeByte((byte) (value &gt;&gt; UINT_4_OCTET_SHIFT));</span>
+<span class="fc" id="L551">        writeByte((byte) (value &gt;&gt; UINT_3_OCTET_SHIFT));</span>
+<span class="fc" id="L552">        writeByte((byte) (value &gt;&gt; UINT_2_OCTET_SHIFT));</span>
+<span class="fc" id="L553">        writeByte((byte) (value                      ));</span>
+<span class="fc" id="L554">    }</span>
+
+    public void writeUInt48(long value)
+    {
+<span class="fc bfc" id="L558" title="All 2 branches covered.">        if (remaining() &lt; 6)</span>
+        {
+<span class="fc" id="L560">            writeUInt48Slow(value);</span>
+<span class="fc" id="L561">            return;</span>
+        }
+
+<span class="fc" id="L564">        final Block block = current;</span>
+<span class="fc" id="L565">        final byte[] data = block.data;</span>
+<span class="fc" id="L566">        int limit = block.limit;</span>
+<span class="fc" id="L567">        data[limit++] = (byte) (value &gt;&gt; UINT_6_OCTET_SHIFT);</span>
+<span class="fc" id="L568">        data[limit++] = (byte) (value &gt;&gt; UINT_5_OCTET_SHIFT);</span>
+<span class="fc" id="L569">        data[limit++] = (byte) (value &gt;&gt; UINT_4_OCTET_SHIFT);</span>
+<span class="fc" id="L570">        data[limit++] = (byte) (value &gt;&gt; UINT_3_OCTET_SHIFT);</span>
+<span class="fc" id="L571">        data[limit++] = (byte) (value &gt;&gt; UINT_2_OCTET_SHIFT);</span>
+<span class="fc" id="L572">        data[limit++] = (byte) ( value                     );</span>
+<span class="fc" id="L573">        block.limit = limit;</span>
+<span class="fc" id="L574">    }</span>
+
+    private void writeUInt56Slow(long value)
+    {
+<span class="fc" id="L578">        writeByte((byte) (value &gt;&gt; UINT_7_OCTET_SHIFT));</span>
+<span class="fc" id="L579">        writeByte((byte) (value &gt;&gt; UINT_6_OCTET_SHIFT));</span>
+<span class="fc" id="L580">        writeByte((byte) (value &gt;&gt; UINT_5_OCTET_SHIFT));</span>
+<span class="fc" id="L581">        writeByte((byte) (value &gt;&gt; UINT_4_OCTET_SHIFT));</span>
+<span class="fc" id="L582">        writeByte((byte) (value &gt;&gt; UINT_3_OCTET_SHIFT));</span>
+<span class="fc" id="L583">        writeByte((byte) (value &gt;&gt; UINT_2_OCTET_SHIFT));</span>
+<span class="fc" id="L584">        writeByte((byte) (value                      ));</span>
+<span class="fc" id="L585">    }</span>
+
+    public void writeUInt56(long value)
+    {
+<span class="fc bfc" id="L589" title="All 2 branches covered.">        if (remaining() &lt; 7)</span>
+        {
+<span class="fc" id="L591">            writeUInt56Slow(value);</span>
+<span class="fc" id="L592">            return;</span>
+        }
+
+<span class="fc" id="L595">        final Block block = current;</span>
+<span class="fc" id="L596">        final byte[] data = block.data;</span>
+<span class="fc" id="L597">        int limit = block.limit;</span>
+<span class="fc" id="L598">        data[limit++] = (byte) (value &gt;&gt; UINT_7_OCTET_SHIFT);</span>
+<span class="fc" id="L599">        data[limit++] = (byte) (value &gt;&gt; UINT_6_OCTET_SHIFT);</span>
+<span class="fc" id="L600">        data[limit++] = (byte) (value &gt;&gt; UINT_5_OCTET_SHIFT);</span>
+<span class="fc" id="L601">        data[limit++] = (byte) (value &gt;&gt; UINT_4_OCTET_SHIFT);</span>
+<span class="fc" id="L602">        data[limit++] = (byte) (value &gt;&gt; UINT_3_OCTET_SHIFT);</span>
+<span class="fc" id="L603">        data[limit++] = (byte) (value &gt;&gt; UINT_2_OCTET_SHIFT);</span>
+<span class="fc" id="L604">        data[limit++] = (byte) (value                      );</span>
+<span class="fc" id="L605">        block.limit = limit;</span>
+<span class="fc" id="L606">    }</span>
+
+    private void writeUInt64Slow(long value)
+    {
+<span class="fc" id="L610">        writeByte((byte) (value &gt;&gt; UINT_8_OCTET_SHIFT));</span>
+<span class="fc" id="L611">        writeByte((byte) (value &gt;&gt; UINT_7_OCTET_SHIFT));</span>
+<span class="fc" id="L612">        writeByte((byte) (value &gt;&gt; UINT_6_OCTET_SHIFT));</span>
+<span class="fc" id="L613">        writeByte((byte) (value &gt;&gt; UINT_5_OCTET_SHIFT));</span>
+<span class="fc" id="L614">        writeByte((byte) (value &gt;&gt; UINT_4_OCTET_SHIFT));</span>
+<span class="fc" id="L615">        writeByte((byte) (value &gt;&gt; UINT_3_OCTET_SHIFT));</span>
+<span class="fc" id="L616">        writeByte((byte) (value &gt;&gt; UINT_2_OCTET_SHIFT));</span>
+<span class="fc" id="L617">        writeByte((byte) ( value                     ));</span>
+<span class="fc" id="L618">    }</span>
+
+    public void writeUInt64(long value)
+    {
+<span class="fc bfc" id="L622" title="All 2 branches covered.">        if (remaining() &lt; 8)</span>
+        {
+<span class="fc" id="L624">            writeUInt64Slow(value);</span>
+<span class="fc" id="L625">            return;</span>
+        }
+
+<span class="fc" id="L628">        final Block block = current;</span>
+<span class="fc" id="L629">        final byte[] data = block.data;</span>
+<span class="fc" id="L630">        int limit = block.limit;</span>
+<span class="fc" id="L631">        data[limit++] = (byte) (value &gt;&gt; UINT_8_OCTET_SHIFT);</span>
+<span class="fc" id="L632">        data[limit++] = (byte) (value &gt;&gt; UINT_7_OCTET_SHIFT);</span>
+<span class="fc" id="L633">        data[limit++] = (byte) (value &gt;&gt; UINT_6_OCTET_SHIFT);</span>
+<span class="fc" id="L634">        data[limit++] = (byte) (value &gt;&gt; UINT_5_OCTET_SHIFT);</span>
+<span class="fc" id="L635">        data[limit++] = (byte) (value &gt;&gt; UINT_4_OCTET_SHIFT);</span>
+<span class="fc" id="L636">        data[limit++] = (byte) (value &gt;&gt; UINT_3_OCTET_SHIFT);</span>
+<span class="fc" id="L637">        data[limit++] = (byte) (value &gt;&gt; UINT_2_OCTET_SHIFT);</span>
+<span class="fc" id="L638">        data[limit++] = (byte) ( value                      );</span>
+<span class="fc" id="L639">        block.limit = limit;</span>
+
+
+<span class="fc" id="L642">    }</span>
+
+    // signed fixed integer writes - does not check bounds (especially important for IntX.MIN_VALUE).
+
+    private static final long INT8_SIGN_MASK  = 1L &lt;&lt; ((8 * 1) - 1);
+    private static final long INT16_SIGN_MASK = 1L &lt;&lt; ((8 * 2) - 1);
+    private static final long INT24_SIGN_MASK = 1L &lt;&lt; ((8 * 3) - 1);
+    private static final long INT32_SIGN_MASK = 1L &lt;&lt; ((8 * 4) - 1);
+    private static final long INT40_SIGN_MASK = 1L &lt;&lt; ((8 * 5) - 1);
+    private static final long INT48_SIGN_MASK = 1L &lt;&lt; ((8 * 6) - 1);
+    private static final long INT56_SIGN_MASK = 1L &lt;&lt; ((8 * 7) - 1);
+    private static final long INT64_SIGN_MASK = 1L &lt;&lt; ((8 * 8) - 1);
+
+    public void writeInt8(long value)
+    {
+<span class="fc bfc" id="L657" title="All 2 branches covered.">        if (value &lt; 0)</span>
+        {
+<span class="fc" id="L659">            value = (-value) | INT8_SIGN_MASK;</span>
+        }
+<span class="fc" id="L661">        writeUInt8(value);</span>
+<span class="fc" id="L662">    }</span>
+
+
+    public void writeInt16(long value)
+    {
+<span class="fc bfc" id="L667" title="All 2 branches covered.">        if (value &lt; 0)</span>
+        {
+<span class="fc" id="L669">            value = (-value) | INT16_SIGN_MASK;</span>
+        }
+<span class="fc" id="L671">        writeUInt16(value);</span>
+<span class="fc" id="L672">    }</span>
+
+    public void writeInt24(long value)
+    {
+<span class="fc bfc" id="L676" title="All 2 branches covered.">        if (value &lt; 0)</span>
+        {
+<span class="fc" id="L678">            value = (-value) | INT24_SIGN_MASK;</span>
+        }
+<span class="fc" id="L680">        writeUInt24(value);</span>
+<span class="fc" id="L681">    }</span>
+
+
+    public void writeInt32(long value)
+    {
+<span class="fc bfc" id="L686" title="All 2 branches covered.">        if (value &lt; 0)</span>
+        {
+<span class="fc" id="L688">            value = (-value) | INT32_SIGN_MASK;</span>
+        }
+<span class="fc" id="L690">        writeUInt32(value);</span>
+<span class="fc" id="L691">    }</span>
+
+
+    public void writeInt40(long value)
+    {
+<span class="fc bfc" id="L696" title="All 2 branches covered.">        if (value &lt; 0)</span>
+        {
+<span class="fc" id="L698">            value = (-value) | INT40_SIGN_MASK;</span>
+        }
+<span class="fc" id="L700">        writeUInt40(value);</span>
+<span class="fc" id="L701">    }</span>
+
+
+    public void writeInt48(long value)
+    {
+<span class="fc bfc" id="L706" title="All 2 branches covered.">        if (value &lt; 0)</span>
+        {
+<span class="fc" id="L708">            value = (-value) | INT48_SIGN_MASK;</span>
+        }
+<span class="fc" id="L710">        writeUInt48(value);</span>
+<span class="fc" id="L711">    }</span>
+
+
+    public void writeInt56(long value)
+    {
+<span class="fc bfc" id="L716" title="All 2 branches covered.">        if (value &lt; 0)</span>
+        {
+<span class="fc" id="L718">            value = (-value) | INT56_SIGN_MASK;</span>
+        }
+<span class="fc" id="L720">        writeUInt56(value);</span>
+<span class="fc" id="L721">    }</span>
+
+
+    public void writeInt64(long value)
+    {
+<span class="fc bfc" id="L726" title="All 2 branches covered.">        if (value &lt; 0)</span>
+        {
+<span class="fc" id="L728">            value = (-value) | INT64_SIGN_MASK;</span>
+        }
+<span class="fc" id="L730">        writeUInt64(value);</span>
+<span class="fc" id="L731">    }</span>
+
+    // variable length integer writing
+
+    private static final long VAR_INT_BITS_PER_OCTET = 7;
+    private static final long VAR_INT_MASK = 0x7F;
+
+    private static final long VAR_UINT_9_OCTET_SHIFT = (8 * VAR_INT_BITS_PER_OCTET);
+    private static final long VAR_UINT_9_OCTET_MIN_VALUE = (1L &lt;&lt; VAR_UINT_9_OCTET_SHIFT);
+
+    private static final long VAR_UINT_8_OCTET_SHIFT = (7 * VAR_INT_BITS_PER_OCTET);
+    private static final long VAR_UINT_8_OCTET_MIN_VALUE = (1L &lt;&lt; VAR_UINT_8_OCTET_SHIFT);
+
+    private static final long VAR_UINT_7_OCTET_SHIFT = (6 * VAR_INT_BITS_PER_OCTET);
+    private static final long VAR_UINT_7_OCTET_MIN_VALUE = (1L &lt;&lt; VAR_UINT_7_OCTET_SHIFT);
+
+    private static final long VAR_UINT_6_OCTET_SHIFT = (5 * VAR_INT_BITS_PER_OCTET);
+    private static final long VAR_UINT_6_OCTET_MIN_VALUE = (1L &lt;&lt; VAR_UINT_6_OCTET_SHIFT);
+
+    private static final long VAR_UINT_5_OCTET_SHIFT = (4 * VAR_INT_BITS_PER_OCTET);
+    private static final long VAR_UINT_5_OCTET_MIN_VALUE = (1L &lt;&lt; VAR_UINT_5_OCTET_SHIFT);
+
+    private static final long VAR_UINT_4_OCTET_SHIFT = (3 * VAR_INT_BITS_PER_OCTET);
+    private static final long VAR_UINT_4_OCTET_MIN_VALUE = (1L &lt;&lt; VAR_UINT_4_OCTET_SHIFT);
+
+    private static final long VAR_UINT_3_OCTET_SHIFT = (2 * VAR_INT_BITS_PER_OCTET);
+    private static final long VAR_UINT_3_OCTET_MIN_VALUE = (1L &lt;&lt; VAR_UINT_3_OCTET_SHIFT);
+
+    private static final long VAR_UINT_2_OCTET_SHIFT = (1 * VAR_INT_BITS_PER_OCTET);
+    private static final long VAR_UINT_2_OCTET_MIN_VALUE = (1L &lt;&lt; VAR_UINT_2_OCTET_SHIFT);
+
+    private static final long VAR_INT_FINAL_OCTET_SIGNAL_MASK = 0x80;
+
+    private int writeVarUIntSlow(final long value)
+    {
+<span class="fc" id="L766">        int size = 1;</span>
+<span class="fc bfc" id="L767" title="All 2 branches covered.">        if (value &gt;= VAR_UINT_9_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc" id="L769">            writeUInt8((value &gt;&gt; VAR_UINT_9_OCTET_SHIFT) &amp; VAR_INT_MASK);</span>
+<span class="fc" id="L770">            size++;</span>
+        }
+<span class="fc bfc" id="L772" title="All 2 branches covered.">        if (value &gt;= VAR_UINT_8_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc" id="L774">            writeUInt8((value &gt;&gt; VAR_UINT_8_OCTET_SHIFT) &amp; VAR_INT_MASK);</span>
+<span class="fc" id="L775">            size++;</span>
+        }
+<span class="fc bfc" id="L777" title="All 2 branches covered.">        if (value &gt;= VAR_UINT_7_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc" id="L779">            writeUInt8((value &gt;&gt; VAR_UINT_7_OCTET_SHIFT) &amp; VAR_INT_MASK);</span>
+<span class="fc" id="L780">            size++;</span>
+        }
+<span class="fc bfc" id="L782" title="All 2 branches covered.">        if (value &gt;= VAR_UINT_6_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc" id="L784">            writeUInt8((value &gt;&gt; VAR_UINT_6_OCTET_SHIFT) &amp; VAR_INT_MASK);</span>
+<span class="fc" id="L785">            size++;</span>
+        }
+<span class="fc bfc" id="L787" title="All 2 branches covered.">        if (value &gt;= VAR_UINT_5_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc" id="L789">            writeUInt8((value &gt;&gt; VAR_UINT_5_OCTET_SHIFT) &amp; VAR_INT_MASK);</span>
+<span class="fc" id="L790">            size++;</span>
+        }
+<span class="fc bfc" id="L792" title="All 2 branches covered.">        if (value &gt;= VAR_UINT_4_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc" id="L794">            writeUInt8((value &gt;&gt; VAR_UINT_4_OCTET_SHIFT) &amp; VAR_INT_MASK);</span>
+<span class="fc" id="L795">            size++;</span>
+        }
+<span class="fc bfc" id="L797" title="All 2 branches covered.">        if (value &gt;= VAR_UINT_3_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc" id="L799">            writeUInt8((value &gt;&gt; VAR_UINT_3_OCTET_SHIFT) &amp; VAR_INT_MASK);</span>
+<span class="fc" id="L800">            size++;</span>
+        }
+<span class="pc bpc" id="L802" title="1 of 2 branches missed.">        if (value &gt;= VAR_UINT_2_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc" id="L804">            writeUInt8((value &gt;&gt; VAR_UINT_2_OCTET_SHIFT) &amp; VAR_INT_MASK);</span>
+<span class="fc" id="L805">            size++;</span>
+        }
+<span class="fc" id="L807">        writeUInt8((value &amp; VAR_INT_MASK) | VAR_INT_FINAL_OCTET_SIGNAL_MASK);</span>
+<span class="fc" id="L808">        return size;</span>
+    }
+
+    private int writeVarUIntDirect2(final long value)
+    {
+<span class="fc" id="L813">        final Block block = current;</span>
+<span class="fc" id="L814">        final byte[] data = block.data;</span>
+<span class="fc" id="L815">        int limit = block.limit;</span>
+<span class="fc" id="L816">        data[limit++] = (byte)  ((value &gt;&gt; VAR_UINT_2_OCTET_SHIFT) &amp; VAR_INT_MASK);</span>
+<span class="fc" id="L817">        data[limit++] = (byte) (((value)                           &amp; VAR_INT_MASK) | VAR_INT_FINAL_OCTET_SIGNAL_MASK);</span>
+
+<span class="fc" id="L819">        block.limit = limit;</span>
+<span class="fc" id="L820">        return 2;</span>
+    }
+
+    private int writeVarUIntDirect3(final long value)
+    {
+<span class="fc" id="L825">        final Block block = current;</span>
+<span class="fc" id="L826">        final byte[] data = block.data;</span>
+<span class="fc" id="L827">        int limit = block.limit;</span>
+<span class="fc" id="L828">        data[limit++] = (byte)  ((value &gt;&gt; VAR_UINT_3_OCTET_SHIFT) &amp; VAR_INT_MASK);</span>
+<span class="fc" id="L829">        data[limit++] = (byte)  ((value &gt;&gt; VAR_UINT_2_OCTET_SHIFT) &amp; VAR_INT_MASK);</span>
+<span class="fc" id="L830">        data[limit++] = (byte) (((value)                           &amp; VAR_INT_MASK) | VAR_INT_FINAL_OCTET_SIGNAL_MASK);</span>
+
+<span class="fc" id="L832">        block.limit = limit;</span>
+<span class="fc" id="L833">        return 3;</span>
+    }
+
+    private int writeVarUIntDirect4(final long value)
+    {
+<span class="fc" id="L838">        final Block block = current;</span>
+<span class="fc" id="L839">        final byte[] data = block.data;</span>
+<span class="fc" id="L840">        int limit = block.limit;</span>
+<span class="fc" id="L841">        data[limit++] = (byte)  ((value &gt;&gt; VAR_UINT_4_OCTET_SHIFT) &amp; VAR_INT_MASK);</span>
+<span class="fc" id="L842">        data[limit++] = (byte)  ((value &gt;&gt; VAR_UINT_3_OCTET_SHIFT) &amp; VAR_INT_MASK);</span>
+<span class="fc" id="L843">        data[limit++] = (byte)  ((value &gt;&gt; VAR_UINT_2_OCTET_SHIFT) &amp; VAR_INT_MASK);</span>
+<span class="fc" id="L844">        data[limit++] = (byte) (((value)                           &amp; VAR_INT_MASK) | VAR_INT_FINAL_OCTET_SIGNAL_MASK);</span>
+
+<span class="fc" id="L846">        block.limit = limit;</span>
+<span class="fc" id="L847">        return 4;</span>
+    }
+
+    private int writeVarUIntDirect5(final long value)
+    {
+<span class="fc" id="L852">        final Block block = current;</span>
+<span class="fc" id="L853">        final byte[] data = block.data;</span>
+<span class="fc" id="L854">        int limit = block.limit;</span>
+<span class="fc" id="L855">        data[limit++] = (byte)  ((value &gt;&gt; VAR_UINT_5_OCTET_SHIFT) &amp; VAR_INT_MASK);</span>
+<span class="fc" id="L856">        data[limit++] = (byte)  ((value &gt;&gt; VAR_UINT_4_OCTET_SHIFT) &amp; VAR_INT_MASK);</span>
+<span class="fc" id="L857">        data[limit++] = (byte)  ((value &gt;&gt; VAR_UINT_3_OCTET_SHIFT) &amp; VAR_INT_MASK);</span>
+<span class="fc" id="L858">        data[limit++] = (byte)  ((value &gt;&gt; VAR_UINT_2_OCTET_SHIFT) &amp; VAR_INT_MASK);</span>
+<span class="fc" id="L859">        data[limit++] = (byte) (((value)                           &amp; VAR_INT_MASK) | VAR_INT_FINAL_OCTET_SIGNAL_MASK);</span>
+
+<span class="fc" id="L861">        block.limit = limit;</span>
+<span class="fc" id="L862">        return 5;</span>
+    }
+
+    public int writeVarUInt(final long value)
+    {
+<span class="fc bfc" id="L867" title="All 2 branches covered.">        if (value &lt; VAR_UINT_2_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc" id="L869">            writeUInt8((value &amp; 0x7F) | 0x80);</span>
+<span class="fc" id="L870">            return 1;</span>
+        }
+<span class="fc bfc" id="L872" title="All 2 branches covered.">        if (value &lt; VAR_UINT_3_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc bfc" id="L874" title="All 2 branches covered.">            if (remaining() &lt; 2)</span>
+            {
+<span class="fc" id="L876">                return writeVarUIntSlow(value);</span>
+            }
+<span class="fc" id="L878">            return writeVarUIntDirect2(value);</span>
+        }
+<span class="fc bfc" id="L880" title="All 2 branches covered.">        if (value &lt; VAR_UINT_4_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc bfc" id="L882" title="All 2 branches covered.">            if (remaining() &lt; 3)</span>
+            {
+<span class="fc" id="L884">                return writeVarUIntSlow(value);</span>
+            }
+<span class="fc" id="L886">            return writeVarUIntDirect3(value);</span>
+        }
+<span class="fc bfc" id="L888" title="All 2 branches covered.">        if (value &lt; VAR_UINT_5_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc bfc" id="L890" title="All 2 branches covered.">            if (remaining() &lt; 4)</span>
+            {
+<span class="fc" id="L892">                return writeVarUIntSlow(value);</span>
+            }
+<span class="fc" id="L894">            return writeVarUIntDirect4(value);</span>
+        }
+<span class="fc bfc" id="L896" title="All 2 branches covered.">        if (value &lt; VAR_UINT_6_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc bfc" id="L898" title="All 2 branches covered.">            if (remaining() &lt; 5)</span>
+            {
+<span class="fc" id="L900">                return writeVarUIntSlow(value);</span>
+            }
+<span class="fc" id="L902">            return writeVarUIntDirect5(value);</span>
+
+        }
+        // TODO determine if it is worth doing the fast path beyond 2**35 - 1
+
+        // we give up--go to the 'slow' path
+<span class="fc" id="L908">        return writeVarUIntSlow(value);</span>
+    }
+
+    private static final long VAR_INT_SIGNED_OCTET_MASK = 0x3F;
+    private static final long VAR_INT_SIGNBIT_ON_MASK   = 0x40L;
+    private static final long VAR_INT_SIGNBIT_OFF_MASK  = 0x00L;
+
+    // note that the highest order bit for signed 64-bit values cannot fit in 9 bytes with the sign
+    private static final long VAR_INT_10_OCTET_SHIFT = 62;
+
+    private static final long VAR_INT_10_OCTET_MIN_VALUE = (1L &lt;&lt; VAR_INT_10_OCTET_SHIFT);
+    private static final long VAR_INT_9_OCTET_MIN_VALUE  = (VAR_UINT_9_OCTET_MIN_VALUE &gt;&gt; 1);
+    private static final long VAR_INT_8_OCTET_MIN_VALUE  = (VAR_UINT_8_OCTET_MIN_VALUE &gt;&gt; 1);
+    private static final long VAR_INT_7_OCTET_MIN_VALUE  = (VAR_UINT_7_OCTET_MIN_VALUE &gt;&gt; 1);
+    private static final long VAR_INT_6_OCTET_MIN_VALUE  = (VAR_UINT_6_OCTET_MIN_VALUE &gt;&gt; 1);
+    private static final long VAR_INT_5_OCTET_MIN_VALUE  = (VAR_UINT_5_OCTET_MIN_VALUE &gt;&gt; 1);
+    private static final long VAR_INT_4_OCTET_MIN_VALUE  = (VAR_UINT_4_OCTET_MIN_VALUE &gt;&gt; 1);
+    private static final long VAR_INT_3_OCTET_MIN_VALUE  = (VAR_UINT_3_OCTET_MIN_VALUE &gt;&gt; 1);
+    private static final long VAR_INT_2_OCTET_MIN_VALUE  = (VAR_UINT_2_OCTET_MIN_VALUE &gt;&gt; 1);
+
+    private int writeVarIntSlow(final long magnitude, final long signMask)
+    {
+<span class="fc" id="L930">        int size = 1;</span>
+<span class="fc bfc" id="L931" title="All 2 branches covered.">        if (magnitude &gt;= VAR_INT_10_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc" id="L933">            writeUInt8(((magnitude &gt;&gt; VAR_INT_10_OCTET_SHIFT) &amp; VAR_INT_SIGNED_OCTET_MASK) | signMask);</span>
+<span class="fc" id="L934">            size++;</span>
+        }
+<span class="fc bfc" id="L936" title="All 2 branches covered.">        if (magnitude &gt;= VAR_INT_9_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc" id="L938">            final long bits = (magnitude &gt;&gt; VAR_UINT_9_OCTET_SHIFT);</span>
+<span class="fc bfc" id="L939" title="All 2 branches covered.">            writeUInt8(size == 1 ? ((bits &amp; VAR_INT_SIGNED_OCTET_MASK) | signMask) : (bits &amp; VAR_INT_MASK));</span>
+<span class="fc" id="L940">            size++;</span>
+        }
+<span class="fc bfc" id="L942" title="All 2 branches covered.">        if (magnitude &gt;= VAR_INT_8_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc" id="L944">            final long bits = (magnitude &gt;&gt; VAR_UINT_8_OCTET_SHIFT);</span>
+<span class="fc bfc" id="L945" title="All 2 branches covered.">            writeUInt8(size == 1 ? ((bits &amp; VAR_INT_SIGNED_OCTET_MASK) | signMask) : (bits &amp; VAR_INT_MASK));</span>
+<span class="fc" id="L946">            size++;</span>
+        }
+<span class="fc bfc" id="L948" title="All 2 branches covered.">        if (magnitude &gt;= VAR_INT_7_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc" id="L950">            final long bits = (magnitude &gt;&gt; VAR_UINT_7_OCTET_SHIFT);</span>
+<span class="fc bfc" id="L951" title="All 2 branches covered.">            writeUInt8(size == 1 ? ((bits &amp; VAR_INT_SIGNED_OCTET_MASK) | signMask) : (bits &amp; VAR_INT_MASK));</span>
+<span class="fc" id="L952">            size++;</span>
+        }
+<span class="fc bfc" id="L954" title="All 2 branches covered.">        if (magnitude &gt;= VAR_INT_6_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc" id="L956">            final long bits = (magnitude &gt;&gt; VAR_UINT_6_OCTET_SHIFT);</span>
+<span class="fc bfc" id="L957" title="All 2 branches covered.">            writeUInt8(size == 1 ? ((bits &amp; VAR_INT_SIGNED_OCTET_MASK) | signMask) : (bits &amp; VAR_INT_MASK));</span>
+<span class="fc" id="L958">            size++;</span>
+        }
+<span class="fc bfc" id="L960" title="All 2 branches covered.">        if (magnitude &gt;= VAR_INT_5_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc" id="L962">            final long bits = (magnitude &gt;&gt; VAR_UINT_5_OCTET_SHIFT);</span>
+<span class="fc bfc" id="L963" title="All 2 branches covered.">            writeUInt8(size == 1 ? ((bits &amp; VAR_INT_SIGNED_OCTET_MASK) | signMask) : (bits &amp; VAR_INT_MASK));</span>
+<span class="fc" id="L964">            size++;</span>
+        }
+<span class="fc bfc" id="L966" title="All 2 branches covered.">        if (magnitude &gt;= VAR_INT_4_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc" id="L968">            final long bits = (magnitude &gt;&gt; VAR_UINT_4_OCTET_SHIFT);</span>
+<span class="fc bfc" id="L969" title="All 2 branches covered.">            writeUInt8(size == 1 ? ((bits &amp; VAR_INT_SIGNED_OCTET_MASK) | signMask) : (bits &amp; VAR_INT_MASK));</span>
+<span class="fc" id="L970">            size++;</span>
+        }
+<span class="fc bfc" id="L972" title="All 2 branches covered.">        if (magnitude &gt;= VAR_INT_3_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc" id="L974">            final long bits = (magnitude &gt;&gt; VAR_UINT_3_OCTET_SHIFT);</span>
+<span class="fc bfc" id="L975" title="All 2 branches covered.">            writeUInt8(size == 1 ? ((bits &amp; VAR_INT_SIGNED_OCTET_MASK) | signMask) : (bits &amp; VAR_INT_MASK));</span>
+<span class="fc" id="L976">            size++;</span>
+        }
+<span class="pc bpc" id="L978" title="1 of 2 branches missed.">        if (magnitude &gt;= VAR_INT_2_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc" id="L980">            final long bits = (magnitude &gt;&gt; VAR_UINT_2_OCTET_SHIFT);</span>
+<span class="fc bfc" id="L981" title="All 2 branches covered.">            writeUInt8(size == 1 ? ((bits &amp; VAR_INT_SIGNED_OCTET_MASK) | signMask) : (bits &amp; VAR_INT_MASK));</span>
+<span class="fc" id="L982">            size++;</span>
+        }
+<span class="pc bpc" id="L984" title="1 of 2 branches missed.">        writeUInt8((size == 1 ? ((magnitude &amp; VAR_INT_SIGNED_OCTET_MASK) | signMask) : (magnitude &amp; VAR_INT_MASK)) | VAR_INT_FINAL_OCTET_SIGNAL_MASK);</span>
+
+<span class="fc" id="L986">        return size;</span>
+    }
+
+    private static final long VAR_INT_BITS_PER_SIGNED_OCTET = 6;
+    private static final long VAR_SINT_2_OCTET_SHIFT = VAR_INT_BITS_PER_SIGNED_OCTET + (1 * VAR_INT_BITS_PER_OCTET);
+    private static final long VAR_SINT_3_OCTET_SHIFT = VAR_INT_BITS_PER_SIGNED_OCTET + (2 * VAR_INT_BITS_PER_OCTET);
+    private static final long VAR_SINT_4_OCTET_SHIFT = VAR_INT_BITS_PER_SIGNED_OCTET + (3 * VAR_INT_BITS_PER_OCTET);
+    private static final long VAR_SINT_5_OCTET_SHIFT = VAR_INT_BITS_PER_SIGNED_OCTET + (4 * VAR_INT_BITS_PER_OCTET);
+
+    public int writeVarInt(long value)
+    {
+<span class="pc bpc" id="L997" title="2 of 4 branches missed.">        assert value != Long.MIN_VALUE;</span>
+
+<span class="fc bfc" id="L999" title="All 2 branches covered.">        final long signMask = value &lt; 0 ? VAR_INT_SIGNBIT_ON_MASK : VAR_INT_SIGNBIT_OFF_MASK;</span>
+<span class="fc bfc" id="L1000" title="All 2 branches covered.">        final long magnitude = value &lt; 0 ? -value : value;</span>
+<span class="fc bfc" id="L1001" title="All 2 branches covered.">        if (magnitude &lt; VAR_INT_2_OCTET_MIN_VALUE)</span>
+        {
+<span class="fc" id="L1003">            writeUInt8((magnitude &amp; VAR_INT_SIGNED_OCTET_MASK) | VAR_INT_FINAL_OCTET_SIGNAL_MASK | signMask);</span>
+<span class="fc" id="L1004">            return 1;</span>
+        }
+<span class="fc bfc" id="L1006" title="All 2 branches covered.">        final long signBit = value &lt; 0 ? 1 : 0;</span>
+<span class="fc" id="L1007">        final int remaining = remaining();</span>
+<span class="fc bfc" id="L1008" title="All 4 branches covered.">        if (magnitude &lt; VAR_INT_3_OCTET_MIN_VALUE &amp;&amp; remaining &gt;= 2)</span>
+        {
+<span class="fc" id="L1010">            return writeVarUIntDirect2(magnitude | (signBit &lt;&lt; VAR_SINT_2_OCTET_SHIFT));</span>
+        }
+<span class="fc bfc" id="L1012" title="All 4 branches covered.">        else if (magnitude &lt; VAR_INT_4_OCTET_MIN_VALUE &amp;&amp; remaining &gt;= 3)</span>
+        {
+<span class="fc" id="L1014">            return writeVarUIntDirect3(magnitude | (signBit &lt;&lt; VAR_SINT_3_OCTET_SHIFT));</span>
+        }
+<span class="fc bfc" id="L1016" title="All 4 branches covered.">        else if (magnitude &lt; VAR_INT_5_OCTET_MIN_VALUE &amp;&amp; remaining &gt;= 4)</span>
+        {
+<span class="fc" id="L1018">            return writeVarUIntDirect4(magnitude | (signBit &lt;&lt; VAR_SINT_4_OCTET_SHIFT));</span>
+        }
+<span class="fc bfc" id="L1020" title="All 4 branches covered.">        else if (magnitude &lt; VAR_INT_6_OCTET_MIN_VALUE &amp;&amp; remaining &gt;= 5)</span>
+        {
+<span class="fc" id="L1022">            return writeVarUIntDirect5(magnitude | (signBit &lt;&lt; VAR_SINT_5_OCTET_SHIFT));</span>
+        }
+        // TODO determine if it is worth doing the fast path beyond 2**34 - 1
+
+        // we give up--go to the slow path
+<span class="fc" id="L1027">        return writeVarIntSlow(magnitude, signMask);</span>
+    }
+
+    // write variable integer of specific size at a specified position -- no bounds checking, will not expand the buffer
+
+    public void writeVarUIntDirect1At(final long position, final long value)
+    {
+<span class="fc" id="L1034">        writeUInt8At(position, (value &amp; VAR_INT_MASK) | VAR_INT_FINAL_OCTET_SIGNAL_MASK);</span>
+<span class="fc" id="L1035">    }</span>
+
+    private void writeVarUIntDirect2StraddlingAt(final int index, final int offset, final long value)
+    {
+        // XXX we're stradling a block
+<span class="fc" id="L1040">        final Block block1 = blocks.get(index);</span>
+<span class="fc" id="L1041">        block1.data[offset] = (byte) ((value &gt;&gt; VAR_UINT_2_OCTET_SHIFT) &amp; VAR_INT_MASK);</span>
+<span class="fc" id="L1042">        final Block block2 = blocks.get(index + 1);</span>
+<span class="fc" id="L1043">        block2.data[0]      = (byte) ((value                            &amp; VAR_INT_MASK) | VAR_INT_FINAL_OCTET_SIGNAL_MASK);</span>
+<span class="fc" id="L1044">    }</span>
+
+    public void writeVarUIntDirect2At(long position, long value)
+    {
+<span class="fc" id="L1048">        final int index = index(position);</span>
+<span class="fc" id="L1049">        final int offset = offset(position);</span>
+
+<span class="fc bfc" id="L1051" title="All 2 branches covered.">        if (offset + 2 &gt; allocator.getBlockSize())</span>
+        {
+<span class="fc" id="L1053">            writeVarUIntDirect2StraddlingAt(index, offset, value);</span>
+<span class="fc" id="L1054">            return;</span>
+        }
+
+<span class="fc" id="L1057">        final Block block = blocks.get(index);</span>
+<span class="fc" id="L1058">        block.data[offset    ] = (byte) ((value &gt;&gt; VAR_UINT_2_OCTET_SHIFT) &amp; VAR_INT_MASK);</span>
+<span class="fc" id="L1059">        block.data[offset + 1] = (byte) ((value                            &amp; VAR_INT_MASK) | VAR_INT_FINAL_OCTET_SIGNAL_MASK);</span>
+<span class="fc" id="L1060">    }</span>
+
+    public void writeUInt8At(final long position, final long value)
+    {
+<span class="fc" id="L1064">        final int index = index(position);</span>
+<span class="fc" id="L1065">        final int offset = offset(position);</span>
+
+        // XXX we'll never overrun a block unless we're given a position past our block array
+<span class="fc" id="L1068">        final Block block = blocks.get(index);</span>
+<span class="fc" id="L1069">        block.data[offset] = (byte) value;</span>
+<span class="fc" id="L1070">    }</span>
+
+    /** Write the entire buffer to output stream. */
+    public void writeTo(final OutputStream out) throws IOException
+    {
+<span class="fc bfc" id="L1075" title="All 2 branches covered.">        for (int i = 0; i &lt;= index; i++)</span>
+        {
+<span class="fc" id="L1077">            Block block = blocks.get(i);</span>
+<span class="fc" id="L1078">            out.write(block.data, 0, block.limit);</span>
+        }
+<span class="fc" id="L1080">    }</span>
+
+    /** Write a specific segment of data from the buffer to a stream. */
+    public void writeTo(final OutputStream out, long position, long length) throws IOException
+    {
+<span class="fc bfc" id="L1085" title="All 2 branches covered.">        while (length &gt; 0)</span>
+        {
+<span class="fc" id="L1087">            final int index = index(position);</span>
+<span class="fc" id="L1088">            final int offset = offset(position);</span>
+<span class="fc" id="L1089">            final Block block = blocks.get(index);</span>
+<span class="fc" id="L1090">            final int amount = (int) Math.min(block.data.length - offset, length);</span>
+<span class="fc" id="L1091">            out.write(block.data, offset, amount);</span>
+
+<span class="fc" id="L1093">            position += amount;</span>
+<span class="fc" id="L1094">            length -= amount;</span>
+<span class="fc" id="L1095">        }</span>
+<span class="fc" id="L1096">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

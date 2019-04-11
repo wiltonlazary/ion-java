@@ -1,0 +1,1467 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReverseBinaryEncoder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl.lite</a> &gt; <span class="el_source">ReverseBinaryEncoder.java</span></div><h1>ReverseBinaryEncoder.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl.lite;
+
+import static com.amazon.ion.SymbolTable.UNKNOWN_SYMBOL_ID;
+import static com.amazon.ion.SystemSymbols.IMPORTS_SID;
+import static com.amazon.ion.SystemSymbols.ION_SYMBOL_TABLE_SID;
+import static com.amazon.ion.SystemSymbols.MAX_ID_SID;
+import static com.amazon.ion.SystemSymbols.NAME_SID;
+import static com.amazon.ion.SystemSymbols.SYMBOLS_SID;
+import static com.amazon.ion.SystemSymbols.VERSION_SID;
+import static com.amazon.ion.impl._Private_IonConstants.BINARY_VERSION_MARKER_1_0;
+import static com.amazon.ion.impl._Private_IonConstants.lnBooleanFalse;
+import static com.amazon.ion.impl._Private_IonConstants.lnBooleanTrue;
+import static com.amazon.ion.impl._Private_IonConstants.lnIsNull;
+import static com.amazon.ion.impl._Private_IonConstants.lnIsVarLen;
+import static com.amazon.ion.impl._Private_IonConstants.tidBlob;
+import static com.amazon.ion.impl._Private_IonConstants.tidBoolean;
+import static com.amazon.ion.impl._Private_IonConstants.tidClob;
+import static com.amazon.ion.impl._Private_IonConstants.tidDecimal;
+import static com.amazon.ion.impl._Private_IonConstants.tidFloat;
+import static com.amazon.ion.impl._Private_IonConstants.tidList;
+import static com.amazon.ion.impl._Private_IonConstants.tidNegInt;
+import static com.amazon.ion.impl._Private_IonConstants.tidNull;
+import static com.amazon.ion.impl._Private_IonConstants.tidPosInt;
+import static com.amazon.ion.impl._Private_IonConstants.tidSexp;
+import static com.amazon.ion.impl._Private_IonConstants.tidString;
+import static com.amazon.ion.impl._Private_IonConstants.tidStruct;
+import static com.amazon.ion.impl._Private_IonConstants.tidSymbol;
+import static com.amazon.ion.impl._Private_IonConstants.tidTimestamp;
+import static com.amazon.ion.impl._Private_IonConstants.tidTypedecl;
+
+import com.amazon.ion.Decimal;
+import com.amazon.ion.IonBlob;
+import com.amazon.ion.IonBool;
+import com.amazon.ion.IonClob;
+import com.amazon.ion.IonDatagram;
+import com.amazon.ion.IonDecimal;
+import com.amazon.ion.IonException;
+import com.amazon.ion.IonFloat;
+import com.amazon.ion.IonInt;
+import com.amazon.ion.IonList;
+import com.amazon.ion.IonSequence;
+import com.amazon.ion.IonSexp;
+import com.amazon.ion.IonString;
+import com.amazon.ion.IonStruct;
+import com.amazon.ion.IonSymbol;
+import com.amazon.ion.IonSystem;
+import com.amazon.ion.IonTimestamp;
+import com.amazon.ion.IonValue;
+import com.amazon.ion.SymbolTable;
+import com.amazon.ion.SymbolToken;
+import com.amazon.ion.Timestamp;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.ListIterator;
+
+
+/**
+ * Encoder implementation that encodes a IonDatagram into binary format using a
+ * reverse encoding algorithm instead of the default pre-order (left-to-right)
+ * two-pass algorithm.
+ * &lt;p&gt;
+ * This reverse encoding algorithm requires a fully materialized IonDatagram
+ * DOM to qualify for use. It uses a single buffer, {@link #myBuffer}, to hold
+ * the entire binary-encoded data, with an integer, {@link #myOffset}, to index
+ * the current position to write the bytes.
+ * &lt;p&gt;
+ * The algorithm begins by traversing from the last top-level value to the
+ * first top-level value. During this traversal, it recursively goes into the
+ * nested values of the top-level value being traversed in a similar
+ * last-to-first (right-to-left) order.
+ */
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">class ReverseBinaryEncoder</span>
+{
+<span class="fc" id="L92">    private static final BigInteger MAX_LONG_VALUE =</span>
+<span class="fc" id="L93">        BigInteger.valueOf(Long.MAX_VALUE);</span>
+
+    private static final int NULL_LENGTH_MASK   = lnIsNull;
+
+    private static final int TYPE_NULL          = tidNull       &lt;&lt; 4;
+    private static final int TYPE_BOOL          = tidBoolean    &lt;&lt; 4;
+    private static final int TYPE_POS_INT       = tidPosInt     &lt;&lt; 4;
+    private static final int TYPE_NEG_INT       = tidNegInt     &lt;&lt; 4;
+    private static final int TYPE_FLOAT         = tidFloat      &lt;&lt; 4;
+    private static final int TYPE_DECIMAL       = tidDecimal    &lt;&lt; 4;
+    private static final int TYPE_TIMESTAMP     = tidTimestamp  &lt;&lt; 4;
+    private static final int TYPE_SYMBOL        = tidSymbol     &lt;&lt; 4;
+    private static final int TYPE_STRING        = tidString     &lt;&lt; 4;
+    private static final int TYPE_CLOB          = tidClob       &lt;&lt; 4;
+    private static final int TYPE_BLOB          = tidBlob       &lt;&lt; 4;
+    private static final int TYPE_LIST          = tidList       &lt;&lt; 4;
+    private static final int TYPE_SEXP          = tidSexp       &lt;&lt; 4;
+    private static final int TYPE_STRUCT        = tidStruct     &lt;&lt; 4;
+    private static final int TYPE_ANNOTATIONS   = tidTypedecl   &lt;&lt; 4;
+
+    /**
+     * Holds the entire binary encoded data. When IonDatagram is fully encoded
+     * into binary data, this byte array will hold that data.
+     */
+    private byte[] myBuffer;
+
+    /**
+     * Index onto the position where the bytes are last written to the buffer.
+     * That means that if you want to write 1 more byte to the buffer, you have
+     * to decrease the index by 1 (myOffset - 1).
+     */
+    private int myOffset;
+
+    /**
+     * The symbol table attached to the IonValue (and its nested values)
+     * that the encoder is currently traversing on.
+     */
+    private SymbolTable mySymbolTable;
+
+    private IonSystem myIonSystem;
+
+    ReverseBinaryEncoder(int initialSize)
+<span class="fc" id="L135">    {</span>
+<span class="fc" id="L136">        myBuffer = new byte[initialSize];</span>
+<span class="fc" id="L137">        myOffset = initialSize;</span>
+<span class="fc" id="L138">    }</span>
+
+    /**
+     * Returns the size of the Ion binary-encoded byte array.
+     * &lt;p&gt;
+     * This makes an unchecked assumption that {{@link #serialize(IonDatagram)}
+     * is already called.
+     *
+     * @return the number of bytes of the byte array
+     */
+    int byteSize()
+    {
+<span class="fc" id="L150">        return myBuffer.length - myOffset;</span>
+    }
+
+    /**
+     * Copies the current contents of the Ion binary-encoded byte array into a
+     * new byte array. The allocates an array of the size needed to exactly hold
+     * the output and copies the entire byte array to it.
+     * &lt;p&gt;
+     * This makes an unchecked assumption that {{@link #serialize(IonDatagram)}
+     * is already called.
+     *
+     * @return the newly allocated byte array
+     */
+    byte[] toNewByteArray()
+    {
+<span class="fc" id="L165">        int length = myBuffer.length - myOffset;</span>
+<span class="fc" id="L166">        byte[] bytes = new byte[length];</span>
+<span class="fc" id="L167">        System.arraycopy(myBuffer, myOffset, bytes, 0, length);</span>
+<span class="fc" id="L168">        return bytes;</span>
+    }
+
+    /**
+     * Copies the current contents of the Ion binary-encoded byte array into a
+     * a given byte array.
+     * &lt;p&gt;
+     * The given array must be large enough to contain all the bytes of the
+     * Ion binary-encoded byte array.
+     * &lt;p&gt;
+     * This makes an unchecked assumption that {{@link #serialize(IonDatagram)}
+     * is already called.
+     * &lt;p&gt;
+     * TODO To be deprecated along with {@link IonDatagram#getBytes(byte[])}
+     *
+     * @param dst the byte array into which bytes are to be written
+     *
+     * @return the number of bytes copied into {@code dst}
+     */
+    int toNewByteArray(byte[] dst)
+    {
+<span class="fc" id="L189">        int length = myBuffer.length - myOffset;</span>
+<span class="fc" id="L190">        System.arraycopy(myBuffer, myOffset, dst, 0, length);</span>
+<span class="fc" id="L191">        return length;</span>
+    }
+
+    /**
+     * Copies the current contents of the Ion binary-encoded byte array into a
+     * a given byte sub-array.
+     * &lt;p&gt;
+     * The given sub-array must be large enough to contain all the bytes of the
+     * Ion binary-encoded byte array.
+     * &lt;p&gt;
+     * This makes an unchecked assumption that {{@link #serialize(IonDatagram)}
+     * is already called.
+     * &lt;p&gt;
+     * TODO To be deprecated along with {@link IonDatagram#getBytes(byte[], int)}
+     *
+     * @param dst the byte sub-array into which bytes are to be written
+     * @param offset the offset within the sub-array of the first byte to be
+     *          written; must be non-negative and no larger
+     *          than {@code dst.length}
+     *
+     * @return the number of bytes copied into {@code dst}
+     */
+    int toNewByteArray(byte[] dst, int offset)
+    {
+<span class="fc" id="L215">        int length = myBuffer.length - myOffset;</span>
+<span class="fc" id="L216">        System.arraycopy(myBuffer, myOffset, dst, offset, length);</span>
+<span class="fc" id="L217">        return length;</span>
+    }
+
+    /**
+     * Copies the current contents of the Ion binary-encoded byte array to a
+     * specified stream.
+     * &lt;p&gt;
+     * This makes an unchecked assumption that {{@link #serialize(IonDatagram)}
+     * is already called.
+     *
+     * @return the number of bytes written into {@code out}
+     *
+     * @throws IOException
+     */
+    int writeBytes(OutputStream out)
+        throws IOException
+    {
+<span class="fc" id="L234">        int length = myBuffer.length - myOffset;</span>
+<span class="fc" id="L235">        byte[] bytes = new byte[length];</span>
+<span class="fc" id="L236">        System.arraycopy(myBuffer, myOffset, bytes, 0, length);</span>
+<span class="fc" id="L237">        out.write(bytes);</span>
+<span class="fc" id="L238">        return length;</span>
+    }
+
+    /**
+     * Serialize the IonDatagram into Ion binary-encoding, to the internal
+     * byte array buffer of the encoder.
+     * &lt;p&gt;
+     * If the IonDatagram has been modified after this method call, you
+     * &lt;em&gt;must&lt;/em&gt; call this method again to correctly reflect the
+     * modifications.
+     *
+     * @throws IonException
+     */
+    void serialize(IonDatagram dg)
+        throws IonException
+    {
+<span class="fc" id="L254">        myIonSystem = dg.getSystem();</span>
+<span class="fc" id="L255">        mySymbolTable = null;</span>
+
+        // Write all top-level values in reverse
+<span class="fc" id="L258">        writeIonValue(dg);</span>
+
+        // After all top-level values are written, write the local symbol table
+        // that is attached to the top-level value that has just been written,
+        // if it exists.
+<span class="fc bfc" id="L263" title="All 4 branches covered.">        if (mySymbolTable != null &amp;&amp; mySymbolTable.isLocalTable()) {</span>
+<span class="fc" id="L264">            writeLocalSymbolTable(mySymbolTable);</span>
+        }
+
+        // Write IVM
+<span class="fc" id="L268">        writeBytes(BINARY_VERSION_MARKER_1_0);</span>
+<span class="fc" id="L269">    }</span>
+
+    void serialize(SymbolTable symTab)
+        throws IonException
+    {
+<span class="fc" id="L274">        writeLocalSymbolTable(symTab);</span>
+<span class="fc" id="L275">    }</span>
+
+    /**
+     * Grows the current buffer and returns the updated offset.
+     *
+     * @param offset the original offset
+     * @return the updated offset
+     */
+    private int growBuffer(int offset)
+    {
+<span class="nc bnc" id="L285" title="All 4 branches missed.">        assert offset &lt; 0;</span>
+<span class="nc" id="L286">        byte[] oldBuf = myBuffer;</span>
+<span class="nc" id="L287">        int oldLen = oldBuf.length;</span>
+<span class="nc" id="L288">        byte[] newBuf = new byte[(-offset + oldLen) &lt;&lt; 1]; // Double the buffer</span>
+<span class="nc" id="L289">        int oldBegin = newBuf.length - oldLen;</span>
+<span class="nc" id="L290">        System.arraycopy(oldBuf, 0, newBuf, oldBegin, oldLen);</span>
+<span class="nc" id="L291">        myBuffer = newBuf;</span>
+<span class="nc" id="L292">        myOffset += oldBegin;</span>
+<span class="nc" id="L293">        return offset + oldBegin;</span>
+    }
+
+    /**
+     * Writes the IonValue and its nested values recursively, including
+     * annotations.
+     *
+     * @param value
+     * @throws IonException
+     */
+    private void writeIonValue(IonValue value)
+        throws IonException
+    {
+<span class="fc" id="L306">        final int valueOffset = myBuffer.length - myOffset;</span>
+
+<span class="pc bpc" id="L308" title="1 of 15 branches missed.">        switch (value.getType())</span>
+        {
+            // scalars
+<span class="fc" id="L311">            case BLOB:      writeIonBlobContent((IonBlob) value);            break;</span>
+<span class="fc" id="L312">            case BOOL:      writeIonBoolContent((IonBool) value);            break;</span>
+<span class="fc" id="L313">            case CLOB:      writeIonClobContent((IonClob) value);            break;</span>
+<span class="fc" id="L314">            case DECIMAL:   writeIonDecimalContent((IonDecimal) value);      break;</span>
+<span class="fc" id="L315">            case FLOAT:     writeIonFloatContent((IonFloat) value);          break;</span>
+<span class="fc" id="L316">            case INT:       writeIonIntContent((IonInt) value);              break;</span>
+<span class="fc" id="L317">            case NULL:      writeIonNullContent();                           break;</span>
+<span class="fc" id="L318">            case STRING:    writeIonStringContent((IonString) value);        break;</span>
+<span class="fc" id="L319">            case SYMBOL:    writeIonSymbolContent((IonSymbol) value);        break;</span>
+<span class="fc" id="L320">            case TIMESTAMP: writeIonTimestampContent((IonTimestamp) value);  break;</span>
+            // containers
+<span class="fc" id="L322">            case LIST:      writeIonListContent((IonList) value);            break;</span>
+<span class="fc" id="L323">            case SEXP:      writeIonSexpContent((IonSexp) value);            break;</span>
+<span class="fc" id="L324">            case STRUCT:    writeIonStructContent((IonStruct) value);        break;</span>
+            // IonDatagram
+<span class="fc" id="L326">            case DATAGRAM:  writeIonDatagramContent((IonDatagram) value);    break;</span>
+            default:
+<span class="nc" id="L328">                throw new IonException(&quot;IonType is unknown: &quot; + value.getType());</span>
+        }
+
+<span class="fc" id="L331">        writeAnnotations(value, valueOffset);</span>
+<span class="fc" id="L332">    }</span>
+
+    // =========================================================================
+    // Basic Field Formats (Primitive Fields)
+    // =========================================================================
+
+    private void writeByte(int b)
+    {
+<span class="fc" id="L340">        int offset = myOffset;</span>
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">        if (--offset &lt; 0) {</span>
+<span class="nc" id="L342">            offset = growBuffer(offset);</span>
+        }
+        // Using narrowing primitive conversion from int to byte
+<span class="fc" id="L345">        myBuffer[offset] = (byte) b;</span>
+<span class="fc" id="L346">        myOffset = offset;</span>
+<span class="fc" id="L347">    }</span>
+
+    private void writeBytes(byte[] bytes)
+    {
+<span class="fc" id="L351">        int length = bytes.length;</span>
+<span class="fc" id="L352">        int offset = myOffset;</span>
+<span class="pc bpc" id="L353" title="1 of 2 branches missed.">        if ((offset -= length) &lt; 0) {</span>
+<span class="nc" id="L354">            offset = growBuffer(offset);</span>
+        }
+<span class="fc" id="L356">        System.arraycopy(bytes, 0, myBuffer, offset, length);</span>
+<span class="fc" id="L357">        myOffset = offset;</span>
+<span class="fc" id="L358">    }</span>
+
+    private void writeUInt(long v)
+    {
+<span class="fc" id="L362">        int offset = myOffset;</span>
+
+<span class="fc bfc" id="L364" title="All 2 branches covered.">        if (v &lt; (1L &lt;&lt; (8 * 1)))</span>
+        {
+<span class="pc bpc" id="L366" title="1 of 2 branches missed.">            if (--offset &lt; 0) {</span>
+<span class="nc" id="L367">                offset = growBuffer(offset);</span>
+            }
+<span class="fc" id="L369">            myBuffer[offset] = (byte) v;</span>
+        }
+<span class="fc bfc" id="L371" title="All 2 branches covered.">        else if (v &lt; (1L &lt;&lt; (8 * 2)))</span>
+        {
+<span class="fc" id="L373">            offset -= 2;</span>
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">            if (offset &lt; 0) {</span>
+<span class="nc" id="L375">                offset = growBuffer(offset);</span>
+            }
+<span class="fc" id="L377">            myBuffer[offset]   = (byte) (v &gt;&gt;&gt; (8 * 1));</span>
+<span class="fc" id="L378">            myBuffer[offset+1] = (byte)  v;</span>
+        }
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        else if (v &lt; (1L &lt;&lt; (8 * 3)))</span>
+        {
+<span class="fc" id="L382">            offset -= 3;</span>
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">            if (offset &lt; 0) {</span>
+<span class="nc" id="L384">                offset = growBuffer(offset);</span>
+            }
+<span class="fc" id="L386">            myBuffer[offset]   = (byte) (v &gt;&gt;&gt; (8 * 2));</span>
+<span class="fc" id="L387">            myBuffer[offset+1] = (byte) (v &gt;&gt;&gt; (8 * 1));</span>
+<span class="fc" id="L388">            myBuffer[offset+2] = (byte)  v;</span>
+        }
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        else if (v &lt; (1L &lt;&lt; (8 * 4)))</span>
+        {
+<span class="fc" id="L392">            offset -= 4;</span>
+<span class="pc bpc" id="L393" title="1 of 2 branches missed.">            if (offset &lt; 0) {</span>
+<span class="nc" id="L394">                offset = growBuffer(offset);</span>
+            }
+<span class="fc" id="L396">            myBuffer[offset]   = (byte) (v &gt;&gt;&gt; (8 * 3));</span>
+<span class="fc" id="L397">            myBuffer[offset+1] = (byte) (v &gt;&gt;&gt; (8 * 2));</span>
+<span class="fc" id="L398">            myBuffer[offset+2] = (byte) (v &gt;&gt;&gt; (8 * 1));</span>
+<span class="fc" id="L399">            myBuffer[offset+3] = (byte)  v;</span>
+        }
+<span class="fc bfc" id="L401" title="All 2 branches covered.">        else if (v &lt; (1L &lt;&lt; (8 * 5)))</span>
+        {
+<span class="fc" id="L403">            offset -= 5;</span>
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">            if (offset &lt; 0) {</span>
+<span class="nc" id="L405">                offset = growBuffer(offset);</span>
+            }
+<span class="fc" id="L407">            myBuffer[offset]   = (byte) (v &gt;&gt;&gt; (8 * 4));</span>
+<span class="fc" id="L408">            myBuffer[offset+1] = (byte) (v &gt;&gt;&gt; (8 * 3));</span>
+<span class="fc" id="L409">            myBuffer[offset+2] = (byte) (v &gt;&gt;&gt; (8 * 2));</span>
+<span class="fc" id="L410">            myBuffer[offset+3] = (byte) (v &gt;&gt;&gt; (8 * 1));</span>
+<span class="fc" id="L411">            myBuffer[offset+4] = (byte)  v;</span>
+        }
+<span class="fc bfc" id="L413" title="All 2 branches covered.">        else if (v &lt; (1L &lt;&lt; (8 * 6)))</span>
+        {
+<span class="fc" id="L415">            offset -= 6;</span>
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">            if (offset &lt; 0) {</span>
+<span class="nc" id="L417">                offset = growBuffer(offset);</span>
+            }
+<span class="fc" id="L419">            myBuffer[offset]   = (byte) (v &gt;&gt;&gt; (8 * 5));</span>
+<span class="fc" id="L420">            myBuffer[offset+1] = (byte) (v &gt;&gt;&gt; (8 * 4));</span>
+<span class="fc" id="L421">            myBuffer[offset+2] = (byte) (v &gt;&gt;&gt; (8 * 3));</span>
+<span class="fc" id="L422">            myBuffer[offset+3] = (byte) (v &gt;&gt;&gt; (8 * 2));</span>
+<span class="fc" id="L423">            myBuffer[offset+4] = (byte) (v &gt;&gt;&gt; (8 * 1));</span>
+<span class="fc" id="L424">            myBuffer[offset+5] = (byte)  v;</span>
+        }
+<span class="fc bfc" id="L426" title="All 2 branches covered.">        else if (v &lt; (1L &lt;&lt; (8 * 7)))</span>
+        {
+<span class="fc" id="L428">            offset -= 7;</span>
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">            if (offset &lt; 0) {</span>
+<span class="nc" id="L430">                offset = growBuffer(offset);</span>
+            }
+<span class="fc" id="L432">            myBuffer[offset]   = (byte) (v &gt;&gt;&gt; (8 * 6));</span>
+<span class="fc" id="L433">            myBuffer[offset+1] = (byte) (v &gt;&gt;&gt; (8 * 5));</span>
+<span class="fc" id="L434">            myBuffer[offset+2] = (byte) (v &gt;&gt;&gt; (8 * 4));</span>
+<span class="fc" id="L435">            myBuffer[offset+3] = (byte) (v &gt;&gt;&gt; (8 * 3));</span>
+<span class="fc" id="L436">            myBuffer[offset+4] = (byte) (v &gt;&gt;&gt; (8 * 2));</span>
+<span class="fc" id="L437">            myBuffer[offset+5] = (byte) (v &gt;&gt;&gt; (8 * 1));</span>
+<span class="fc" id="L438">            myBuffer[offset+6] = (byte)  v;</span>
+        }
+        else
+        {
+<span class="fc" id="L442">            offset -= 8;</span>
+<span class="pc bpc" id="L443" title="1 of 2 branches missed.">            if (offset &lt; 0) {</span>
+<span class="nc" id="L444">                offset = growBuffer(offset);</span>
+            }
+<span class="fc" id="L446">            myBuffer[offset]   = (byte) (v &gt;&gt;&gt; (8 * 7));</span>
+<span class="fc" id="L447">            myBuffer[offset+1] = (byte) (v &gt;&gt;&gt; (8 * 6));</span>
+<span class="fc" id="L448">            myBuffer[offset+2] = (byte) (v &gt;&gt;&gt; (8 * 5));</span>
+<span class="fc" id="L449">            myBuffer[offset+3] = (byte) (v &gt;&gt;&gt; (8 * 4));</span>
+<span class="fc" id="L450">            myBuffer[offset+4] = (byte) (v &gt;&gt;&gt; (8 * 3));</span>
+<span class="fc" id="L451">            myBuffer[offset+5] = (byte) (v &gt;&gt;&gt; (8 * 2));</span>
+<span class="fc" id="L452">            myBuffer[offset+6] = (byte) (v &gt;&gt;&gt; (8 * 1));</span>
+<span class="fc" id="L453">            myBuffer[offset+7] = (byte)  v;</span>
+        }
+
+<span class="fc" id="L456">        myOffset = offset;</span>
+<span class="fc" id="L457">    }</span>
+
+    /**
+     * Write a VarUInt field. VarUInts are sequence of bytes. The high-order
+     * bit of the last octet is one, indicating the end of the sequence. All
+     * other high-order bits must be zero.
+     * &lt;p&gt;
+     * Writes at least one byte, even for zero values. int parameter is enough
+     * as the scalar and container writers do not have APIs that return long or
+     * BigInteger representations.
+     *
+     * @param v
+     */
+    private void writeVarUInt(int v)
+    {
+<span class="fc" id="L472">        int offset = myOffset;</span>
+
+<span class="fc bfc" id="L474" title="All 2 branches covered.">        if (v &lt; (1 &lt;&lt; (7 * 1)))               // 1 byte - 7 bits used - 0x7f max</span>
+        {
+<span class="pc bpc" id="L476" title="1 of 2 branches missed.">            if (--offset &lt; 0) {</span>
+<span class="nc" id="L477">                offset = growBuffer(offset);</span>
+            }
+<span class="fc" id="L479">            myBuffer[offset]     = (byte) (v | 0x80 );</span>
+        }
+<span class="fc bfc" id="L481" title="All 2 branches covered.">        else if (v &lt; (1 &lt;&lt; (7 * 2)))          // 2 bytes - 14 bits used - 0x3fff max</span>
+        {
+<span class="pc bpc" id="L483" title="1 of 2 branches missed.">            if ((offset -= 2) &lt; 0) {</span>
+<span class="nc" id="L484">                offset = growBuffer(offset);</span>
+            }
+<span class="fc" id="L486">            myBuffer[offset]     = (byte) (v &gt;&gt;&gt; (7 * 1));</span>
+<span class="fc" id="L487">            myBuffer[offset + 1] = (byte) (v | 0x80);</span>
+        }
+<span class="fc bfc" id="L489" title="All 2 branches covered.">        else if (v &lt; (1 &lt;&lt; (7 * 3)))          // 3 bytes - 21 bits used - 0x1fffff max</span>
+        {
+<span class="pc bpc" id="L491" title="1 of 2 branches missed.">            if ((offset -= 3) &lt; 0) {</span>
+<span class="nc" id="L492">                offset = growBuffer(offset);</span>
+            }
+<span class="fc" id="L494">            myBuffer[offset]     = (byte) ( v &gt;&gt;&gt; (7 * 2));</span>
+<span class="fc" id="L495">            myBuffer[offset + 1] = (byte) ((v &gt;&gt;&gt; (7 * 1)) &amp; 0x7f);</span>
+<span class="fc" id="L496">            myBuffer[offset + 2] = (byte) ( v | 0x80);</span>
+        }
+<span class="fc bfc" id="L498" title="All 2 branches covered.">        else if (v &lt; (1 &lt;&lt; (7 * 4)))          // 4 bytes - 28 bits used - 0xfffffff max</span>
+        {
+<span class="pc bpc" id="L500" title="1 of 2 branches missed.">            if ((offset -= 4) &lt; 0) {</span>
+<span class="nc" id="L501">                offset = growBuffer(offset);</span>
+            }
+<span class="fc" id="L503">            myBuffer[offset]     = (byte) ( v &gt;&gt;&gt; (7 * 3));</span>
+<span class="fc" id="L504">            myBuffer[offset + 1] = (byte) ((v &gt;&gt;&gt; (7 * 2)) &amp; 0x7f);</span>
+<span class="fc" id="L505">            myBuffer[offset + 2] = (byte) ((v &gt;&gt;&gt; (7 * 1)) &amp; 0x7f);</span>
+<span class="fc" id="L506">            myBuffer[offset + 3] = (byte) ( v | 0x80);</span>
+        }
+        else                                  // 5 bytes - 32 bits used - 0x7fffffff max (Integer.MAX_VALUE)
+        {
+<span class="pc bpc" id="L510" title="1 of 2 branches missed.">            if ((offset -= 5) &lt; 0) {</span>
+<span class="nc" id="L511">                offset = growBuffer(offset);</span>
+            }
+<span class="fc" id="L513">            myBuffer[offset]     = (byte) ( v &gt;&gt;&gt; (7 * 4));</span>
+<span class="fc" id="L514">            myBuffer[offset + 1] = (byte) ((v &gt;&gt;&gt; (7 * 3)) &amp; 0x7f);</span>
+<span class="fc" id="L515">            myBuffer[offset + 2] = (byte) ((v &gt;&gt;&gt; (7 * 2)) &amp; 0x7f);</span>
+<span class="fc" id="L516">            myBuffer[offset + 3] = (byte) ((v &gt;&gt;&gt; (7 * 1)) &amp; 0x7f);</span>
+<span class="fc" id="L517">            myBuffer[offset + 4] = (byte) ( v | 0x80);</span>
+        }
+
+<span class="fc" id="L520">        myOffset = offset;</span>
+<span class="fc" id="L521">    }</span>
+
+    /**
+     * Write a VarInt field. VarInts are sequence of bytes. The high-order bit
+     * of the last octet is one, indicating the end of the sequence. All other
+     * high-order bits must be zero. The second-highest order bit (0x40) is a
+     * sign flag in the first octet of the representation, but part of the
+     * extension bits for all other octets.
+     * &lt;p&gt;
+     * Writes at least one byte, even for zero values. int parameter is enough
+     * as the scalar and container writers do not have APIs that return long or
+     * BigInteger representations.
+     *
+     * @param v
+     */
+    private void writeVarInt(int v)
+    {
+<span class="fc bfc" id="L538" title="All 2 branches covered.">        if (v == 0)</span>
+        {
+<span class="fc" id="L540">            writeByte(0x80);</span>
+        }
+        else
+        {
+<span class="fc" id="L544">            int offset = myOffset;</span>
+
+<span class="fc bfc" id="L546" title="All 2 branches covered.">            boolean is_negative = (v &lt; 0);</span>
+<span class="fc bfc" id="L547" title="All 2 branches covered.">            if (is_negative)</span>
+            {
+                // note that for Integer.MIN_VALUE (0x80000000) the negative
+                // is the same, but that's also the bit pattern we need to
+                // write out - so no worries
+<span class="fc" id="L552">                v = -v;</span>
+            }
+
+<span class="fc bfc" id="L555" title="All 2 branches covered.">            if (v &lt; (1 &lt;&lt; (7 * 1 - 1)))           // 1 byte - 6 bits used - 0x3f max</span>
+            {
+<span class="pc bpc" id="L557" title="1 of 2 branches missed.">                if (--offset &lt; 0) {</span>
+<span class="nc" id="L558">                    offset = growBuffer(offset);</span>
+                }
+<span class="fc bfc" id="L560" title="All 2 branches covered.">                if (is_negative)</span>
+<span class="fc" id="L561">                    v |= 0x40;</span>
+<span class="fc" id="L562">                myBuffer[offset]     = (byte) (v | 0x80);</span>
+            }
+<span class="fc bfc" id="L564" title="All 2 branches covered.">            else if (v &lt; (1 &lt;&lt; (7 * 2 - 1)))      // 2 bytes - 13 bits used - 0x1fff max</span>
+            {
+<span class="pc bpc" id="L566" title="1 of 2 branches missed.">                if ((offset -= 2) &lt; 0) {</span>
+<span class="nc" id="L567">                    offset = growBuffer(offset);</span>
+                }
+<span class="fc bfc" id="L569" title="All 2 branches covered.">                if (is_negative)</span>
+<span class="fc" id="L570">                    v |= 0x2000;</span>
+<span class="fc" id="L571">                myBuffer[offset]     = (byte) (v &gt;&gt;&gt; (7 * 1));</span>
+<span class="fc" id="L572">                myBuffer[offset + 1] = (byte) (v | 0x80);</span>
+            }
+<span class="fc bfc" id="L574" title="All 2 branches covered.">            else if (v &lt; (1 &lt;&lt; (7 * 3 - 1)))      // 3 bytes - 20 bits used - 0xfffff max</span>
+            {
+<span class="pc bpc" id="L576" title="1 of 2 branches missed.">                if ((offset -= 3) &lt; 0) {</span>
+<span class="nc" id="L577">                    offset = growBuffer(offset);</span>
+                }
+<span class="pc bpc" id="L579" title="1 of 2 branches missed.">                if (is_negative)</span>
+<span class="nc" id="L580">                    v |= 0x100000;</span>
+<span class="fc" id="L581">                myBuffer[offset]     = (byte) ( v &gt;&gt;&gt; (7 * 2));</span>
+<span class="fc" id="L582">                myBuffer[offset + 1] = (byte) ((v &gt;&gt;&gt; (7 * 1)) &amp; 0x7f);</span>
+<span class="fc" id="L583">                myBuffer[offset + 2] = (byte) ( v | 0x80);</span>
+            }
+<span class="fc bfc" id="L585" title="All 2 branches covered.">            else if (v &lt; (1 &lt;&lt; (7 * 4 - 1)))      // 4 bytes - 27 bits used - 0x7ffffff max</span>
+            {
+<span class="pc bpc" id="L587" title="1 of 2 branches missed.">                if ((offset -= 4) &lt; 0) {</span>
+<span class="nc" id="L588">                    offset = growBuffer(offset);</span>
+                }
+<span class="pc bpc" id="L590" title="1 of 2 branches missed.">                if (is_negative)</span>
+<span class="nc" id="L591">                    v |= 0x8000000;</span>
+<span class="fc" id="L592">                myBuffer[offset]     = (byte) ( v &gt;&gt;&gt; (7 * 3));</span>
+<span class="fc" id="L593">                myBuffer[offset + 1] = (byte) ((v &gt;&gt;&gt; (7 * 2)) &amp; 0x7f);</span>
+<span class="fc" id="L594">                myBuffer[offset + 2] = (byte) ((v &gt;&gt;&gt; (7 * 1)) &amp; 0x7f);</span>
+<span class="fc" id="L595">                myBuffer[offset + 3] = (byte) ( v | 0x80);</span>
+            }
+            else                                  // 5 bytes - 31 bits used - 0x7fffffff max (Integer.MAX_VALUE)
+            {
+<span class="pc bpc" id="L599" title="1 of 2 branches missed.">                if ((offset -= 5) &lt; 0) {</span>
+<span class="nc" id="L600">                    offset = growBuffer(offset);</span>
+                }
+
+                // This is different from the previous if-blocks because we
+                // cannot represent a int with more than 32 bits to perform
+                // the &quot;OR-assignment&quot; (|=).
+<span class="fc" id="L606">                myBuffer[offset]     = (byte) ((v &gt;&gt;&gt; (7 * 4)) &amp; 0x7f);</span>
+<span class="pc bpc" id="L607" title="1 of 2 branches missed.">                if (is_negative) {</span>
+<span class="nc" id="L608">                    myBuffer[offset] |= 0x40;</span>
+                }
+
+<span class="fc" id="L611">                myBuffer[offset + 1] = (byte) ((v &gt;&gt;&gt; (7 * 3)) &amp; 0x7f);</span>
+<span class="fc" id="L612">                myBuffer[offset + 2] = (byte) ((v &gt;&gt;&gt; (7 * 2)) &amp; 0x7f);</span>
+<span class="fc" id="L613">                myBuffer[offset + 3] = (byte) ((v &gt;&gt;&gt; (7 * 1)) &amp; 0x7f);</span>
+<span class="fc" id="L614">                myBuffer[offset + 4] = (byte) ( v | 0x80);</span>
+            }
+
+<span class="fc" id="L617">            myOffset = offset;</span>
+        }
+<span class="fc" id="L619">    }</span>
+
+    // =========================================================================
+    // Type Descriptors
+    // =========================================================================
+
+    /**
+     * Writes the prefix (type and length) preceding the body of an encoded
+     * value. This method is only called &lt;em&gt;after&lt;/em&gt; a value's body is
+     * written to the buffer.
+     *
+     * @param type
+     *        the value's type, a four-bit high-nibble mask
+     * @param length
+     *        the number of bytes (octets) in the body, excluding the prefix
+     *        itself
+     */
+    private void writePrefix(int type, int length)
+    {
+<span class="fc bfc" id="L638" title="All 2 branches covered.">        if (length &gt;= lnIsVarLen)</span>
+        {
+<span class="fc" id="L640">            writeVarUInt(length);</span>
+<span class="fc" id="L641">            length = lnIsVarLen;</span>
+        }
+
+<span class="fc" id="L644">        int offset = myOffset;</span>
+<span class="pc bpc" id="L645" title="1 of 2 branches missed.">        if (--offset &lt; 0) {</span>
+<span class="nc" id="L646">            offset = growBuffer(offset);</span>
+        }
+<span class="fc" id="L648">        myBuffer[offset] = (byte) (type | length);</span>
+<span class="fc" id="L649">        myOffset = offset;</span>
+<span class="fc" id="L650">    }</span>
+
+    private void writeAnnotations(IonValue value, int endOfValueOffset)
+    {
+<span class="fc" id="L654">        SymbolToken[] annotationSymTokens = value.getTypeAnnotationSymbols();</span>
+<span class="fc bfc" id="L655" title="All 2 branches covered.">        if (annotationSymTokens.length &gt; 0)</span>
+        {
+<span class="fc" id="L657">            final int annotatedValueOffset = myBuffer.length - myOffset;</span>
+            int sid;
+<span class="fc bfc" id="L659" title="All 2 branches covered.">            for (int i = annotationSymTokens.length; --i &gt;= 0;)</span>
+            {
+<span class="fc" id="L661">                sid = findSid(annotationSymTokens[i]);</span>
+<span class="fc" id="L662">                writeVarUInt(sid);</span>
+            }
+<span class="fc" id="L664">            writeVarUInt(myBuffer.length - myOffset - annotatedValueOffset);</span>
+<span class="fc" id="L665">            writePrefix(TYPE_ANNOTATIONS,</span>
+                        myBuffer.length - myOffset - endOfValueOffset);
+        }
+<span class="fc" id="L668">    }</span>
+
+    // =========================================================================
+    // Scalars
+    // =========================================================================
+
+    private void writeIonNullContent()
+    {
+        // null.null
+<span class="fc" id="L677">        int encoded = TYPE_NULL | NULL_LENGTH_MASK;</span>
+<span class="fc" id="L678">        writeByte(encoded);</span>
+<span class="fc" id="L679">    }</span>
+
+    private void writeIonBoolContent(IonBool val)
+    {
+        int encoded;
+<span class="fc bfc" id="L684" title="All 2 branches covered.">        if (val.isNullValue())</span>
+        {
+<span class="fc" id="L686">            encoded = TYPE_BOOL | NULL_LENGTH_MASK;</span>
+        }
+        else
+        {
+<span class="fc" id="L690">            boolean b = val.booleanValue();</span>
+<span class="fc bfc" id="L691" title="All 2 branches covered.">            encoded = b ? (TYPE_BOOL | lnBooleanTrue) :</span>
+<span class="fc" id="L692">                          (TYPE_BOOL | lnBooleanFalse);</span>
+        }
+<span class="fc" id="L694">        writeByte(encoded);</span>
+<span class="fc" id="L695">    }</span>
+
+    /**
+     * @see IonBinary#writeUIntValue(BigInteger value, int len)
+     * @param val
+     */
+    private void writeIonIntContent(IonInt val)
+    {
+<span class="fc bfc" id="L703" title="All 2 branches covered.">        if (val.isNullValue())</span>
+        {
+            // NOTE: We are only writing the positive binary representation of
+            // null value here.
+<span class="fc" id="L707">            writeByte((byte) (TYPE_POS_INT | NULL_LENGTH_MASK));</span>
+        }
+        else
+        {
+<span class="fc" id="L711">            BigInteger bigInt = val.bigIntegerValue();</span>
+<span class="fc" id="L712">            int signum = bigInt.signum();</span>
+            int type;
+<span class="fc" id="L714">            final int originalOffset = myBuffer.length - myOffset;</span>
+<span class="fc bfc" id="L715" title="All 2 branches covered.">            if (signum == 0)</span>
+            {
+                // Zero has no bytes of data at all
+<span class="fc" id="L718">                writeByte((byte) TYPE_POS_INT);</span>
+<span class="fc" id="L719">                return; // Finished writing IonInt as zero.</span>
+            }
+<span class="fc bfc" id="L721" title="All 2 branches covered.">            else if (signum &lt; 0)</span>
+            {
+<span class="fc" id="L723">                type = TYPE_NEG_INT;</span>
+<span class="fc" id="L724">                bigInt = bigInt.negate();</span>
+            }
+            else
+            {
+<span class="fc" id="L728">                type = TYPE_POS_INT;</span>
+            }
+
+            // Check the value if it's smaller than a long, if so we can use a
+            // simpler routine to write the BigInteger value.
+<span class="fc bfc" id="L733" title="All 2 branches covered.">            if (bigInt.compareTo(MAX_LONG_VALUE) &lt; 0)</span>
+            {
+<span class="fc" id="L735">                long lvalue = bigInt.longValue();</span>
+<span class="fc" id="L736">                writeUInt(lvalue);</span>
+<span class="fc" id="L737">            }</span>
+            else
+            {
+                // BigInteger.toByteArray() returns a two's complement
+                // representation byte array. However, we have negated all
+                // negative BigInts to become positive BigInts, so essentially
+                // we don't have to convert the two's complement representation
+                // to sign-magnitude UInt.
+<span class="fc" id="L745">                byte[] bits = bigInt.toByteArray();</span>
+
+                // BigInteger will pad this with a null byte sometimes
+                // for negative numbers. Let's skip past any leading null bytes.
+<span class="fc" id="L749">                int offset = 0;</span>
+<span class="pc bpc" id="L750" title="1 of 4 branches missed.">                while (offset &lt; bits.length &amp;&amp; bits[offset] == 0)</span>
+                {
+<span class="fc" id="L752">                    offset++;</span>
+                }
+
+<span class="fc" id="L755">                int actualBitLength = bits.length - offset;</span>
+<span class="fc" id="L756">                int bufferOffset = myOffset - actualBitLength;</span>
+<span class="pc bpc" id="L757" title="1 of 2 branches missed.">                if (bufferOffset &lt; 0) {</span>
+<span class="nc" id="L758">                    bufferOffset = growBuffer(bufferOffset);</span>
+                }
+<span class="fc" id="L760">                System.arraycopy(bits, offset, myBuffer, bufferOffset,</span>
+                                 actualBitLength);
+<span class="fc" id="L762">                myOffset = bufferOffset;</span>
+            }
+
+<span class="fc" id="L765">            writePrefix(type, myBuffer.length - myOffset - originalOffset);</span>
+        }
+<span class="fc" id="L767">    }</span>
+
+    private void writeIonFloatContent(IonFloat val)
+    {
+<span class="fc bfc" id="L771" title="All 2 branches covered.">        if (val.isNullValue())</span>
+        {
+<span class="fc" id="L773">            writeByte((byte) (TYPE_FLOAT | NULL_LENGTH_MASK));</span>
+        }
+        else
+        {
+            // Write a 64-bit value in IEE-754 standard. This format happens to
+            // match the 8-byte UInt encoding.
+<span class="fc" id="L779">            long bits = Double.doubleToRawLongBits(val.doubleValue());</span>
+<span class="fc" id="L780">            int offset = myOffset;</span>
+<span class="pc bpc" id="L781" title="1 of 2 branches missed.">            if ((offset -= 8) &lt; 0) {</span>
+<span class="nc" id="L782">                offset = growBuffer(offset);</span>
+            }
+
+<span class="fc" id="L785">            myBuffer[offset]     = (byte) (bits &gt;&gt;&gt; (8 * 7));</span>
+<span class="fc" id="L786">            myBuffer[offset + 1] = (byte) (bits &gt;&gt;&gt; (8 * 6));</span>
+<span class="fc" id="L787">            myBuffer[offset + 2] = (byte) (bits &gt;&gt;&gt; (8 * 5));</span>
+<span class="fc" id="L788">            myBuffer[offset + 3] = (byte) (bits &gt;&gt;&gt; (8 * 4));</span>
+<span class="fc" id="L789">            myBuffer[offset + 4] = (byte) (bits &gt;&gt;&gt; (8 * 3));</span>
+<span class="fc" id="L790">            myBuffer[offset + 5] = (byte) (bits &gt;&gt;&gt; (8 * 2));</span>
+<span class="fc" id="L791">            myBuffer[offset + 6] = (byte) (bits &gt;&gt;&gt; (8 * 1));</span>
+<span class="fc" id="L792">            myBuffer[offset + 7] = (byte)  bits;</span>
+
+<span class="fc" id="L794">            myOffset = offset;</span>
+
+<span class="fc" id="L796">            writePrefix(TYPE_FLOAT, 8); // 64-bit IEE-754</span>
+        }
+<span class="fc" id="L798">    }</span>
+
+<span class="fc" id="L800">    private static final byte[] negativeZeroBitArray = new byte[] { (byte) 0x80 };</span>
+<span class="fc" id="L801">    private static final byte[] positiveZeroBitArray = new byte[0];</span>
+
+    /**
+     * @see com.amazon.ion.impl.IonBinary.Writer#writeDecimalContent
+     */
+    private void writeIonDecimalContent(BigDecimal bd)
+    {
+<span class="fc" id="L808">        BigInteger mantissa = bd.unscaledValue();</span>
+
+        byte[] mantissaBits;
+
+<span class="pc bpc" id="L812" title="1 of 4 branches missed.">        switch (mantissa.signum())</span>
+        {
+            case 0:
+<span class="fc bfc" id="L815" title="All 2 branches covered.">                if (Decimal.isNegativeZero(bd))</span>
+                {
+<span class="fc" id="L817">                    mantissaBits = negativeZeroBitArray;</span>
+                }
+                else
+                {
+<span class="fc" id="L821">                    mantissaBits = positiveZeroBitArray;</span>
+                }
+<span class="fc" id="L823">                break;</span>
+            case -1:
+                // Obtain the unsigned value of the BigInteger
+                // We cannot use the twos complement representation of a
+                // negative BigInteger as this is different from the encoding
+                // of basic field Int.
+<span class="fc" id="L829">                mantissaBits = mantissa.negate().toByteArray();</span>
+                // Set the sign on the highest order bit of the first octet
+<span class="fc" id="L831">                mantissaBits[0] |= 0x80;</span>
+<span class="fc" id="L832">                break;</span>
+            case 1:
+<span class="fc" id="L834">                mantissaBits = mantissa.toByteArray();</span>
+<span class="fc" id="L835">                break;</span>
+            default:
+<span class="nc" id="L837">                throw new IllegalStateException(&quot;mantissa signum out of range&quot;);</span>
+        }
+
+<span class="fc" id="L840">        writeBytes(mantissaBits);</span>
+
+        // Ion stores exponent, BigDecimal uses the negation 'scale' instead
+<span class="fc" id="L843">        int exponent = -bd.scale();</span>
+<span class="fc" id="L844">        writeVarInt(exponent);</span>
+<span class="fc" id="L845">    }</span>
+
+    private void writeIonDecimalContent(IonDecimal val)
+    {
+<span class="fc bfc" id="L849" title="All 2 branches covered.">        if (val.isNullValue())</span>
+        {
+<span class="fc" id="L851">            writeByte((byte) (TYPE_DECIMAL | NULL_LENGTH_MASK));</span>
+        }
+        else
+        {
+<span class="fc" id="L855">            final int originalOffset = myBuffer.length - myOffset;</span>
+<span class="fc" id="L856">            writeIonDecimalContent(val.decimalValue());</span>
+<span class="fc" id="L857">            writePrefix(TYPE_DECIMAL,</span>
+                        myBuffer.length - myOffset - originalOffset);
+        }
+<span class="fc" id="L860">    }</span>
+
+    private void writeIonTimestampContent(IonTimestamp val)
+    {
+<span class="fc bfc" id="L864" title="All 2 branches covered.">        if (val.isNullValue())</span>
+        {
+<span class="fc" id="L866">            writeByte((byte) (TYPE_TIMESTAMP | NULL_LENGTH_MASK));</span>
+        }
+        else
+        {
+<span class="fc" id="L870">            final int originalOffset = myBuffer.length - myOffset;</span>
+
+<span class="fc" id="L872">            Timestamp t = val.timestampValue();</span>
+
+            // Time and date portion
+<span class="pc bpc" id="L875" title="1 of 6 branches missed.">            switch (t.getPrecision())</span>
+            {
+                // Fall through each case - by design
+                case FRACTION:
+                case SECOND:
+                {
+<span class="fc" id="L881">                    BigDecimal fraction = t.getZFractionalSecond();</span>
+<span class="fc bfc" id="L882" title="All 2 branches covered.">                    if (fraction != null)</span>
+                    {
+<span class="pc bpc" id="L884" title="2 of 4 branches missed.">                        assert (fraction.signum() &gt;= 0</span>
+<span class="pc bpc" id="L885" title="1 of 2 branches missed.">                                &amp;&amp; ! fraction.equals(BigDecimal.ZERO))</span>
+                            : &quot;Bad timestamp fraction: &quot; + fraction;
+<span class="fc" id="L887">                        writeIonDecimalContent(fraction);</span>
+                    }
+<span class="fc" id="L889">                    writeVarUInt(t.getZSecond());</span>
+                }
+                case MINUTE:
+<span class="fc" id="L892">                    writeVarUInt(t.getZMinute());</span>
+<span class="fc" id="L893">                    writeVarUInt(t.getZHour());</span>
+                case DAY:
+<span class="fc" id="L895">                    writeVarUInt(t.getZDay());</span>
+                case MONTH:
+<span class="fc" id="L897">                    writeVarUInt(t.getZMonth());</span>
+                case YEAR:
+<span class="fc" id="L899">                    writeVarUInt(t.getZYear());</span>
+<span class="fc" id="L900">                    break;</span>
+                default:
+<span class="nc" id="L902">                    throw new IllegalStateException(</span>
+                              &quot;unrecognized Timestamp precision: &quot; +
+<span class="nc" id="L904">                              t.getPrecision());</span>
+            }
+
+            // Offset portion
+<span class="fc" id="L908">            Integer offset = t.getLocalOffset();</span>
+<span class="fc bfc" id="L909" title="All 2 branches covered.">            if (offset == null)</span>
+            {
+<span class="fc" id="L911">                writeByte((byte) (0x80 | 0x40)); // Negative 0 (no timezone)</span>
+            }
+            else
+            {
+<span class="fc" id="L915">                writeVarInt(offset.intValue());</span>
+            }
+
+<span class="fc" id="L918">            writePrefix(TYPE_TIMESTAMP,</span>
+                        myBuffer.length - myOffset - originalOffset);
+        }
+<span class="fc" id="L921">    }</span>
+
+    private void writeIonSymbolContent(IonSymbol val)
+    {
+<span class="fc bfc" id="L925" title="All 2 branches covered.">        if (val.isNullValue())</span>
+        {
+<span class="fc" id="L927">            writeByte((byte) (TYPE_SYMBOL | NULL_LENGTH_MASK));</span>
+        }
+        else
+        {
+<span class="fc" id="L931">            final int originalOffset = myBuffer.length - myOffset;</span>
+<span class="fc" id="L932">            SymbolToken symToken = val.symbolValue();</span>
+<span class="fc" id="L933">            int sid = findSid(symToken);</span>
+<span class="fc" id="L934">            writeUInt(sid);</span>
+
+<span class="fc" id="L936">            writePrefix(TYPE_SYMBOL,</span>
+                        myBuffer.length - myOffset - originalOffset);
+        }
+<span class="fc" id="L939">    }</span>
+
+    private void writeIonStringContent(IonString val)
+    {
+<span class="fc bfc" id="L943" title="All 2 branches covered.">        if (val.isNullValue())</span>
+        {
+<span class="fc" id="L945">            writeByte((byte) (TYPE_STRING | NULL_LENGTH_MASK));</span>
+        }
+        else
+        {
+<span class="fc" id="L949">            writeIonStringContent(val.stringValue());</span>
+        }
+<span class="fc" id="L951">    }</span>
+
+    private void writeIonStringContent(String str)
+    {
+<span class="fc" id="L955">        int strlen = str.length();</span>
+<span class="fc" id="L956">        byte[] buffer = myBuffer;</span>
+<span class="fc" id="L957">        int offset = myOffset;</span>
+
+        // The number of UTF-8 code units (bytes) we will write is at least as
+        // large as the number of UTF-16 code units (ints) that are in the
+        // input string.  Ensure we have at least that much capacity, to reduce
+        // the number of times we need to grow the buffer.
+<span class="fc" id="L963">        offset -= strlen;</span>
+<span class="pc bpc" id="L964" title="1 of 2 branches missed.">        if (offset &lt; 0)</span>
+        {
+<span class="nc" id="L966">            offset = growBuffer(offset);</span>
+<span class="nc" id="L967">            buffer = myBuffer;</span>
+        }
+<span class="fc" id="L969">        offset += strlen;</span>
+
+        // Optimize for ASCII, under the assumption that it happens a lot.
+        // This fits within the capacity allocated above, so we don't have to
+        // grow the buffer within this loop.
+<span class="fc" id="L974">        int i = strlen - 1;</span>
+<span class="fc bfc" id="L975" title="All 2 branches covered.">        for (; i &gt;= 0; --i)</span>
+        {
+<span class="fc" id="L977">            int c = str.charAt(i);</span>
+<span class="fc bfc" id="L978" title="All 2 branches covered.">            if (!(c &lt;= 0x7f))</span>
+<span class="fc" id="L979">                break;</span>
+<span class="fc" id="L980">            buffer[--offset] = (byte) c;</span>
+        }
+
+<span class="fc bfc" id="L983" title="All 2 branches covered.">        for (; i &gt;= 0; --i)</span>
+        {
+<span class="fc" id="L985">            int c = str.charAt(i);</span>
+
+<span class="fc bfc" id="L987" title="All 2 branches covered.">            if (c &lt;= 0x7f)              // U+0000 to U+007f codepoints</span>
+            {
+<span class="pc bpc" id="L989" title="1 of 2 branches missed.">                if (--offset &lt; 0)</span>
+                {
+<span class="nc" id="L991">                    offset = growBuffer(offset);</span>
+<span class="nc" id="L992">                    buffer = myBuffer;</span>
+                }
+<span class="fc" id="L994">                buffer[offset] = (byte) c;</span>
+            }
+<span class="fc bfc" id="L996" title="All 2 branches covered.">            else if (c &lt;= 0x7ff)        // U+0080 to U+07ff codepoints</span>
+            {
+<span class="pc bpc" id="L998" title="1 of 2 branches missed.">                if ((offset -= 2) &lt; 0)</span>
+                {
+<span class="nc" id="L1000">                    offset = growBuffer(offset);</span>
+<span class="nc" id="L1001">                    buffer = myBuffer;</span>
+                }
+<span class="fc" id="L1003">                buffer[offset]     = (byte) (0xc0 | ((c &gt;&gt; 6) &amp; 0x1f));</span>
+<span class="fc" id="L1004">                buffer[offset + 1] = (byte) (0x80 | (c &amp; 0x3f));</span>
+            }
+<span class="fc bfc" id="L1006" title="All 4 branches covered.">            else if (c &gt;= 0xd800 &amp;&amp; c &lt;= 0xdfff) // Surrogate!</span>
+            {
+                // high surrogate not followed by low surrogate
+<span class="pc bpc" id="L1009" title="1 of 2 branches missed.">                if (c &lt;= 0xdbff)</span>
+                {
+<span class="nc" id="L1011">                    throw new IonException(&quot;invalid string, unpaired high surrogate character&quot;);</span>
+                }
+
+                // string starts with low surrogate
+<span class="pc bpc" id="L1015" title="1 of 2 branches missed.">                if (i == 0)</span>
+                {
+<span class="nc" id="L1017">                    throw new IonException(&quot;invalid string, unpaired low surrogate character&quot;);</span>
+                }
+
+                // low surrogate not preceded by high surrogate
+                // charAt(--i) is never out of bounds as i == 0 is asserted to
+                // be false in previous if-block
+<span class="fc" id="L1023">                int c2 = str.charAt(--i);</span>
+<span class="pc bpc" id="L1024" title="2 of 4 branches missed.">                if (!(c2 &gt;= 0xd800 &amp;&amp; c2 &lt;= 0xdbff))</span>
+                {
+<span class="nc" id="L1026">                    throw new IonException(&quot;invalid string, unpaired low surrogate character&quot;);</span>
+                }
+
+                // valid surrogate pair: (c2, c)
+<span class="fc" id="L1030">                int codepoint = 0x10000 + (((c2 &amp; 0x3ff) &lt;&lt; 10) | (c &amp; 0x3ff));</span>
+
+<span class="pc bpc" id="L1032" title="1 of 2 branches missed.">                if ((offset -= 4) &lt; 0)</span>
+                {
+<span class="nc" id="L1034">                    offset = growBuffer(offset);</span>
+<span class="nc" id="L1035">                    buffer = myBuffer;</span>
+                }
+<span class="fc" id="L1037">                buffer[offset]     = (byte) (0xF0 | ((codepoint &gt;&gt; 18) &amp; 0x07));</span>
+<span class="fc" id="L1038">                buffer[offset + 1] = (byte) (0x80 | ((codepoint &gt;&gt; 12) &amp; 0x3F));</span>
+<span class="fc" id="L1039">                buffer[offset + 2] = (byte) (0x80 | ((codepoint &gt;&gt; 6)  &amp; 0x3F));</span>
+<span class="fc" id="L1040">                buffer[offset + 3] = (byte) (0x80 | ((codepoint &gt;&gt; 0)  &amp; 0x3F));</span>
+<span class="fc" id="L1041">            }</span>
+            else // U+0800 to U+D7FF and U+E000 to U+FFFF codepoints
+            {
+<span class="pc bpc" id="L1044" title="1 of 2 branches missed.">                if ((offset -= 3) &lt; 0)</span>
+                {
+<span class="nc" id="L1046">                    offset = growBuffer(offset);</span>
+<span class="nc" id="L1047">                    buffer = myBuffer;</span>
+                }
+<span class="fc" id="L1049">                buffer[offset]     = (byte) (0xE0 | ((c &gt;&gt; 12) &amp; 0x0F));</span>
+<span class="fc" id="L1050">                buffer[offset + 1] = (byte) (0x80 | ((c &gt;&gt; 6) &amp; 0x3F));</span>
+<span class="fc" id="L1051">                buffer[offset + 2] = (byte) (0x80 | (c &amp; 0x3F));</span>
+            }
+        }
+
+<span class="fc" id="L1055">        int length = myOffset - offset;</span>
+<span class="fc" id="L1056">        myOffset = offset;</span>
+
+<span class="fc" id="L1058">        writePrefix(TYPE_STRING, length);</span>
+<span class="fc" id="L1059">    }</span>
+
+    private void writeIonClobContent(IonClob val)
+    {
+<span class="fc bfc" id="L1063" title="All 2 branches covered.">        if (val.isNullValue())</span>
+        {
+<span class="fc" id="L1065">            writeByte((byte) (TYPE_CLOB | NULL_LENGTH_MASK));</span>
+        }
+        else
+        {
+<span class="fc" id="L1069">            byte[] lob = val.getBytes();</span>
+<span class="fc" id="L1070">            writeLobContent(lob);</span>
+<span class="fc" id="L1071">            writePrefix(TYPE_CLOB, lob.length);</span>
+        }
+<span class="fc" id="L1073">    }</span>
+
+    private void writeIonBlobContent(IonBlob val)
+    {
+<span class="fc bfc" id="L1077" title="All 2 branches covered.">        if (val.isNullValue())</span>
+        {
+<span class="fc" id="L1079">            writeByte((byte) (TYPE_BLOB | NULL_LENGTH_MASK));</span>
+        }
+        else
+        {
+<span class="fc" id="L1083">            byte[] lob = val.getBytes();</span>
+<span class="fc" id="L1084">            writeLobContent(lob);</span>
+<span class="fc" id="L1085">            writePrefix(TYPE_BLOB, lob.length);</span>
+        }
+<span class="fc" id="L1087">    }</span>
+
+    private void writeLobContent(byte[] lob)
+    {
+<span class="fc" id="L1091">        int length = lob.length;</span>
+<span class="fc" id="L1092">        int offset = myOffset - length;</span>
+<span class="pc bpc" id="L1093" title="1 of 2 branches missed.">        if (offset &lt; 0) {</span>
+<span class="nc" id="L1094">            offset = growBuffer(offset);</span>
+        }
+<span class="fc" id="L1096">        System.arraycopy(lob, 0, myBuffer, offset, length);</span>
+<span class="fc" id="L1097">        myOffset = offset;</span>
+<span class="fc" id="L1098">    }</span>
+
+    // =========================================================================
+    // Containers
+    // =========================================================================
+
+    private void writeIonListContent(IonList val)
+    {
+<span class="fc bfc" id="L1106" title="All 2 branches covered.">        if (val.isNullValue())</span>
+        {
+<span class="fc" id="L1108">            writeByte((byte) (TYPE_LIST | NULL_LENGTH_MASK));</span>
+        }
+        else
+        {
+<span class="fc" id="L1112">            writeIonSequenceContent(val);</span>
+        }
+<span class="fc" id="L1114">    }</span>
+
+    private void writeIonSexpContent(IonSexp val)
+    {
+<span class="fc bfc" id="L1118" title="All 2 branches covered.">        if (val.isNullValue())</span>
+        {
+<span class="fc" id="L1120">            writeByte((byte) (TYPE_SEXP | NULL_LENGTH_MASK));</span>
+        }
+        else
+        {
+<span class="fc" id="L1124">            writeIonSequenceContent(val);</span>
+        }
+<span class="fc" id="L1126">    }</span>
+
+    private void writeIonSequenceContent(IonSequence seq)
+    {
+<span class="fc" id="L1130">        final int originalOffset = myBuffer.length - myOffset;</span>
+<span class="fc" id="L1131">        IonValue[] values = seq.toArray();</span>
+
+<span class="fc bfc" id="L1133" title="All 2 branches covered.">        for (int i = values.length; --i &gt;= 0;)</span>
+        {
+<span class="fc" id="L1135">            writeIonValue(values[i]);</span>
+        }
+
+<span class="pc bpc" id="L1138" title="1 of 3 branches missed.">        switch (seq.getType())</span>
+        {
+            case LIST:
+<span class="fc" id="L1141">                writePrefix(TYPE_LIST,</span>
+                            myBuffer.length - myOffset - originalOffset);
+<span class="fc" id="L1143">                break;</span>
+            case SEXP:
+<span class="fc" id="L1145">                writePrefix(TYPE_SEXP,</span>
+                            myBuffer.length - myOffset - originalOffset);
+<span class="fc" id="L1147">                break;</span>
+            default:
+<span class="nc" id="L1149">                throw new IonException(</span>
+                          &quot;cannot identify instance of IonSequence&quot;);
+        }
+<span class="fc" id="L1152">    }</span>
+
+    private void writeIonStructContent(IonStruct val)
+    {
+<span class="fc bfc" id="L1156" title="All 2 branches covered.">        if (val.isNullValue())</span>
+        {
+<span class="fc" id="L1158">            writeByte((byte) (TYPE_STRUCT | NULL_LENGTH_MASK));</span>
+        }
+        else
+        {
+<span class="fc" id="L1162">            final int originalOffset = myBuffer.length - myOffset;</span>
+
+            // TODO amzn/ion-java/issues/31 should not preserve the ordering of fields
+<span class="fc" id="L1165">            ArrayList&lt;IonValue&gt; values = new ArrayList&lt;IonValue&gt;();</span>
+
+            // Fill ArrayList with IonValues, the add() just copies the
+            // references of the IonValues
+<span class="fc bfc" id="L1169" title="All 2 branches covered.">            for (IonValue curr : val)</span>
+            {
+<span class="fc" id="L1171">                values.add(curr);</span>
+<span class="fc" id="L1172">            }</span>
+
+<span class="fc bfc" id="L1174" title="All 2 branches covered.">            for (int i = values.size(); --i &gt;= 0; )</span>
+            {
+<span class="fc" id="L1176">                IonValue v = values.get(i);</span>
+<span class="fc" id="L1177">                SymbolToken symToken = v.getFieldNameSymbol();</span>
+
+<span class="fc" id="L1179">                writeIonValue(v);</span>
+
+<span class="fc" id="L1181">                int sid = findSid(symToken);</span>
+<span class="fc" id="L1182">                writeVarUInt(sid);</span>
+<span class="fc" id="L1183">            }</span>
+
+            // TODO amzn/ion-java/issues/41 Detect if the struct fields are sorted in ascending
+            // order of Sids. If so, 1 should be written into 'length' field.
+            // Note that this 'length' field is not the same as the four-bit
+            // length L in the type descriptor octet.
+<span class="fc" id="L1189">            writePrefix(TYPE_STRUCT,</span>
+                        myBuffer.length - myOffset - originalOffset);
+        }
+<span class="fc" id="L1192">    }</span>
+
+    private void writeIonDatagramContent(IonDatagram dg)
+    {
+<span class="fc" id="L1196">        ListIterator&lt;IonValue&gt; reverseIter = dg.listIterator(dg.size());</span>
+<span class="fc bfc" id="L1197" title="All 2 branches covered.">        while (reverseIter.hasPrevious())</span>
+        {
+<span class="fc" id="L1199">            IonValue currentTopLevelValue = reverseIter.previous();</span>
+<span class="fc" id="L1200">            checkLocalSymbolTablePlacement(currentTopLevelValue);</span>
+<span class="fc" id="L1201">            writeIonValue(currentTopLevelValue);</span>
+<span class="fc" id="L1202">        }</span>
+<span class="fc" id="L1203">    }</span>
+
+    // =========================================================================
+    // Symbol Tables
+    // =========================================================================
+
+    private int findSid(SymbolToken symToken)
+    {
+<span class="fc" id="L1211">        int sid = symToken.getSid();</span>
+<span class="fc" id="L1212">        String text = symToken.getText();</span>
+
+<span class="fc bfc" id="L1214" title="All 2 branches covered.">        if (sid != UNKNOWN_SYMBOL_ID)   // sid is assigned</span>
+        {
+<span class="pc bpc" id="L1216" title="1 of 4 branches missed.">            assert text == null ||</span>
+<span class="pc bpc" id="L1217" title="1 of 2 branches missed.">                   text.equals(mySymbolTable.findKnownSymbol(sid));</span>
+        }
+        else                            // sid is not assigned
+        {
+<span class="fc bfc" id="L1221" title="All 2 branches covered.">            if (mySymbolTable.isSystemTable())</span>
+            {
+                // Replace current symtab with a new local symbol table
+                // using the default system symtab
+<span class="fc" id="L1225">                mySymbolTable = myIonSystem.newLocalSymbolTable();</span>
+            }
+
+            // Intern the new symbol and get its assigned sid
+<span class="fc" id="L1229">            sid = mySymbolTable.intern(text).getSid();</span>
+        }
+
+<span class="fc" id="L1232">        return sid;</span>
+    }
+
+    /**
+     * Determine if the local symbol table attached to the previous top-level
+     * value (TLV), {@link #mySymbolTable}, needs to be encoded before the
+     * next TLV is encoded. This is called &lt;em&gt;before&lt;/em&gt; encoding each
+     * TLV by {@link #writeIonValue(IonValue)}.
+     * &lt;p&gt;
+     * Connotations of &quot;Previous TLV&quot; and &quot;Next TLV&quot; in this method are
+     * &lt;em&gt;different&lt;/em&gt; from those defined outside of this method.
+     * This is done on purpose within this method to facilitate a clear
+     * understanding of what is going on within this method.
+     * &lt;ul&gt;
+     *    &lt;li&gt;&quot;Previous top-level value&quot; refers to the top-level IonValue that
+     *    has already been encoded into the buffer.
+     *    &lt;li&gt;&quot;Next top-level value&quot; refers to the top-level IonValue that
+     *    is about to be encoded to the buffer. Its contents are &lt;em&gt;not&lt;/em&gt;
+     *    traversed yet.
+     *    &lt;li&gt;&quot;Previous symbol table&quot; refers to previous TLV's symbol table.
+     *    &lt;li&gt;&quot;Next symbol table&quot; refers to next TLV's symbol table.
+     * &lt;/ul&gt;
+     *
+     * Local symbol tables and IVMs can be interspersed within an IonDatagram.
+     * This method checks for such cases by looking at the next symtab and
+     * previous symtab.
+     *
+     * &lt;h2&gt;The following 4 cases define the scenarios where a LST/IVM is
+     * written to the buffer:&lt;/h2&gt;
+     * &lt;p&gt;
+     * Next symtab is a local table:
+     * &lt;ul&gt;
+     *    &lt;li&gt;Previous symtab is a local table - write LST if the two symtabs
+     *    are different references
+     *    &lt;li&gt;Previous symtab is a system table - write IVM always
+     * &lt;/ul&gt;
+     * &lt;p&gt;
+     * Next symtab is a system table:
+     * &lt;ul&gt;
+     *    &lt;li&gt;Previous symtab is a local table - propagate LST upwards
+     *    &lt;li&gt;Previous symtab is a system table - write IVM if the two symtabs
+     *    have different Ion versions.
+     * &lt;/ul&gt;
+     *
+     * TODO amzn/ion-java/issues/25 Currently, {@link IonDatagram#systemIterator()} doesn't
+     * retain information about interspersed IVMs within the IonDatagram.
+     * As such, we cannot obtain the location of interspersed IVMs, if any.
+     *
+     * @param nextTopLevelValue the next top-level IonValue to be encoded
+     */
+    private void checkLocalSymbolTablePlacement(IonValue nextTopLevelValue)
+    {
+        // Check that nextTopLevelValue is indeed a top-level value
+<span class="pc bpc" id="L1285" title="2 of 4 branches missed.">        assert nextTopLevelValue == nextTopLevelValue.topLevelValue();</span>
+
+<span class="fc" id="L1287">        SymbolTable nextSymTab = nextTopLevelValue.getSymbolTable();</span>
+
+<span class="pc bpc" id="L1289" title="1 of 2 branches missed.">        if (nextSymTab == null) {</span>
+<span class="nc" id="L1290">            throw new IllegalStateException(</span>
+                      &quot;Binary reverse encoder isn't using LiteImpl&quot;);
+        }
+
+<span class="fc bfc" id="L1294" title="All 2 branches covered.">        if (mySymbolTable == null) {</span>
+            // There is no current symtab, i.e. there wasn't any TLV encoded
+            // before this, return and continue encoding next TLV.
+<span class="fc" id="L1297">            mySymbolTable = nextSymTab;</span>
+<span class="fc" id="L1298">            return;</span>
+        }
+
+<span class="pc bpc" id="L1301" title="2 of 6 branches missed.">        assert nextSymTab.isLocalTable() || nextSymTab.isSystemTable();</span>
+
+<span class="fc bfc" id="L1303" title="All 2 branches covered.">        if (nextSymTab.isLocalTable())</span>
+        {
+<span class="fc bfc" id="L1305" title="All 2 branches covered.">            if (mySymbolTable.isSystemTable())</span>
+            {
+<span class="fc" id="L1307">                writeBytes(BINARY_VERSION_MARKER_1_0);</span>
+<span class="fc" id="L1308">                mySymbolTable = nextSymTab;</span>
+            }
+            // mySymbolTable is local
+<span class="fc bfc" id="L1311" title="All 2 branches covered.">            else if (nextSymTab != mySymbolTable)</span>
+            {
+<span class="fc" id="L1313">                writeLocalSymbolTable(mySymbolTable);</span>
+<span class="fc" id="L1314">                mySymbolTable = nextSymTab;</span>
+            }
+        }
+        // nextSymTab is system
+<span class="fc bfc" id="L1318" title="All 2 branches covered.">        else if (mySymbolTable.isSystemTable() &amp;&amp;</span>
+<span class="pc bpc" id="L1319" title="1 of 2 branches missed.">                !mySymbolTable.getIonVersionId().equals(nextSymTab.getIonVersionId()))</span>
+        {
+<span class="nc" id="L1321">            writeBytes(BINARY_VERSION_MARKER_1_0);</span>
+<span class="nc" id="L1322">            mySymbolTable = nextSymTab;</span>
+        }
+<span class="fc" id="L1324">    }</span>
+
+    /**
+     * Write contents of a local symbol table as a struct.
+     * The contents are the IST:: annotation, declared symbols, and import
+     * declarations (that refer to shared symtabs) if they exist.
+     *
+     * @param symTab the local symbol table, not shared, not system
+     */
+    private void writeLocalSymbolTable(SymbolTable symTab)
+    {
+<span class="pc bpc" id="L1335" title="2 of 4 branches missed.">        assert symTab.isLocalTable();</span>
+
+<span class="fc" id="L1337">        final int originalOffset = myBuffer.length - myOffset;</span>
+
+        // Write declared local symbol strings if any exists
+<span class="fc" id="L1340">        writeSymbolsField(symTab);</span>
+
+        // Write import declarations if any exists
+<span class="fc" id="L1343">        writeImportsField(symTab);</span>
+
+        // Write the struct prefix
+<span class="fc" id="L1346">        writePrefix(TYPE_STRUCT, myBuffer.length - myOffset - originalOffset);</span>
+
+        // Write the $ion_symbol_table annotation
+<span class="fc" id="L1349">        byte[] ionSymbolTableByteArray = {</span>
+               (byte) (0x80 | 1),                       /* annot-length */
+               (byte) (0x80 | ION_SYMBOL_TABLE_SID)     /* annot */
+               };
+<span class="fc" id="L1353">        writeBytes(ionSymbolTableByteArray);</span>
+<span class="fc" id="L1354">        writePrefix(TYPE_ANNOTATIONS,</span>
+                    myBuffer.length - myOffset - originalOffset);
+<span class="fc" id="L1356">    }</span>
+
+    /**
+     * Write a single import declaration (which refers to a shared SymbolTable).
+     *
+     * @param symTab the shared symbol table, not local, not system
+     */
+    private void writeImport(SymbolTable symTab)
+    {
+<span class="pc bpc" id="L1365" title="2 of 4 branches missed.">        assert symTab.isSharedTable();</span>
+
+<span class="fc" id="L1367">        final int originalOffset = myBuffer.length - myOffset;</span>
+
+        // Write the maxId as int
+<span class="fc" id="L1370">        int maxId = symTab.getMaxId();</span>
+<span class="fc bfc" id="L1371" title="All 2 branches covered.">        if (maxId == 0) {</span>
+<span class="fc" id="L1372">            writeByte((byte) TYPE_POS_INT);</span>
+        } else {
+<span class="fc" id="L1374">            writeUInt(maxId);</span>
+<span class="fc" id="L1375">            writePrefix(TYPE_POS_INT,</span>
+                        myBuffer.length - myOffset - originalOffset);
+        }
+
+        // Write the &quot;max_id&quot; field name
+<span class="fc" id="L1380">        writeByte((byte) (0x80 | MAX_ID_SID));</span>
+
+<span class="fc" id="L1382">        final int maxIdOffset = myBuffer.length - myOffset;</span>
+
+        // Write the version as int (version will be at least one)
+<span class="fc" id="L1385">        int version = symTab.getVersion();</span>
+<span class="fc" id="L1386">        writeUInt(version);</span>
+<span class="fc" id="L1387">        writePrefix(TYPE_POS_INT, myBuffer.length - myOffset - maxIdOffset);</span>
+
+        // Write the &quot;version&quot; field name
+<span class="fc" id="L1390">        writeByte((byte) (0x80 | VERSION_SID));</span>
+
+        // Write the name as string
+<span class="fc" id="L1393">        String name = symTab.getName();</span>
+<span class="fc" id="L1394">        writeIonStringContent(name);</span>
+
+        // Write the &quot;name&quot; field name
+<span class="fc" id="L1397">        writeByte((byte) (0x80 | NAME_SID));</span>
+
+        // Write the struct prefix
+<span class="fc" id="L1400">        writePrefix(TYPE_STRUCT, myBuffer.length - myOffset - originalOffset);</span>
+<span class="fc" id="L1401">    }</span>
+
+    /**
+     * Write import declarations (which refer to shared symbol tables) if any
+     * exists.
+     *
+     * @param symTab the local symbol table, not shared, not system
+     */
+    private void writeImportsField(SymbolTable symTab)
+    {
+        // SymbolTable[] holds accurate information, i.e. it contains the
+        // actual import declaration information, through the means of
+        // substitute tables if an exact match was not found by the catalog.
+<span class="fc" id="L1414">        SymbolTable[] sharedSymTabs = symTab.getImportedTables();</span>
+
+<span class="fc bfc" id="L1416" title="All 2 branches covered.">        if (sharedSymTabs.length == 0)</span>
+        {
+<span class="fc" id="L1418">            return;</span>
+        }
+
+<span class="fc" id="L1421">        final int importsOffset = myBuffer.length - myOffset;</span>
+
+<span class="fc bfc" id="L1423" title="All 2 branches covered.">        for (int i = sharedSymTabs.length; --i &gt;= 0;)</span>
+        {
+<span class="fc" id="L1425">            writeImport(sharedSymTabs[i]);</span>
+        }
+
+<span class="fc" id="L1428">        writePrefix(TYPE_LIST, myBuffer.length - myOffset - importsOffset);</span>
+<span class="fc" id="L1429">        writeByte((byte) (0x80 | IMPORTS_SID));</span>
+<span class="fc" id="L1430">    }</span>
+
+    /**
+     * Write declared local symbol names if any exists.
+     *
+     * @param symTab the local symbol table, not shared, not system
+     */
+    private void writeSymbolsField(SymbolTable symTab)
+    {
+        // SymbolTable's APIs doesn't expose an Iterator to traverse declared
+        // symbol strings in reverse order. As such, we utilize these two
+        // indexes to traverse the strings in reverse.
+<span class="fc" id="L1442">        int importedMaxId = symTab.getImportedMaxId();</span>
+<span class="fc" id="L1443">        int maxId = symTab.getMaxId();</span>
+
+<span class="fc bfc" id="L1445" title="All 2 branches covered.">        if (importedMaxId == maxId) {</span>
+            // There are no declared local symbols
+<span class="fc" id="L1447">            return;</span>
+        }
+
+<span class="fc" id="L1450">        final int originalOffset = myBuffer.length - myOffset;</span>
+
+<span class="fc bfc" id="L1452" title="All 2 branches covered.">        for (int i = maxId; i &gt; importedMaxId; i--)</span>
+        {
+<span class="fc" id="L1454">            String str = symTab.findKnownSymbol(i);</span>
+<span class="fc bfc" id="L1455" title="All 2 branches covered.">            if (str == null) {</span>
+<span class="fc" id="L1456">                writeByte((byte) (TYPE_STRING | NULL_LENGTH_MASK));</span>
+            } else {
+<span class="fc" id="L1458">                writeIonStringContent(str);</span>
+            }
+        }
+
+<span class="fc" id="L1462">        writePrefix(TYPE_LIST, myBuffer.length - myOffset - originalOffset);</span>
+<span class="fc" id="L1463">        writeByte((byte) (0x80 | SYMBOLS_SID));</span>
+<span class="fc" id="L1464">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

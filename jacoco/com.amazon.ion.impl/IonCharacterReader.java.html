@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonCharacterReader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl</a> &gt; <span class="el_source">IonCharacterReader.java</span></div><h1>IonCharacterReader.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl;
+
+import java.io.IOException;
+import java.io.PushbackReader;
+import java.io.Reader;
+import java.util.LinkedList;
+
+/**
+ * Extension of the {@link java.io.PushbackReader} to abstract line/offset counting
+ * and push back support.
+ *
+ * Note that this class does not leverage {@link java.io.LineNumberReader} as we
+ * need to un-roll the line number on push back and we need to have the logic to
+ * deal with newline combinations anyhow.
+ */
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">final class IonCharacterReader extends PushbackReader {</span>
+
+    /**
+     * The default buffer size
+     *
+     * @see _Private_Utils#MAX_LOOKAHEAD_UTF16
+     */
+    public static final int DEFAULT_BUFFER_SIZE = 12;
+
+    /**
+     * The additional buffer padding--this is to add to the fact that the
+     * pushback buffer may have to be larger than user specified characters
+     * a CR/LF combo is 2 characters, but logically one newline.
+     *
+     * FIXME does this properly account for surrogates?
+     *
+     * @see _Private_Utils#MAX_LOOKAHEAD_UTF16
+     */
+    public static final int BUFFER_PADDING = 1;
+
+    private long m_consumed;
+    private int  m_line;
+    private int  m_column;
+    private int  m_size;
+
+    // our offset stack--really, for efficiency this should
+    // be a linked list of primitive ints to avoid boxing costs
+    // however, pursue this only if it is really a performance
+    // issue.  Also, we are not using the List interface for code
+    // clarity as this is used as a deque. (Java 6 has java.util.Deque)
+
+    /**
+     * This offset stack is for pushing back characters that unroll lines
+     * and keeps our offset/line number counts correct.  This is essentially
+     * a pushback stack for character offsets.
+     */
+    private LinkedList&lt;Integer&gt; m_columns;
+
+    /**
+     * Constructs a character reader with an explicit buffer size.  Note that this
+     * is a minimum and the implementation is allowed to make it larger for
+     * internal operations.
+     *
+     * @param in    The underlying reader to wrap.
+     * @param size  The size of the push back buffer.
+     */
+    public IonCharacterReader( final Reader in, final int size ) {
+<span class="fc" id="L78">        super( in, size + BUFFER_PADDING );</span>
+
+<span class="pc bpc" id="L80" title="2 of 4 branches missed.">        assert size &gt; 0;</span>
+
+<span class="fc" id="L82">        m_consumed = 0;</span>
+<span class="fc" id="L83">        m_line = 1;</span>
+<span class="fc" id="L84">        m_column = 0;</span>
+<span class="fc" id="L85">        m_columns = new LinkedList&lt;Integer&gt;();</span>
+<span class="fc" id="L86">        m_size = size + BUFFER_PADDING;</span>
+<span class="fc" id="L87">    }</span>
+
+    /**
+     * Constructs a character reader with the default buffer size.
+     *
+     * @param in    The underlying reader to wrap.
+     */
+    public IonCharacterReader( final Reader in ) {
+<span class="nc" id="L95">        this( in, DEFAULT_BUFFER_SIZE );</span>
+<span class="nc" id="L96">    }</span>
+
+    /**
+     * Returns the logical number of consumed characters.
+     * This does not necessarily equal to the number of
+     * actual characters read as newline combinations are
+     * treated as one.
+     *
+     * @return The logical number of consumed characters.
+     */
+    public final long getConsumedAmount() {
+<span class="fc" id="L107">        return m_consumed;</span>
+    }
+
+    /**
+     * Returns the current line number in the stream based on the last call
+     * to read().
+     *
+     * @return  The line number, 1-based.
+     */
+    public final int getLineNumber() {
+<span class="fc" id="L117">        return m_line;</span>
+    }
+
+    /**
+     * Returns the offset within the line based on the last call to read().
+     *
+     * @return  The offset, 1-based.
+     */
+    public final int getColumn() {
+<span class="fc" id="L126">        return m_column;</span>
+    }
+
+    /**
+     * Uses the push back implementation but normalizes newlines to &quot;\n&quot;.
+     */
+    @Override
+    public int read() throws IOException {
+<span class="fc" id="L134">        int nextChar = super.read();</span>
+
+        // process the character
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if ( nextChar != -1 ) {</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            if ( nextChar == '\n' ) {</span>
+<span class="fc" id="L139">                m_line++;</span>
+<span class="fc" id="L140">                pushColumn( m_column );</span>
+<span class="fc" id="L141">                m_column = 0;</span>
+            }
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            else if ( nextChar == '\r') {</span>
+<span class="fc" id="L144">                int aheadChar = super.read();</span>
+
+                // if the lookahead is not a newline combo, unread it
+<span class="fc bfc" id="L147" title="All 2 branches covered.">                if ( aheadChar != '\n' ) {</span>
+                    // no need to unread it with line/offset update.
+<span class="fc" id="L149">                    unreadImpl( aheadChar, false );</span>
+                }
+
+<span class="fc" id="L152">                m_line++;</span>
+<span class="fc" id="L153">                pushColumn( m_column );</span>
+<span class="fc" id="L154">                m_column = 0;</span>
+
+                // normalize
+<span class="fc" id="L157">                nextChar = '\n';</span>
+<span class="fc" id="L158">            } else {</span>
+<span class="fc" id="L159">                m_column++;</span>
+            }
+<span class="fc" id="L161">            m_consumed++;</span>
+        }
+
+<span class="fc" id="L164">        return nextChar;</span>
+    }
+
+    private final void pushColumn( final int offset ) {
+        // constrain the offset stack
+        // to the buffer size
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        if ( m_columns.size() == m_size ) {</span>
+<span class="nc" id="L171">            m_columns.removeFirst();</span>
+        }
+
+        // box into collection
+<span class="fc" id="L175">        m_columns.addLast( offset );</span>
+<span class="fc" id="L176">    }</span>
+
+    private final int popColumn() throws IOException {
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        if ( m_columns.isEmpty() ) {</span>
+<span class="nc" id="L180">            throw new IOException( &quot;Cannot unread past buffer&quot; );</span>
+        }
+
+        // unbox out of collection
+<span class="fc" id="L184">        return m_columns.removeLast();</span>
+    }
+
+    /**
+     * Readers a buffer's worth of data.  This implementation
+     * simply leverages {@link #read()} over the buffer.
+     */
+    @Override
+    public int read( char[] cbuf, int off, int len ) throws IOException {
+<span class="pc bpc" id="L193" title="2 of 4 branches missed.">        assert len &gt;= 0;</span>
+<span class="pc bpc" id="L194" title="2 of 4 branches missed.">        assert off &gt;= 0;</span>
+
+<span class="fc" id="L196">        int amountRead = 0;</span>
+<span class="fc" id="L197">        final int endIndex = off + len;</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        for ( int index = off; index &lt; endIndex; index++ ) {</span>
+<span class="fc" id="L199">            int readChar = read();</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">            if ( readChar == -1 ) {</span>
+<span class="nc" id="L201">                break;</span>
+            }
+
+<span class="fc" id="L204">            cbuf[ index ] = ( char ) readChar;</span>
+<span class="fc" id="L205">            amountRead++;</span>
+        }
+
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        return amountRead == 0 ? -1 : amountRead;</span>
+    }
+
+    /**
+     * Skips over some number of characters.
+     * This is implemented as a series of {@link #read()} calls.
+     */
+    @Override
+    public long skip( final long n ) throws IOException {
+<span class="pc bpc" id="L217" title="2 of 4 branches missed.">        assert n &gt; 0;</span>
+
+<span class="fc" id="L219">        long charsLeft = n;</span>
+        // note the read side effect
+<span class="pc bpc" id="L221" title="1 of 4 branches missed.">        while ( charsLeft &gt; 0 &amp;&amp; read() != -1 ) {</span>
+<span class="fc" id="L222">            charsLeft--;</span>
+        }
+<span class="fc" id="L224">        return n - charsLeft;</span>
+    }
+
+    /**
+     * Delegates to {@link #unread(int)}.
+     */
+    @Override
+    public void unread( char[] cbuf, int off, int len ) throws IOException {
+<span class="pc bpc" id="L232" title="2 of 4 branches missed.">        assert len &gt;= 0;</span>
+<span class="pc bpc" id="L233" title="2 of 4 branches missed.">        assert off &gt;= 0;</span>
+
+<span class="fc" id="L235">        final int endIndex = off + len;</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        for ( int index = endIndex - 1; index &gt;= off; index-- ) {</span>
+<span class="fc" id="L237">            unread( cbuf[ index ] );</span>
+        }
+<span class="fc" id="L239">    }</span>
+
+    /**
+     * Delegates to {@link #unread(char[],int,int)}.
+     */
+    @Override
+    public void unread( char[] cbuf ) throws IOException {
+<span class="fc" id="L246">        unread( cbuf, 0, cbuf.length );</span>
+<span class="fc" id="L247">    }</span>
+
+    /**
+     * Will unread a character and update the line number if necessary.  This will throw an
+     * exception if a carriage return is given as this character is never yielded from
+     * this stream.
+     */
+    @Override
+    public void unread( int c ) throws IOException {
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        if ( c == '\r' ) {</span>
+<span class="fc" id="L257">            throw new IOException( &quot;Cannot unread a carriage return&quot; );</span>
+        }
+
+<span class="fc" id="L260">        unreadImpl( c, true );</span>
+<span class="fc" id="L261">    }</span>
+
+    /**
+     * Performs ths actual unread operation.
+     *
+     * @param c the character to unread.
+     * @param updateCounts Whether or not we actually update the line number.
+     */
+    private void unreadImpl(int c, boolean updateCounts ) throws IOException {
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        if ( c != -1 ) {</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">            if ( updateCounts ) {</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">                if ( c == '\n' ) {</span>
+<span class="fc" id="L273">                    m_line--;</span>
+<span class="fc" id="L274">                    m_column = popColumn();</span>
+                } else {
+<span class="fc" id="L276">                    m_column--;</span>
+                }
+<span class="fc" id="L278">                m_consumed--;</span>
+            }
+<span class="fc" id="L280">            super.unread( c );</span>
+        }
+<span class="fc" id="L282">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

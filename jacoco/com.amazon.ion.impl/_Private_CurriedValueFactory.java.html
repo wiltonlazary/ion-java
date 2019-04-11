@@ -1,0 +1,436 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>_Private_CurriedValueFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl</a> &gt; <span class="el_source">_Private_CurriedValueFactory.java</span></div><h1>_Private_CurriedValueFactory.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl;
+
+import com.amazon.ion.ContainedValueException;
+import com.amazon.ion.IonBlob;
+import com.amazon.ion.IonBool;
+import com.amazon.ion.IonClob;
+import com.amazon.ion.IonDecimal;
+import com.amazon.ion.IonException;
+import com.amazon.ion.IonFloat;
+import com.amazon.ion.IonInt;
+import com.amazon.ion.IonList;
+import com.amazon.ion.IonNull;
+import com.amazon.ion.IonSequence;
+import com.amazon.ion.IonSexp;
+import com.amazon.ion.IonString;
+import com.amazon.ion.IonStruct;
+import com.amazon.ion.IonSymbol;
+import com.amazon.ion.IonTimestamp;
+import com.amazon.ion.IonType;
+import com.amazon.ion.IonValue;
+import com.amazon.ion.SymbolToken;
+import com.amazon.ion.Timestamp;
+import com.amazon.ion.ValueFactory;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.Collection;
+
+/**
+ * NOT FOR APPLICATION USE!
+ * &lt;p&gt;
+ * Helper for implementing curried container insertion methods such as
+ * {@link IonStruct#put(String)}.
+ */
+public abstract class _Private_CurriedValueFactory
+    implements ValueFactory
+{
+    private final ValueFactory myFactory;
+
+    /**
+     * @param factory must not be null.
+     */
+    protected _Private_CurriedValueFactory(ValueFactory factory)
+<span class="fc" id="L58">    {</span>
+<span class="fc" id="L59">        myFactory = factory;</span>
+<span class="fc" id="L60">    }</span>
+
+    /**
+     * Subclasses override this to do something with each newly-constructed
+     * value.
+     *
+     * @param newValue was just constructed by {@link #myFactory}.
+     */
+    protected abstract void handle(IonValue newValue);
+
+    //-------------------------------------------------------------------------
+
+    public IonBlob newNullBlob()
+    {
+<span class="fc" id="L74">        IonBlob v = myFactory.newNullBlob();</span>
+<span class="fc" id="L75">        handle(v);</span>
+<span class="fc" id="L76">        return v;</span>
+    }
+
+    public IonBlob newBlob(byte[] value)
+    {
+<span class="fc" id="L81">        IonBlob v = myFactory.newBlob(value);</span>
+<span class="fc" id="L82">        handle(v);</span>
+<span class="fc" id="L83">        return v;</span>
+    }
+
+    public IonBlob newBlob(byte[] value, int offset, int length)
+    {
+<span class="nc" id="L88">        IonBlob v = myFactory.newBlob(value, offset, length);</span>
+<span class="nc" id="L89">        handle(v);</span>
+<span class="nc" id="L90">        return v;</span>
+    }
+
+    //-------------------------------------------------------------------------
+
+    public IonBool newNullBool()
+    {
+<span class="fc" id="L97">        IonBool v = myFactory.newNullBool();</span>
+<span class="fc" id="L98">        handle(v);</span>
+<span class="fc" id="L99">        return v;</span>
+    }
+
+    public IonBool newBool(boolean value)
+    {
+<span class="fc" id="L104">        IonBool v = myFactory.newBool(value);</span>
+<span class="fc" id="L105">        handle(v);</span>
+<span class="fc" id="L106">        return v;</span>
+    }
+
+    public IonBool newBool(Boolean value)
+    {
+<span class="nc" id="L111">        IonBool v = myFactory.newBool(value);</span>
+<span class="nc" id="L112">        handle(v);</span>
+<span class="nc" id="L113">        return v;</span>
+    }
+
+    //-------------------------------------------------------------------------
+
+    public IonClob newNullClob()
+    {
+<span class="fc" id="L120">        IonClob v = myFactory.newNullClob();</span>
+<span class="fc" id="L121">        handle(v);</span>
+<span class="fc" id="L122">        return v;</span>
+    }
+
+    public IonClob newClob(byte[] value)
+    {
+<span class="fc" id="L127">        IonClob v = myFactory.newClob(value);</span>
+<span class="fc" id="L128">        handle(v);</span>
+<span class="fc" id="L129">        return v;</span>
+    }
+
+    public IonClob newClob(byte[] value, int offset, int length)
+    {
+<span class="nc" id="L134">        IonClob v = myFactory.newClob(value, offset, length);</span>
+<span class="nc" id="L135">        handle(v);</span>
+<span class="nc" id="L136">        return v;</span>
+    }
+
+    //-------------------------------------------------------------------------
+
+    public IonDecimal newNullDecimal()
+    {
+<span class="fc" id="L143">        IonDecimal v = myFactory.newNullDecimal();</span>
+<span class="fc" id="L144">        handle(v);</span>
+<span class="fc" id="L145">        return v;</span>
+    }
+
+    public IonDecimal newDecimal(long value)
+    {
+<span class="nc" id="L150">        IonDecimal v = myFactory.newDecimal(value);</span>
+<span class="nc" id="L151">        handle(v);</span>
+<span class="nc" id="L152">        return v;</span>
+    }
+
+    public IonDecimal newDecimal(double value)
+    {
+<span class="nc" id="L157">        IonDecimal v = myFactory.newDecimal(value);</span>
+<span class="nc" id="L158">        handle(v);</span>
+<span class="nc" id="L159">        return v;</span>
+    }
+
+    public IonDecimal newDecimal(BigInteger value)
+    {
+<span class="nc" id="L164">        IonDecimal v = myFactory.newDecimal(value);</span>
+<span class="nc" id="L165">        handle(v);</span>
+<span class="nc" id="L166">        return v;</span>
+    }
+
+    public IonDecimal newDecimal(BigDecimal value)
+    {
+<span class="nc" id="L171">        IonDecimal v = myFactory.newDecimal(value);</span>
+<span class="nc" id="L172">        handle(v);</span>
+<span class="nc" id="L173">        return v;</span>
+    }
+
+    //-------------------------------------------------------------------------
+
+    public IonFloat newNullFloat()
+    {
+<span class="nc" id="L180">        IonFloat v = myFactory.newNullFloat();</span>
+<span class="nc" id="L181">        handle(v);</span>
+<span class="nc" id="L182">        return v;</span>
+    }
+
+    public IonFloat newFloat(long value)
+    {
+<span class="nc" id="L187">        IonFloat v = myFactory.newFloat(value);</span>
+<span class="nc" id="L188">        handle(v);</span>
+<span class="nc" id="L189">        return v;</span>
+    }
+
+    public IonFloat newFloat(double value)
+    {
+<span class="nc" id="L194">        IonFloat v = myFactory.newFloat(value);</span>
+<span class="nc" id="L195">        handle(v);</span>
+<span class="nc" id="L196">        return v;</span>
+    }
+
+    //-------------------------------------------------------------------------
+
+    public IonInt newNullInt()
+    {
+<span class="nc" id="L203">        IonInt v = myFactory.newNullInt();</span>
+<span class="nc" id="L204">        handle(v);</span>
+<span class="nc" id="L205">        return v;</span>
+    }
+
+    public IonInt newInt(int value)
+    {
+<span class="fc" id="L210">        IonInt v = myFactory.newInt(value);</span>
+<span class="fc" id="L211">        handle(v);</span>
+<span class="fc" id="L212">        return v;</span>
+    }
+
+    public IonInt newInt(long value)
+    {
+<span class="nc" id="L217">        IonInt v = myFactory.newInt(value);</span>
+<span class="nc" id="L218">        handle(v);</span>
+<span class="nc" id="L219">        return v;</span>
+    }
+
+    public IonInt newInt(Number value)
+    {
+<span class="nc" id="L224">        IonInt v = myFactory.newInt(value);</span>
+<span class="nc" id="L225">        handle(v);</span>
+<span class="nc" id="L226">        return v;</span>
+    }
+
+    //-------------------------------------------------------------------------
+
+    public IonList newNullList()
+    {
+<span class="nc" id="L233">        IonList v = myFactory.newNullList();</span>
+<span class="nc" id="L234">        handle(v);</span>
+<span class="nc" id="L235">        return v;</span>
+    }
+
+    public IonList newEmptyList()
+    {
+<span class="fc" id="L240">        IonList v = myFactory.newEmptyList();</span>
+<span class="fc" id="L241">        handle(v);</span>
+<span class="fc" id="L242">        return v;</span>
+    }
+
+    @Deprecated
+    public IonList newList(Collection&lt;? extends IonValue&gt; values)
+        throws ContainedValueException, NullPointerException
+    {
+<span class="nc" id="L249">        IonList v = myFactory.newList(values);</span>
+<span class="nc" id="L250">        handle(v);</span>
+<span class="nc" id="L251">        return v;</span>
+    }
+
+    public IonList newList(IonSequence firstChild)
+    throws ContainedValueException, NullPointerException
+    {
+<span class="nc" id="L257">        IonList v = myFactory.newList(firstChild);</span>
+<span class="nc" id="L258">        handle(v);</span>
+<span class="nc" id="L259">        return v;</span>
+    }
+
+    public IonList newList(IonValue... values)
+        throws ContainedValueException, NullPointerException
+    {
+<span class="fc" id="L265">        IonList v = myFactory.newList(values);</span>
+<span class="fc" id="L266">        handle(v);</span>
+<span class="fc" id="L267">        return v;</span>
+    }
+
+    public IonList newList(int[] values)
+    {
+<span class="nc" id="L272">        IonList v = myFactory.newList(values);</span>
+<span class="nc" id="L273">        handle(v);</span>
+<span class="nc" id="L274">        return v;</span>
+    }
+
+    public IonList newList(long[] values)
+    {
+<span class="nc" id="L279">        IonList v = myFactory.newList(values);</span>
+<span class="nc" id="L280">        handle(v);</span>
+<span class="nc" id="L281">        return v;</span>
+    }
+
+    //-------------------------------------------------------------------------
+
+    public IonNull newNull()
+    {
+<span class="fc" id="L288">        IonNull v = myFactory.newNull();</span>
+<span class="fc" id="L289">        handle(v);</span>
+<span class="fc" id="L290">        return v;</span>
+    }
+
+    public IonValue newNull(IonType type)
+    {
+<span class="nc" id="L295">        IonValue v = myFactory.newNull(type);</span>
+<span class="nc" id="L296">        handle(v);</span>
+<span class="nc" id="L297">        return v;</span>
+    }
+
+    //-------------------------------------------------------------------------
+
+    public IonSexp newNullSexp()
+    {
+<span class="nc" id="L304">        IonSexp v = myFactory.newNullSexp();</span>
+<span class="nc" id="L305">        handle(v);</span>
+<span class="nc" id="L306">        return v;</span>
+    }
+
+    public IonSexp newEmptySexp()
+    {
+<span class="fc" id="L311">        IonSexp v = myFactory.newEmptySexp();</span>
+<span class="fc" id="L312">        handle(v);</span>
+<span class="fc" id="L313">        return v;</span>
+    }
+
+    @Deprecated
+    public IonSexp newSexp(Collection&lt;? extends IonValue&gt; values)
+        throws ContainedValueException, NullPointerException
+    {
+<span class="nc" id="L320">        IonSexp v = myFactory.newSexp(values);</span>
+<span class="nc" id="L321">        handle(v);</span>
+<span class="nc" id="L322">        return v;</span>
+    }
+
+    public IonSexp newSexp(IonSequence firstChild)
+    throws ContainedValueException, NullPointerException
+    {
+<span class="nc" id="L328">        IonSexp v = myFactory.newSexp(firstChild);</span>
+<span class="nc" id="L329">        handle(v);</span>
+<span class="nc" id="L330">        return v;</span>
+    }
+
+    public IonSexp newSexp(IonValue... values)
+        throws ContainedValueException, NullPointerException
+    {
+<span class="nc" id="L336">        IonSexp v = myFactory.newSexp(values);</span>
+<span class="nc" id="L337">        handle(v);</span>
+<span class="nc" id="L338">        return v;</span>
+    }
+
+    public IonSexp newSexp(int[] values)
+    {
+<span class="nc" id="L343">        IonSexp v = myFactory.newSexp(values);</span>
+<span class="nc" id="L344">        handle(v);</span>
+<span class="nc" id="L345">        return v;</span>
+    }
+
+    public IonSexp newSexp(long[] values)
+    {
+<span class="nc" id="L350">        IonSexp v = myFactory.newSexp(values);</span>
+<span class="nc" id="L351">        handle(v);</span>
+<span class="nc" id="L352">        return v;</span>
+    }
+
+    //-------------------------------------------------------------------------
+
+    public IonString newNullString()
+    {
+<span class="fc" id="L359">        IonString v = myFactory.newNullString();</span>
+<span class="fc" id="L360">        handle(v);</span>
+<span class="fc" id="L361">        return v;</span>
+    }
+
+    public IonString newString(String value)
+    {
+<span class="fc" id="L366">        IonString v = myFactory.newString(value);</span>
+<span class="fc" id="L367">        handle(v);</span>
+<span class="fc" id="L368">        return v;</span>
+    }
+
+    //-------------------------------------------------------------------------
+
+    public IonStruct newNullStruct()
+    {
+<span class="nc" id="L375">        IonStruct v = myFactory.newNullStruct();</span>
+<span class="nc" id="L376">        handle(v);</span>
+<span class="nc" id="L377">        return v;</span>
+    }
+
+    public IonStruct newEmptyStruct()
+    {
+<span class="fc" id="L382">        IonStruct v = myFactory.newEmptyStruct();</span>
+<span class="fc" id="L383">        handle(v);</span>
+<span class="fc" id="L384">        return v;</span>
+    }
+
+    //-------------------------------------------------------------------------
+
+    public IonSymbol newNullSymbol()
+    {
+<span class="fc" id="L391">        IonSymbol v = myFactory.newNullSymbol();</span>
+<span class="fc" id="L392">        handle(v);</span>
+<span class="fc" id="L393">        return v;</span>
+    }
+
+    public IonSymbol newSymbol(String value)
+    {
+<span class="fc" id="L398">        IonSymbol v = myFactory.newSymbol(value);</span>
+<span class="fc" id="L399">        handle(v);</span>
+<span class="fc" id="L400">        return v;</span>
+    }
+
+    public IonSymbol newSymbol(SymbolToken value)
+    {
+<span class="fc" id="L405">        IonSymbol v = myFactory.newSymbol(value);</span>
+<span class="fc" id="L406">        handle(v);</span>
+<span class="fc" id="L407">        return v;</span>
+    }
+
+    //-------------------------------------------------------------------------
+
+    public IonTimestamp newNullTimestamp()
+    {
+<span class="fc" id="L414">        IonTimestamp v = myFactory.newNullTimestamp();</span>
+<span class="fc" id="L415">        handle(v);</span>
+<span class="fc" id="L416">        return v;</span>
+    }
+
+    public IonTimestamp newTimestamp(Timestamp value)
+    {
+<span class="nc" id="L421">        IonTimestamp v = myFactory.newTimestamp(value);</span>
+<span class="nc" id="L422">        handle(v);</span>
+<span class="nc" id="L423">        return v;</span>
+    }
+
+    //-------------------------------------------------------------------------
+
+    public &lt;T extends IonValue&gt; T clone(T value)
+        throws IonException
+    {
+<span class="fc" id="L431">        T v = myFactory.clone(value);</span>
+<span class="fc" id="L432">        handle(v);</span>
+<span class="fc" id="L433">        return v;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

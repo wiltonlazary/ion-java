@@ -1,0 +1,999 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonReaderTextSystemX.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl</a> &gt; <span class="el_source">IonReaderTextSystemX.java</span></div><h1>IonReaderTextSystemX.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl;
+
+import static com.amazon.ion.impl._Private_ScalarConversions.getValueTypeName;
+
+import com.amazon.ion.Decimal;
+import com.amazon.ion.IntegerSize;
+import com.amazon.ion.IonBlob;
+import com.amazon.ion.IonClob;
+import com.amazon.ion.IonException;
+import com.amazon.ion.IonList;
+import com.amazon.ion.IonSequence;
+import com.amazon.ion.IonSexp;
+import com.amazon.ion.IonStruct;
+import com.amazon.ion.IonSystem;
+import com.amazon.ion.IonTimestamp;
+import com.amazon.ion.IonType;
+import com.amazon.ion.IonValue;
+import com.amazon.ion.SymbolTable;
+import com.amazon.ion.SymbolToken;
+import com.amazon.ion.Timestamp;
+import com.amazon.ion.UnknownSymbolException;
+import com.amazon.ion.impl.IonReaderTextRawTokensX.IonReaderTextTokenException;
+import com.amazon.ion.impl.IonTokenConstsX.CharacterSequence;
+import com.amazon.ion.impl._Private_ScalarConversions.AS_TYPE;
+import com.amazon.ion.impl._Private_ScalarConversions.CantConvertException;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.Date;
+import java.lang.Character;
+
+/**
+ * This reader calls the {@link IonReaderTextRawX} for low level events.
+ * It surfaces the reader functions that construct instances
+ * of various sorts (numbers, java strings, etc). It also
+ * caches the fieldname and annotations of the current value.
+ *
+ *  It does not understand symbol tables nor care about them
+ *  the IonTextUserReader is responsible for that.
+ *
+ */
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">class IonReaderTextSystemX</span>
+    extends IonReaderTextRawX
+    implements _Private_ReaderWriter
+{
+<span class="fc" id="L61">    private static int UNSIGNED_BYTE_MAX_VALUE = 255;</span>
+
+    SymbolTable _system_symtab;
+
+    protected IonReaderTextSystemX(UnifiedInputStreamX iis)
+<span class="fc" id="L66">    {</span>
+<span class="fc" id="L67">        _system_symtab = _Private_Utils.systemSymtab(1); // TODO check IVM to determine version: amzn/ion-java/issues/19</span>
+<span class="fc" id="L68">        init_once();</span>
+<span class="fc" id="L69">        init(iis, IonType.DATAGRAM);</span>
+<span class="fc" id="L70">    }</span>
+
+    // TODO getIntegerType() is duplicated in IonReaderBinarySystemX. It could
+    // be consolidated into a single location, but that would have to be part
+    // of a larger refactor of common logic from both IonReader*SystemX classes
+    // into a base class (the *Value() methods also share a lot of similarity).
+    public IntegerSize getIntegerSize()
+    {
+<span class="fc" id="L78">        load_once();</span>
+<span class="fc bfc" id="L79" title="All 4 branches covered.">        if (_value_type != IonType.INT || _v.isNull())</span>
+        {
+<span class="fc" id="L81">            return null;</span>
+        }
+<span class="fc" id="L83">        return _Private_ScalarConversions.getIntegerSize(_v.getAuthoritativeType());</span>
+    }
+
+    private void load_once()
+    {
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (_v.isEmpty()) {</span>
+            try {
+<span class="fc" id="L90">                load_scalar_value();</span>
+            }
+<span class="nc" id="L92">            catch (IOException e) {</span>
+<span class="nc" id="L93">                throw new IonException(e);</span>
+<span class="fc" id="L94">            }</span>
+        }
+<span class="fc" id="L96">    }</span>
+
+    /**
+     * this checks the state of the raw reader to make sure
+     * this is valid.  It also checks for an existing cached
+     * value of the correct type.  It will either cast the
+     * current value from an existing type to the type desired
+     * or it will construct the desired type from the raw
+     * input in the raw reader
+     *
+     * @param value_type desired value type (in local type terms)
+     * @throws IOException
+     */
+    private final void load_or_cast_cached_value(int value_type) {
+<span class="fc" id="L110">        load_once();</span>
+<span class="pc bpc" id="L111" title="1 of 4 branches missed.">        if (value_type != 0 &amp;&amp; !_v.hasValueOfType(value_type)) {</span>
+<span class="fc" id="L112">            cast_cached_value(value_type);</span>
+        }
+<span class="fc" id="L114">    }</span>
+
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">    enum Radix</span>
+    {
+<span class="fc" id="L118">        DECIMAL</span>
+        {
+
+            @Override
+            boolean isInt(String image, int len)
+            {
+<span class="fc" id="L124">                return valueWithinBounds(image, len, MIN_INT_IMAGE, MAX_INT_IMAGE);</span>
+            }
+
+            @Override
+            boolean isLong(String image, int len)
+            {
+<span class="fc" id="L130">                return valueWithinBounds(image, len, MIN_LONG_IMAGE, MAX_LONG_IMAGE);</span>
+            }
+
+        },
+<span class="fc" id="L134">        HEX</span>
+        {
+
+            @Override
+            boolean isInt(String image, int len)
+            {
+<span class="fc" id="L140">                return valueWithinBounds(image, len, MIN_HEX_INT_IMAGE, MAX_HEX_INT_IMAGE);</span>
+            }
+
+            @Override
+            boolean isLong(String image, int len)
+            {
+<span class="fc" id="L146">                return valueWithinBounds(image, len, MIN_HEX_LONG_IMAGE, MAX_HEX_LONG_IMAGE);</span>
+            }
+
+        },
+<span class="fc" id="L150">        BINARY</span>
+        {
+
+            @Override
+            boolean isInt(String image, int len)
+            {
+<span class="fc" id="L156">                return valueWithinBounds(image, len, MIN_BINARY_INT_IMAGE, MAX_BINARY_INT_IMAGE);</span>
+            }
+
+            @Override
+            boolean isLong(String image, int len)
+            {
+<span class="fc" id="L162">                return valueWithinBounds(image, len, MIN_BINARY_LONG_IMAGE, MAX_BINARY_LONG_IMAGE);</span>
+            }
+
+        };
+
+<span class="fc" id="L167">        private static final char[] MAX_INT_IMAGE = Integer.toString(Integer.MAX_VALUE).toCharArray();</span>
+<span class="fc" id="L168">        private static final char[] MIN_INT_IMAGE = Integer.toString(Integer.MIN_VALUE).toCharArray();</span>
+<span class="fc" id="L169">        private static final char[] MAX_LONG_IMAGE = Long.toString(Long.MAX_VALUE).toCharArray();</span>
+<span class="fc" id="L170">        private static final char[] MIN_LONG_IMAGE = Long.toString(Long.MIN_VALUE).toCharArray();</span>
+<span class="fc" id="L171">        private static final char[] MAX_BINARY_INT_IMAGE = Integer.toBinaryString(Integer.MAX_VALUE).toCharArray();</span>
+<span class="fc" id="L172">        private static final char[] MIN_BINARY_INT_IMAGE = (&quot;-&quot; + Integer.toBinaryString(Integer.MIN_VALUE)).toCharArray();</span>
+<span class="fc" id="L173">        private static final char[] MAX_BINARY_LONG_IMAGE = Long.toBinaryString(Long.MAX_VALUE).toCharArray();</span>
+<span class="fc" id="L174">        private static final char[] MIN_BINARY_LONG_IMAGE = (&quot;-&quot; + Long.toBinaryString(Long.MIN_VALUE)).toCharArray();</span>
+<span class="fc" id="L175">        private static final char[] MAX_HEX_INT_IMAGE = Integer.toHexString(Integer.MAX_VALUE).toCharArray();</span>
+<span class="fc" id="L176">        private static final char[] MIN_HEX_INT_IMAGE = (&quot;-&quot; + Integer.toHexString(Integer.MIN_VALUE)).toCharArray();</span>
+<span class="fc" id="L177">        private static final char[] MAX_HEX_LONG_IMAGE = Long.toHexString(Long.MAX_VALUE).toCharArray();</span>
+<span class="fc" id="L178">        private static final char[] MIN_HEX_LONG_IMAGE = (&quot;-&quot; + Long.toHexString(Long.MIN_VALUE)).toCharArray();</span>
+
+        abstract boolean isInt(String image, int len);
+        abstract boolean isLong(String image, int len);
+
+        private static boolean valueWithinBounds(String value, int len, char[] minImage, char[] maxImage)
+        {
+<span class="fc bfc" id="L185" title="All 2 branches covered.">            boolean negative = value.charAt(0) == '-';</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">            char[] boundaryImage = negative ? minImage : maxImage;</span>
+<span class="fc" id="L187">            int maxImageLength = boundaryImage.length;</span>
+<span class="fc bfc" id="L188" title="All 6 branches covered.">            return len &lt; maxImageLength || (len == maxImageLength &amp;&amp; magnitudeLessThanOrEqualTo(value, len, boundaryImage));</span>
+        }
+
+        private static boolean magnitudeLessThanOrEqualTo(String lhs, int lhsLen, char[] rhs)
+        {
+<span class="pc bpc" id="L193" title="2 of 4 branches missed.">            assert lhsLen == rhs.length;</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">            for (int i = lhsLen - 1; i &gt;= 0; i--)</span>
+            {
+<span class="fc bfc" id="L196" title="All 2 branches covered.">                if (lhs.charAt(i) &gt; rhs[i])</span>
+                {
+<span class="fc" id="L198">                    return false;</span>
+                }
+            }
+<span class="fc" id="L201">            return true;</span>
+        }
+    }
+
+    private final void load_scalar_value() throws IOException {
+        // make sure we're trying to load a scalar value here
+<span class="pc bpc" id="L207" title="1 of 3 branches missed.">        switch(_value_type) {</span>
+        case NULL:
+<span class="nc" id="L209">            _v.setValueToNull(_null_type);</span>
+<span class="nc" id="L210">            _v.setAuthoritativeType(AS_TYPE.null_value);</span>
+<span class="nc" id="L211">            return;</span>
+        case BOOL:
+        case INT:
+        case FLOAT:
+        case DECIMAL:
+        case TIMESTAMP:
+        case SYMBOL:
+        case STRING:
+<span class="fc" id="L219">            break;</span>
+        default:
+<span class="fc" id="L221">            return;</span>
+        }
+
+<span class="fc" id="L224">        StringBuilder cs = token_contents_load(_scanner.getToken());</span>
+
+<span class="fc" id="L226">        int token_type = _scanner.getToken();</span>
+
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        if (_value_type == IonType.DECIMAL) {</span>
+            // we do this here (instead of in the case below
+            // so that we can modify the value while it's not
+            // a string, but still in the StringBuilder
+<span class="fc bfc" id="L232" title="All 2 branches covered.">            for (int ii=0; ii&lt;cs.length(); ii++) {</span>
+<span class="fc" id="L233">                int c = cs.charAt(ii);</span>
+<span class="fc bfc" id="L234" title="All 4 branches covered.">                if (c == 'd' || c == 'D') {</span>
+<span class="fc" id="L235">                    cs.setCharAt(ii, 'e');</span>
+<span class="fc" id="L236">                    break;</span>
+                }
+            }
+<span class="fc bfc" id="L239" title="All 4 branches covered.">        } else if (token_type == IonTokenConstsX.TOKEN_HEX || token_type == IonTokenConstsX.TOKEN_BINARY) {</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">            boolean isNegative = (cs.charAt(0) == '-');</span>
+            // prefix = is_negative ? &quot;-0x&quot; : &quot;0x&quot;;
+<span class="fc bfc" id="L242" title="All 2 branches covered.">            int pos = isNegative ? 1 : 0;</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">            char caseChar = token_type == IonTokenConstsX.TOKEN_HEX ? 'x' : 'b';</span>
+<span class="pc bpc" id="L244" title="1 of 6 branches missed.">            if (cs.length() &lt;= (isNegative ? 3 : 2) || Character.toLowerCase(cs.charAt(pos + 1)) != caseChar) {</span>
+<span class="pc bfc" id="L245" title="All 2 branches covered.">                parse_error(&quot;Invalid &quot; + (caseChar == 'x' ? &quot;hexadecimal&quot; : &quot;binary&quot;) + &quot; int value.&quot;);</span>
+            }
+<span class="fc" id="L247">            cs.deleteCharAt(pos);</span>
+<span class="fc" id="L248">            cs.deleteCharAt(pos);</span>
+        }
+
+
+<span class="fc" id="L252">        int          len = cs.length();</span>
+<span class="fc" id="L253">        String       s  = cs.toString();</span>
+
+<span class="fc" id="L255">        clear_current_value_buffer();</span>
+
+<span class="pc bpc" id="L257" title="1 of 11 branches missed.">        switch (token_type) {</span>
+        case IonTokenConstsX.TOKEN_UNKNOWN_NUMERIC:
+<span class="pc bpc" id="L259" title="2 of 5 branches missed.">            switch (_value_type) {</span>
+            case INT:
+<span class="fc bfc" id="L261" title="All 2 branches covered.">                if (Radix.DECIMAL.isInt(s, len)) {</span>
+<span class="fc" id="L262">                    _v.setValue(Integer.parseInt(s));</span>
+                }
+<span class="fc bfc" id="L264" title="All 2 branches covered.">                else if (Radix.DECIMAL.isLong(s, len)) {</span>
+<span class="fc" id="L265">                    _v.setValue(Long.parseLong(s));</span>
+                }
+                else {
+<span class="fc" id="L268">                    _v.setValue(new BigInteger(s));</span>
+                }
+<span class="fc" id="L270">                break;</span>
+            case DECIMAL:
+                // note that the string was modified above when it was a charsequence
+                try {
+<span class="fc" id="L274">                _v.setValue(Decimal.valueOf(s));</span>
+                }
+<span class="fc" id="L276">                catch (NumberFormatException e) {</span>
+<span class="nc" id="L277">                    parse_error(e);</span>
+<span class="fc" id="L278">                }</span>
+<span class="nc" id="L279">                break;</span>
+            case FLOAT:
+                try {
+<span class="fc" id="L282">                    _v.setValue(Double.parseDouble(s));</span>
+                }
+<span class="fc" id="L284">                catch (NumberFormatException e) {</span>
+<span class="nc" id="L285">                    parse_error(e);</span>
+<span class="fc" id="L286">                }</span>
+<span class="nc" id="L287">                break;</span>
+            case TIMESTAMP:
+<span class="nc" id="L289">                _v.setValue(Timestamp.valueOf(s));</span>
+<span class="nc" id="L290">                break;</span>
+            default:
+<span class="nc" id="L292">                String message = &quot;unexpected prefectched value type &quot;</span>
+<span class="nc" id="L293">                               + getType().toString()</span>
+                               + &quot; encountered handling an unquoted symbol&quot;;
+<span class="nc" id="L295">                parse_error(message);</span>
+            }
+<span class="fc" id="L297">            break;</span>
+        case IonTokenConstsX.TOKEN_INT:
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">            if (Radix.DECIMAL.isInt(s, len)) {</span>
+<span class="fc" id="L300">                _v.setValue(Integer.parseInt(s));</span>
+            }
+<span class="nc bnc" id="L302" title="All 2 branches missed.">            else if (Radix.DECIMAL.isLong(s, len)) {</span>
+<span class="nc" id="L303">                _v.setValue(Long.parseLong(s));</span>
+            }
+            else {
+<span class="nc" id="L306">                _v.setValue(new BigInteger(s));</span>
+            }
+<span class="nc" id="L308">            break;</span>
+        case IonTokenConstsX.TOKEN_BINARY:
+<span class="fc bfc" id="L310" title="All 2 branches covered.">            if (Radix.BINARY.isInt(s, len)) {</span>
+<span class="fc" id="L311">                _v.setValue(Integer.parseInt(s, 2));</span>
+            }
+<span class="fc bfc" id="L313" title="All 2 branches covered.">            else if (Radix.BINARY.isLong(s, len)) {</span>
+<span class="fc" id="L314">                _v.setValue(Long.parseLong(s, 2));</span>
+            }
+            else {
+<span class="fc" id="L317">                _v.setValue(new BigInteger(s, 2));</span>
+            }
+<span class="fc" id="L319">            break;</span>
+        case IonTokenConstsX.TOKEN_HEX:
+<span class="fc bfc" id="L321" title="All 2 branches covered.">            if (Radix.HEX.isInt(s, len)) {</span>
+<span class="fc" id="L322">                int v_int = Integer.parseInt(s, 16);</span>
+<span class="fc" id="L323">                _v.setValue(v_int);</span>
+<span class="fc" id="L324">            }</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">            else if (Radix.HEX.isLong(s, len)) {</span>
+<span class="fc" id="L326">                long v_long = Long.parseLong(s, 16);</span>
+<span class="fc" id="L327">                _v.setValue(v_long);</span>
+<span class="fc" id="L328">            }</span>
+            else {
+<span class="fc" id="L330">                BigInteger v_big_int = new BigInteger(s, 16);</span>
+<span class="fc" id="L331">                _v.setValue(v_big_int);</span>
+            }
+<span class="fc" id="L333">            break;</span>
+        case IonTokenConstsX.TOKEN_DECIMAL:
+            try {
+<span class="fc" id="L336">            _v.setValue(Decimal.valueOf(s));</span>
+            }
+<span class="fc" id="L338">            catch (NumberFormatException e) {</span>
+<span class="nc" id="L339">                parse_error(e);</span>
+<span class="fc" id="L340">            }</span>
+<span class="nc" id="L341">            break;</span>
+        case IonTokenConstsX.TOKEN_FLOAT:
+            try {
+<span class="fc" id="L344">                _v.setValue(Double.parseDouble(s));</span>
+            }
+<span class="fc" id="L346">            catch (NumberFormatException e) {</span>
+<span class="nc" id="L347">                parse_error(e);</span>
+<span class="fc" id="L348">            }</span>
+
+<span class="nc" id="L350">            break;</span>
+        case IonTokenConstsX.TOKEN_TIMESTAMP:
+<span class="fc" id="L352">            Timestamp t = null;</span>
+            try {
+<span class="fc" id="L354">                t = Timestamp.valueOf(s);</span>
+            }
+<span class="fc" id="L356">            catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L357">                parse_error(e);</span>
+<span class="fc" id="L358">            }</span>
+<span class="fc" id="L359">            _v.setValue(t);</span>
+<span class="fc" id="L360">            break;</span>
+        case IonTokenConstsX.TOKEN_SYMBOL_IDENTIFIER:
+            // this includes the various value keywords like true
+            // and nan, in addition to &quot;normal&quot; unquoted symbols
+
+            // we check to make sure it's not null first
+            // since it could be null.symbol (which would
+            // have the getType() of SYMBOL and would confuse
+            // us as to what the saved type is)
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">            if (isNullValue()) {</span>
+                // the raw parser set _null_type when it
+                // detected the unquoted symbol null in the
+                // input (which is what isNullValue looks at)
+<span class="nc" id="L373">                _v.setValueToNull(_null_type);</span>
+            }
+            else {
+<span class="pc bpc" id="L376" title="3 of 4 branches missed.">                switch(getType()) {</span>
+                case SYMBOL:
+                    // TODO this is catching SIDs too, using wrong text.
+<span class="fc" id="L379">                    _v.setValue(s);</span>
+<span class="fc" id="L380">                    break;</span>
+                case FLOAT:
+<span class="nc bnc" id="L382" title="All 2 branches missed.">                    switch (_value_keyword) {</span>
+                    case IonTokenConstsX.KEYWORD_NAN:
+<span class="nc" id="L384">                        _v.setValue(Double.NaN);</span>
+<span class="nc" id="L385">                        break;</span>
+                    default:
+<span class="nc" id="L387">                        String message = &quot;unexpected keyword &quot;</span>
+                                       + s
+                                       + &quot; identified as a FLOAT&quot;;
+<span class="nc" id="L390">                        parse_error(message);</span>
+                    }
+<span class="nc" id="L392">                    break;</span>
+                case BOOL:
+<span class="nc bnc" id="L394" title="All 3 branches missed.">                    switch (_value_keyword) {</span>
+                    case IonTokenConstsX.KEYWORD_TRUE:
+<span class="nc" id="L396">                        _v.setValue(true);</span>
+<span class="nc" id="L397">                        break;</span>
+                    case IonTokenConstsX.KEYWORD_FALSE:
+<span class="nc" id="L399">                        _v.setValue(false);</span>
+<span class="nc" id="L400">                        break;</span>
+                    default:
+<span class="nc" id="L402">                        String message = &quot;unexpected keyword &quot;</span>
+                            + s
+                            + &quot; identified as a BOOL&quot;;
+<span class="nc" id="L405">                        parse_error(message);</span>
+                    }
+<span class="nc" id="L407">                    break;</span>
+                default:
+<span class="nc" id="L409">                    String message = &quot;unexpected prefectched value type &quot;</span>
+<span class="nc" id="L410">                                   + getType().toString()</span>
+                                   + &quot; encountered handling an unquoted symbol&quot;;
+<span class="nc" id="L412">                    parse_error(message);</span>
+                }
+            }
+<span class="fc" id="L415">            break;</span>
+        case IonTokenConstsX.TOKEN_SYMBOL_QUOTED:
+        case IonTokenConstsX.TOKEN_SYMBOL_OPERATOR:
+        case IonTokenConstsX.TOKEN_STRING_DOUBLE_QUOTE:
+<span class="fc" id="L419">            _v.setValue(s);</span>
+<span class="fc" id="L420">            break;</span>
+        case IonTokenConstsX.TOKEN_STRING_TRIPLE_QUOTE:
+            // long strings (triple quoted strings) are never
+            // finished by the raw parser.  At most it reads
+            // the first triple quoted string.
+<span class="fc" id="L425">            _v.setValue(s);</span>
+<span class="fc" id="L426">            break;</span>
+        default:
+<span class="nc" id="L428">            parse_error(&quot;scalar token &quot;+IonTokenConstsX.getTokenName(_scanner.getToken())+&quot;isn't a recognized type&quot;);</span>
+        }
+<span class="fc" id="L430">    }</span>
+    private final void cast_cached_value(int new_type)
+    {
+        // this should only be called when it actually has to do some work
+<span class="pc bpc" id="L434" title="2 of 4 branches missed.">        assert !_v.hasValueOfType(new_type);</span>
+
+<span class="fc bfc" id="L436" title="All 2 branches covered.">        if (_v.isNull()) {</span>
+<span class="fc" id="L437">            return;</span>
+        }
+
+<span class="fc bfc" id="L440" title="All 2 branches covered.">        if (IonType.SYMBOL.equals(_value_type)) {</span>
+<span class="pc bpc" id="L441" title="1 of 3 branches missed.">            switch(new_type) {</span>
+                case AS_TYPE.string_value:
+<span class="fc" id="L443">                    int sid = _v.getInt();</span>
+<span class="fc" id="L444">                    String sym = getSymbolTable().findKnownSymbol(sid);</span>
+<span class="fc" id="L445">                    _v.addValue(sym);</span>
+<span class="fc" id="L446">                    break;</span>
+                case AS_TYPE.int_value:
+<span class="fc" id="L448">                    sym = _v.getString();</span>
+<span class="fc" id="L449">                    sid = getSymbolTable().findSymbol(sym);</span>
+<span class="fc" id="L450">                    _v.addValue(sid);</span>
+<span class="fc" id="L451">                    break;</span>
+                default:
+<span class="nc" id="L453">                {   String message = &quot;can't cast symbol from &quot;</span>
+<span class="nc" id="L454">                        +getValueTypeName(_v.getAuthoritativeType())</span>
+                        +&quot; to &quot;
+<span class="nc" id="L456">                        +getValueTypeName(new_type);</span>
+<span class="nc" id="L457">                    throw new CantConvertException(message);</span>
+                }
+            }
+        }
+        else {
+<span class="pc bpc" id="L462" title="1 of 2 branches missed.">            if (!_v.can_convert(new_type)) {</span>
+<span class="nc" id="L463">                String message = &quot;can't cast from &quot;</span>
+<span class="nc" id="L464">                    +getValueTypeName(_v.getAuthoritativeType())</span>
+                    +&quot; to &quot;
+<span class="nc" id="L466">                    +getValueTypeName(new_type);</span>
+<span class="nc" id="L467">                throw new CantConvertException(message);</span>
+            }
+<span class="fc" id="L469">            int fnid = _v.get_conversion_fnid(new_type);</span>
+<span class="fc" id="L470">            _v.cast(fnid);</span>
+        }
+<span class="fc" id="L472">    }</span>
+
+    //
+    // public value routines
+    //
+
+    public SymbolToken[] getTypeAnnotationSymbols()
+    {
+<span class="fc" id="L480">        final int count = _annotation_count;</span>
+<span class="fc bfc" id="L481" title="All 2 branches covered.">        if (count == 0) return SymbolToken.EMPTY_ARRAY;</span>
+
+<span class="fc" id="L483">        SymbolTable symbols = getSymbolTable();</span>
+
+<span class="fc" id="L485">        SymbolToken[] result = new SymbolToken[count];</span>
+<span class="fc bfc" id="L486" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++)</span>
+        {
+<span class="fc" id="L488">            SymbolToken sym = _annotations[i];</span>
+<span class="fc" id="L489">            SymbolToken updated = _Private_Utils.localize(symbols, sym);</span>
+<span class="fc bfc" id="L490" title="All 2 branches covered.">            if (updated != sym) _annotations[i] = updated;</span>
+<span class="fc" id="L491">            result[i] = updated;</span>
+        }
+
+<span class="fc" id="L494">        return result;</span>
+    }
+
+
+    public boolean isNullValue()
+    {
+<span class="fc" id="L500">        return _v.isNull();</span>
+    }
+
+    public boolean booleanValue()
+    {
+<span class="fc" id="L505">        load_or_cast_cached_value(AS_TYPE.boolean_value);</span>
+<span class="fc" id="L506">        return _v.getBoolean();</span>
+    }
+
+    public double doubleValue()
+    {
+<span class="fc" id="L511">        load_or_cast_cached_value(AS_TYPE.double_value);</span>
+<span class="fc" id="L512">        return _v.getDouble();</span>
+    }
+
+    public int intValue()
+    {
+<span class="pc bpc" id="L517" title="2 of 6 branches missed.">        if (_value_type != IonType.INT &amp;&amp;</span>
+            _value_type != IonType.DECIMAL &amp;&amp;
+            _value_type != IonType.FLOAT)
+        {
+<span class="fc" id="L521">            throw new IllegalStateException();</span>
+        }
+
+<span class="fc" id="L524">        load_or_cast_cached_value(AS_TYPE.int_value);</span>
+<span class="fc" id="L525">        return _v.getInt();</span>
+    }
+
+    public long longValue()
+    {
+<span class="pc bpc" id="L530" title="1 of 6 branches missed.">        if (_value_type != IonType.INT &amp;&amp;</span>
+            _value_type != IonType.DECIMAL &amp;&amp;
+            _value_type != IonType.FLOAT)
+        {
+<span class="fc" id="L534">            throw new IllegalStateException();</span>
+        }
+
+<span class="fc" id="L537">        load_or_cast_cached_value(AS_TYPE.long_value);</span>
+<span class="fc" id="L538">        return _v.getLong();</span>
+    }
+
+    @Override
+    public BigInteger bigIntegerValue()
+    {
+<span class="fc bfc" id="L544" title="All 6 branches covered.">        if (_value_type != IonType.INT &amp;&amp;</span>
+            _value_type != IonType.DECIMAL &amp;&amp;
+            _value_type != IonType.FLOAT)
+        {
+<span class="fc" id="L548">            throw new IllegalStateException();</span>
+        }
+
+<span class="fc" id="L551">        load_or_cast_cached_value(AS_TYPE.bigInteger_value);</span>
+<span class="fc bfc" id="L552" title="All 2 branches covered.">        if (_v.isNull()) return null;</span>
+<span class="fc" id="L553">        return _v.getBigInteger();</span>
+    }
+
+    public BigDecimal bigDecimalValue()
+    {
+<span class="fc" id="L558">        load_or_cast_cached_value(AS_TYPE.decimal_value);</span>
+<span class="fc bfc" id="L559" title="All 2 branches covered.">        if (_v.isNull()) return null;</span>
+<span class="fc" id="L560">        return _v.getBigDecimal();</span>
+    }
+
+    public Decimal decimalValue()
+    {
+<span class="fc" id="L565">        load_or_cast_cached_value(AS_TYPE.decimal_value);</span>
+<span class="fc bfc" id="L566" title="All 2 branches covered.">        if (_v.isNull()) return null;</span>
+<span class="fc" id="L567">        return _v.getDecimal();</span>
+    }
+
+    public Date dateValue()
+    {
+<span class="fc" id="L572">        load_or_cast_cached_value(AS_TYPE.date_value);</span>
+<span class="fc bfc" id="L573" title="All 2 branches covered.">        if (_v.isNull()) return null;</span>
+<span class="fc" id="L574">        return _v.getDate();</span>
+    }
+
+    public Timestamp timestampValue()
+    {
+<span class="fc" id="L579">        load_or_cast_cached_value(AS_TYPE.timestamp_value);</span>
+<span class="fc bfc" id="L580" title="All 2 branches covered.">        if (_v.isNull()) return null;</span>
+<span class="fc" id="L581">        return _v.getTimestamp();</span>
+    }
+
+    public final String stringValue()
+    {
+<span class="fc bfc" id="L586" title="All 2 branches covered.">        if (! IonType.isText(_value_type)) throw new IllegalStateException();</span>
+<span class="fc bfc" id="L587" title="All 2 branches covered.">        if (_v.isNull()) return null;</span>
+
+<span class="fc" id="L589">        load_or_cast_cached_value(AS_TYPE.string_value);</span>
+<span class="fc" id="L590">        String text = _v.getString();</span>
+<span class="fc bfc" id="L591" title="All 2 branches covered.">        if (text == null) {</span>
+<span class="pc bpc" id="L592" title="2 of 4 branches missed.">            assert _value_type == IonType.SYMBOL;</span>
+<span class="fc" id="L593">            int sid = _v.getInt();</span>
+<span class="pc bpc" id="L594" title="2 of 4 branches missed.">            assert sid &gt; 0;</span>
+<span class="fc" id="L595">            throw new UnknownSymbolException(sid);</span>
+        }
+<span class="fc" id="L597">        return text;</span>
+    }
+
+    /**
+     * Horrible temporary hack.
+     *
+     * @return not null.
+     */
+    @Override
+    public SymbolTable getSymbolTable()
+    {
+<span class="fc" id="L608">        SymbolTable symtab = super.getSymbolTable();</span>
+<span class="pc bpc" id="L609" title="1 of 2 branches missed.">        if (symtab == null)</span>
+        {
+<span class="fc" id="L611">            symtab = _system_symtab;</span>
+        }
+<span class="fc" id="L613">        return symtab;</span>
+    }
+
+
+    @Override
+    public final int getFieldId()
+    {
+        // Superclass handles hoisting logic
+<span class="fc" id="L621">        int id = super.getFieldId();</span>
+<span class="fc bfc" id="L622" title="All 2 branches covered.">        if (id == SymbolTable.UNKNOWN_SYMBOL_ID)</span>
+        {
+<span class="fc" id="L624">            String fieldname = getRawFieldName();</span>
+<span class="fc bfc" id="L625" title="All 2 branches covered.">            if (fieldname != null)</span>
+            {
+<span class="fc" id="L627">                SymbolTable symbols = getSymbolTable();</span>
+<span class="fc" id="L628">                id = symbols.findSymbol(fieldname);</span>
+            }
+        }
+<span class="fc" id="L631">        return id;</span>
+    }
+
+    @Override
+    public final String getFieldName()
+    {
+        // Superclass handles hoisting logic
+<span class="fc" id="L638">        String text = getRawFieldName();</span>
+<span class="fc bfc" id="L639" title="All 2 branches covered.">        if (text == null)</span>
+        {
+<span class="fc" id="L641">            int id = getFieldId();</span>
+<span class="fc bfc" id="L642" title="All 2 branches covered.">            if (id != SymbolTable.UNKNOWN_SYMBOL_ID)</span>
+            {
+<span class="fc" id="L644">                SymbolTable symbols = getSymbolTable();</span>
+<span class="fc" id="L645">                text = symbols.findKnownSymbol(id);</span>
+<span class="fc bfc" id="L646" title="All 2 branches covered.">                if (text == null)</span>
+                {
+<span class="fc" id="L648">                    throw new UnknownSymbolException(id);</span>
+                }
+            }
+        }
+<span class="fc" id="L652">        return text;</span>
+    }
+
+    @Override
+    public SymbolToken getFieldNameSymbol()
+    {
+<span class="fc" id="L658">        SymbolToken sym = super.getFieldNameSymbol();</span>
+<span class="fc bfc" id="L659" title="All 2 branches covered.">        if (sym != null)</span>
+        {
+<span class="fc" id="L661">            sym = _Private_Utils.localize(getSymbolTable(), sym);</span>
+        }
+<span class="fc" id="L663">        return sym;</span>
+    }
+
+    public SymbolToken symbolValue()
+    {
+<span class="fc bfc" id="L668" title="All 2 branches covered.">        if (_value_type != IonType.SYMBOL) throw new IllegalStateException();</span>
+<span class="fc bfc" id="L669" title="All 2 branches covered.">        if (_v.isNull()) return null;</span>
+
+<span class="fc" id="L671">        load_or_cast_cached_value(AS_TYPE.string_value);</span>
+<span class="fc bfc" id="L672" title="All 2 branches covered.">        if (! _v.hasValueOfType(AS_TYPE.int_value))</span>
+        {
+<span class="fc" id="L674">            cast_cached_value(AS_TYPE.int_value);</span>
+        }
+
+<span class="fc" id="L677">        String text = _v.getString();</span>
+<span class="fc" id="L678">        int    sid  = _v.getInt();</span>
+<span class="fc" id="L679">        return new SymbolTokenImpl(text, sid);</span>
+    }
+
+    //
+    // blob and clob support routines
+    //
+
+    public int byteSize()
+    {
+<span class="fc" id="L688">        ensureLob(&quot;byteSize&quot;);</span>
+
+        long len;
+        try {
+<span class="fc" id="L692">            len = load_lob_contents();</span>
+        }
+<span class="nc" id="L694">        catch (IOException e) {</span>
+<span class="nc" id="L695">            throw new IonException(e);</span>
+<span class="fc" id="L696">        }</span>
+<span class="pc bpc" id="L697" title="2 of 4 branches missed.">        if (len &lt; 0 || len &gt; Integer.MAX_VALUE) {</span>
+<span class="nc" id="L698">            load_lob_length_overflow_error(len);</span>
+        }
+<span class="fc" id="L700">        return (int)len;</span>
+    }
+    private final void load_lob_length_overflow_error(long len) {
+<span class="nc" id="L703">        String message = &quot;Size overflow: &quot;</span>
+<span class="nc" id="L704">            + _value_type.toString()</span>
+            + &quot; size (&quot;
+<span class="nc" id="L706">            + Long.toString(len)</span>
+            + &quot;) exceeds int &quot;;
+<span class="nc" id="L708">        throw new IonException(message);</span>
+    }
+
+    private final long load_lob_save_point() throws IOException
+    {
+<span class="pc bpc" id="L713" title="1 of 2 branches missed.">        if (_lob_loaded == LOB_STATE.EMPTY) {</span>
+<span class="pc bpc" id="L714" title="3 of 6 branches missed.">            assert(!_current_value_save_point_loaded &amp;&amp; _current_value_save_point.isClear());</span>
+<span class="fc" id="L715">            _scanner.save_point_start(_current_value_save_point);</span>
+<span class="fc" id="L716">            _scanner.skip_over_lob(_lob_token, _current_value_save_point);</span>
+<span class="fc" id="L717">            _current_value_save_point_loaded = true;</span>
+<span class="fc" id="L718">            tokenValueIsFinished();</span>
+<span class="fc" id="L719">            _lob_loaded = LOB_STATE.READ;</span>
+        }
+
+<span class="fc" id="L722">        long size = _current_value_save_point.length();</span>
+<span class="fc" id="L723">        return size;</span>
+    }
+    private int load_lob_contents() throws IOException
+    {
+<span class="fc bfc" id="L727" title="All 2 branches covered.">        if (_lob_loaded == LOB_STATE.EMPTY) {</span>
+<span class="fc" id="L728">            load_lob_save_point();</span>
+        }
+<span class="fc bfc" id="L730" title="All 2 branches covered.">        if (_lob_loaded == LOB_STATE.READ) {</span>
+<span class="fc" id="L731">            long raw_size =  _current_value_save_point.length();</span>
+<span class="pc bpc" id="L732" title="2 of 4 branches missed.">            if (raw_size &lt; 0 || raw_size &gt; Integer.MAX_VALUE) {</span>
+<span class="nc" id="L733">                load_lob_length_overflow_error(raw_size);</span>
+            }
+<span class="fc" id="L735">            _lob_bytes = new byte[(int)raw_size];</span>
+
+            try {
+<span class="pc bpc" id="L738" title="3 of 6 branches missed.">                assert(_current_value_save_point_loaded &amp;&amp; _current_value_save_point.isDefined());</span>
+<span class="fc" id="L739">                _scanner.save_point_activate(_current_value_save_point);</span>
+<span class="fc" id="L740">                _lob_actual_len = readBytes(_lob_bytes, 0, (int)raw_size);</span>
+<span class="fc" id="L741">                _scanner.save_point_deactivate(_current_value_save_point);</span>
+            }
+<span class="nc" id="L743">            catch (IOException e) {</span>
+<span class="nc" id="L744">                throw new IonException(e);</span>
+<span class="fc" id="L745">            }</span>
+<span class="pc bpc" id="L746" title="2 of 4 branches missed.">            assert(_lob_actual_len &lt;= raw_size);</span>
+
+<span class="fc" id="L748">            _lob_loaded = LOB_STATE.FINISHED;</span>
+        }
+<span class="pc bpc" id="L750" title="2 of 4 branches missed.">        assert( _lob_loaded == LOB_STATE.FINISHED);</span>
+<span class="fc" id="L751">        return _lob_actual_len;</span>
+    }
+
+    private void ensureLob(String apiName)
+    {
+<span class="pc bpc" id="L756" title="1 of 2 branches missed.">        switch (_value_type) {</span>
+            case CLOB:
+            case BLOB:
+<span class="fc" id="L759">                break;</span>
+            default:
+            {
+<span class="nc" id="L762">                String msg =</span>
+                    apiName +
+                    &quot; is only valid if the reader is on a lob value, not a &quot; +
+                    _value_type +
+                    &quot; value&quot;;
+<span class="nc" id="L767">                throw new IllegalStateException(msg);</span>
+            }
+        }
+<span class="fc" id="L770">    }</span>
+
+    public byte[] newBytes()
+    {
+<span class="fc" id="L774">        ensureLob(&quot;newBytes&quot;);</span>
+
+        byte[] bytes;
+        int    len;
+
+        try {
+<span class="fc" id="L780">            len = load_lob_contents();</span>
+        }
+<span class="nc" id="L782">        catch (IOException e) {</span>
+<span class="nc" id="L783">            throw new IonException(e);</span>
+<span class="fc" id="L784">        }</span>
+<span class="fc" id="L785">        bytes = new byte[len];</span>
+<span class="fc" id="L786">        System.arraycopy(_lob_bytes, 0, bytes, 0, len);</span>
+
+<span class="fc" id="L788">        return bytes;</span>
+    }
+
+    public int getBytes(byte[] buffer, int offset, int len)
+    {
+<span class="nc" id="L793">        ensureLob(&quot;getBytes&quot;);</span>
+
+<span class="nc bnc" id="L795" title="All 2 branches missed.">        if (_lob_loaded == LOB_STATE.READ) {</span>
+            // if we've already read through the lob
+            // (and therefore have it's length and the
+            // bytes cached in our input buffer) anyway
+            // just finish the job of converting the
+            // data to something useful
+            try {
+<span class="nc" id="L802">                load_lob_contents();</span>
+            }
+<span class="nc" id="L804">            catch (IOException e) {</span>
+<span class="nc" id="L805">                throw new IonException(e);</span>
+<span class="nc" id="L806">            }</span>
+        }
+
+        int len_read;
+<span class="nc bnc" id="L810" title="All 2 branches missed.">        if (_lob_loaded == LOB_STATE.FINISHED) {</span>
+            // if we have loaded data, just copy it
+<span class="nc" id="L812">            len_read = len;</span>
+<span class="nc bnc" id="L813" title="All 2 branches missed.">            if (len_read &gt; _lob_actual_len) {</span>
+<span class="nc" id="L814">                len_read = _lob_actual_len;</span>
+            }
+<span class="nc" id="L816">            System.arraycopy(_lob_bytes, 0, buffer, offset, len_read);</span>
+        }
+        else {
+            // if we haven't loaded it, the we also haven't
+            // even read over the data - so we'll read if from
+            // the input source
+            try {
+<span class="nc bnc" id="L823" title="All 4 branches missed.">                if (_current_value_save_point_loaded &amp;&amp; _lob_value_position &gt; 0) {</span>
+<span class="nc bnc" id="L824" title="All 2 branches missed.">                    if (_current_value_save_point.isActive()) {</span>
+<span class="nc" id="L825">                        _scanner.save_point_deactivate(_current_value_save_point);</span>
+                    }
+<span class="nc" id="L827">                    _scanner.save_point_activate(_current_value_save_point);</span>
+<span class="nc" id="L828">                    _lob_value_position = 0;</span>
+                }
+
+<span class="nc bnc" id="L831" title="All 6 branches missed.">                assert(_current_value_save_point_loaded &amp;&amp; _current_value_save_point.isDefined());</span>
+<span class="nc" id="L832">                _scanner.save_point_activate(_current_value_save_point);</span>
+
+<span class="nc" id="L834">                len_read = readBytes(buffer, offset, len);</span>
+<span class="nc" id="L835">                _scanner.save_point_deactivate(_current_value_save_point);</span>
+
+            }
+<span class="nc" id="L838">            catch (IOException e) {</span>
+<span class="nc" id="L839">                throw new IonException(e);</span>
+<span class="nc" id="L840">            }</span>
+        }
+<span class="nc" id="L842">        return len_read;</span>
+    }
+
+    private int readBytes(byte[] buffer, int offset, int len)
+        throws IOException
+    {
+<span class="fc" id="L848">        int starting_offset = offset;</span>
+<span class="fc" id="L849">        int c = -1;</span>
+
+<span class="pc bpc" id="L851" title="1 of 4 branches missed.">        switch (_lob_token) {</span>
+        // BLOB
+        case IonTokenConstsX.TOKEN_OPEN_DOUBLE_BRACE:
+<span class="pc bpc" id="L854" title="1 of 2 branches missed.">            while (len-- &gt; 0) {</span>
+<span class="fc" id="L855">                c = _scanner.read_base64_byte();</span>
+<span class="fc bfc" id="L856" title="All 2 branches covered.">                if (c &lt; 0) break;</span>
+<span class="fc" id="L857">                buffer[offset++] = (byte)c;</span>
+            }
+            break;
+        // CLOB
+        case IonTokenConstsX.TOKEN_STRING_DOUBLE_QUOTE:
+<span class="fc bfc" id="L862" title="All 2 branches covered.">            while (len-- &gt; 0) {</span>
+<span class="fc" id="L863">                c = _scanner.read_double_quoted_char(true);</span>
+<span class="fc bfc" id="L864" title="All 2 branches covered.">                if (c &lt; 0) {</span>
+<span class="pc bpc" id="L865" title="3 of 6 branches missed.">                    if (c == CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_1</span>
+                     || c == CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_2
+                     || c == CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_3
+                    ) {
+<span class="nc" id="L869">                        continue;</span>
+                    }
+                    break;
+                }
+<span class="pc bpc" id="L873" title="2 of 4 branches missed.">                assert(c &lt;= UNSIGNED_BYTE_MAX_VALUE);</span>
+<span class="fc" id="L874">                buffer[offset++] = (byte)c;</span>
+            }
+            break;
+        // CLOB
+        case IonTokenConstsX.TOKEN_STRING_TRIPLE_QUOTE:
+<span class="fc bfc" id="L879" title="All 2 branches covered.">            while (len-- &gt; 0) {</span>
+<span class="fc" id="L880">                c = _scanner.read_triple_quoted_char(true);</span>
+<span class="fc bfc" id="L881" title="All 2 branches covered.">                if (c &lt; 0) {</span>
+<span class="pc bpc" id="L882" title="2 of 8 branches missed.">                    if (c == CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_1</span>
+                     || c == CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_2
+                     || c == CharacterSequence.CHAR_SEQ_ESCAPED_NEWLINE_SEQUENCE_3
+                     || c == CharacterSequence.CHAR_SEQ_STRING_NON_TERMINATOR
+                    ) {
+<span class="fc" id="L887">                        continue;</span>
+                    }
+<span class="pc bpc" id="L889" title="2 of 6 branches missed.">                    if (c == CharacterSequence.CHAR_SEQ_NEWLINE_SEQUENCE_1</span>
+                     || c == CharacterSequence.CHAR_SEQ_NEWLINE_SEQUENCE_2
+                     || c == CharacterSequence.CHAR_SEQ_NEWLINE_SEQUENCE_3
+                    ) {
+<span class="fc" id="L893">                        buffer[offset++] = (byte)'\n';</span>
+<span class="fc" id="L894">                        continue;</span>
+                    }
+                    break;
+                }
+<span class="pc bpc" id="L898" title="3 of 6 branches missed.">                assert(c &gt;= 0 &amp;&amp; c &lt;= UNSIGNED_BYTE_MAX_VALUE);</span>
+<span class="fc" id="L899">                buffer[offset++] = (byte)c;</span>
+            }
+            break;
+        default:
+<span class="nc" id="L903">            String message = &quot;invalid type [&quot;+_value_type.toString()+&quot;] for lob handling&quot;;</span>
+<span class="nc" id="L904">            throw new IonReaderTextTokenException(message);</span>
+        }
+<span class="fc bfc" id="L906" title="All 2 branches covered.">        if (c == -1) {</span>
+<span class="fc" id="L907">            _scanner.tokenIsFinished();</span>
+        }
+<span class="fc" id="L909">        int read = offset - starting_offset;</span>
+<span class="fc" id="L910">        _lob_value_position += read;   // TODO: is _lob_value_position really needed?</span>
+<span class="fc" id="L911">        return read;</span>
+    }
+
+    public IonValue getIonValue(IonSystem sys)
+    {
+<span class="nc bnc" id="L916" title="All 2 branches missed.">        if (isNullValue()) {</span>
+<span class="nc bnc" id="L917" title="All 14 branches missed.">            switch (_value_type) {</span>
+<span class="nc" id="L918">            case NULL:      return sys.newNull();</span>
+<span class="nc" id="L919">            case BOOL:      return sys.newNullBool();</span>
+<span class="nc" id="L920">            case INT:       return sys.newNullInt();</span>
+<span class="nc" id="L921">            case FLOAT:     return sys.newNullFloat();</span>
+<span class="nc" id="L922">            case DECIMAL:   return sys.newNullDecimal();</span>
+<span class="nc" id="L923">            case TIMESTAMP: return sys.newNullTimestamp();</span>
+<span class="nc" id="L924">            case SYMBOL:    return sys.newNullSymbol();</span>
+<span class="nc" id="L925">            case STRING:    return sys.newNullString();</span>
+<span class="nc" id="L926">            case CLOB:      return sys.newNullClob();</span>
+<span class="nc" id="L927">            case BLOB:      return sys.newNullBlob();</span>
+<span class="nc" id="L928">            case LIST:      return sys.newNullList();</span>
+<span class="nc" id="L929">            case SEXP:      return sys.newNullSexp();</span>
+<span class="nc" id="L930">            case STRUCT:    return sys.newNullString();</span>
+            default:
+<span class="nc" id="L932">                throw new IonException(&quot;unrecognized type encountered&quot;);</span>
+            }
+        }
+
+<span class="nc bnc" id="L936" title="All 14 branches missed.">        switch (_value_type) {</span>
+<span class="nc" id="L937">        case NULL:      return sys.newNull();</span>
+<span class="nc" id="L938">        case BOOL:      return sys.newBool(booleanValue());</span>
+<span class="nc" id="L939">        case INT:       return sys.newInt(longValue());</span>
+<span class="nc" id="L940">        case FLOAT:     return sys.newFloat(doubleValue());</span>
+<span class="nc" id="L941">        case DECIMAL:   return sys.newDecimal(decimalValue());</span>
+        case TIMESTAMP:
+<span class="nc" id="L943">            IonTimestamp t = sys.newNullTimestamp();</span>
+<span class="nc" id="L944">            Timestamp ti = timestampValue();</span>
+<span class="nc" id="L945">            t.setValue(ti);</span>
+<span class="nc" id="L946">            return t;</span>
+<span class="nc" id="L947">        case SYMBOL:    return sys.newSymbol(stringValue());</span>
+<span class="nc" id="L948">        case STRING:    return sys.newString(stringValue());</span>
+        case CLOB:
+<span class="nc" id="L950">            IonClob clob = sys.newNullClob();</span>
+            // FIXME inefficient: both newBytes and setBytes copy the data
+<span class="nc" id="L952">            clob.setBytes(newBytes());</span>
+<span class="nc" id="L953">            return clob;</span>
+        case BLOB:
+<span class="nc" id="L955">            IonBlob blob = sys.newNullBlob();</span>
+            // FIXME inefficient: both newBytes and setBytes copy the data
+<span class="nc" id="L957">            blob.setBytes(newBytes());</span>
+<span class="nc" id="L958">            return blob;</span>
+        case LIST:
+<span class="nc" id="L960">            IonList list = sys.newNullList();</span>
+<span class="nc" id="L961">            fillContainerList(sys, list);</span>
+<span class="nc" id="L962">            return list;</span>
+        case SEXP:
+<span class="nc" id="L964">            IonSexp sexp = sys.newNullSexp();</span>
+<span class="nc" id="L965">            fillContainerList(sys, sexp);</span>
+<span class="nc" id="L966">            return sexp;</span>
+        case STRUCT:
+<span class="nc" id="L968">            IonStruct struct = sys.newNullStruct();</span>
+<span class="nc" id="L969">            fillContainerStruct(sys, struct);</span>
+<span class="nc" id="L970">            return struct;</span>
+        default:
+<span class="nc" id="L972">            throw new IonException(&quot;unrecognized type encountered&quot;);</span>
+        }
+    }
+    private final void fillContainerList(IonSystem sys, IonSequence list) {
+<span class="nc" id="L976">        this.stepIn();</span>
+<span class="nc bnc" id="L977" title="All 2 branches missed.">        while (this.next() != null) {</span>
+<span class="nc" id="L978">            IonValue v = this.getIonValue(sys);</span>
+<span class="nc" id="L979">            list.add(v);</span>
+<span class="nc" id="L980">        }</span>
+<span class="nc" id="L981">        this.stepOut();</span>
+<span class="nc" id="L982">    }</span>
+    private final void fillContainerStruct(IonSystem sys, IonStruct struct) {
+<span class="nc" id="L984">        this.stepIn();</span>
+<span class="nc bnc" id="L985" title="All 2 branches missed.">        while (this.next() != null) {</span>
+<span class="nc" id="L986">            String name = this.getFieldName();</span>
+<span class="nc" id="L987">            IonValue v = this.getIonValue(sys);</span>
+<span class="nc" id="L988">            struct.add(name, v);</span>
+<span class="nc" id="L989">        }</span>
+<span class="nc" id="L990">        this.stepOut();</span>
+<span class="nc" id="L991">    }</span>
+
+    // system readers don't skip any symbol tables
+    public SymbolTable pop_passed_symbol_table()
+    {
+<span class="fc" id="L996">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

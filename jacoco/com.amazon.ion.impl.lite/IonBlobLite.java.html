@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonBlobLite.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl.lite</a> &gt; <span class="el_source">IonBlobLite.java</span></div><h1>IonBlobLite.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl.lite;
+
+import com.amazon.ion.IonBlob;
+import com.amazon.ion.IonType;
+import com.amazon.ion.IonWriter;
+import com.amazon.ion.ValueVisitor;
+import com.amazon.ion.impl._Private_Utils;
+import java.io.IOException;
+import java.io.InputStream;
+
+
+final class IonBlobLite
+    extends IonLobLite
+    implements IonBlob
+{
+<span class="fc" id="L31">    private static final int HASH_SIGNATURE =</span>
+<span class="fc" id="L32">        IonType.BLOB.toString().hashCode();</span>
+
+    /**
+     * Constructs a &lt;code&gt;null.blob&lt;/code&gt; element.
+     */
+    IonBlobLite(ContainerlessContext context, boolean isNull)
+    {
+<span class="fc" id="L39">        super(context, isNull);</span>
+<span class="fc" id="L40">    }</span>
+
+    IonBlobLite(IonBlobLite existing, IonContext context)
+    {
+<span class="fc" id="L44">        super(existing, context);</span>
+<span class="fc" id="L45">    }</span>
+
+    @Override
+    IonBlobLite clone(IonContext context)
+    {
+<span class="fc" id="L50">        return new IonBlobLite(this, context);</span>
+    }
+
+    @Override
+    public IonBlobLite clone()
+    {
+<span class="fc" id="L56">        return clone(ContainerlessContext.wrap(getSystem()));</span>
+    }
+
+    @Override
+    int hashCode(SymbolTableProvider symbolTableProvider) {
+<span class="fc" id="L61">        return lobHashCode(HASH_SIGNATURE, symbolTableProvider);</span>
+    }
+
+    @Override
+    public IonType getType()
+    {
+<span class="fc" id="L67">        return IonType.BLOB;</span>
+    }
+
+
+    public void printBase64(Appendable out)
+        throws IOException
+    {
+<span class="fc" id="L74">        validateThisNotNull();</span>
+<span class="fc" id="L75">        InputStream byteStream = newInputStream();</span>
+        try
+        {
+<span class="fc" id="L78">            _Private_Utils.writeAsBase64(byteStream, out);</span>
+        }
+        finally
+        {
+<span class="fc" id="L82">            byteStream.close();</span>
+        }
+<span class="fc" id="L84">    }</span>
+
+    @Override
+    final void writeBodyTo(IonWriter writer, SymbolTableProvider symbolTableProvider)
+        throws IOException
+    {
+<span class="fc" id="L90">        writer.writeBlob(getBytesNoCopy());</span>
+<span class="fc" id="L91">    }</span>
+
+    @Override
+    public void accept(ValueVisitor visitor) throws Exception
+    {
+<span class="fc" id="L96">        visitor.visit(this);</span>
+<span class="fc" id="L97">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

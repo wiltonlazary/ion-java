@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnifiedInputBufferX.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl</a> &gt; <span class="el_source">UnifiedInputBufferX.java</span></div><h1>UnifiedInputBufferX.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl;
+
+
+<span class="pc bpc" id="L19" title="1 of 2 branches missed.">abstract class UnifiedInputBufferX</span>
+{
+<span class="fc" id="L21">    public enum BufferType { BYTES, CHARS }</span>
+
+    protected int               _page_size;
+    protected UnifiedDataPageX[] _buffers;
+    protected int               _buffer_current;
+    protected int               _buffer_count;
+    protected int               _locks;
+
+    public static UnifiedInputBufferX makePageBuffer(byte[] bytes, int offset, int length) {
+<span class="fc" id="L30">        UnifiedInputBufferX buf = new UnifiedInputBufferX.Bytes(bytes, offset, length);</span>
+<span class="fc" id="L31">        return buf;</span>
+    }
+    public static UnifiedInputBufferX makePageBuffer(char[] chars, int offset, int length) {
+<span class="fc" id="L34">        UnifiedInputBufferX buf = new UnifiedInputBufferX.Chars(chars, offset, length);</span>
+<span class="fc" id="L35">        return buf;</span>
+    }
+    public static UnifiedInputBufferX makePageBuffer(CharSequence chars, int offset, int length) {
+<span class="fc" id="L38">        char [] char_array = chars_make_char_array(chars, offset, length);</span>
+<span class="fc" id="L39">        UnifiedInputBufferX buf = makePageBuffer(char_array, 0, length);</span>
+<span class="fc" id="L40">        return buf;</span>
+    }
+    public static UnifiedInputBufferX makePageBuffer(BufferType bufferType, int initialPageSize)
+    {
+        UnifiedInputBufferX buf;
+<span class="pc bpc" id="L45" title="1 of 3 branches missed.">        switch(bufferType) {</span>
+        case CHARS:
+<span class="fc" id="L47">            buf = new UnifiedInputBufferX.Chars(initialPageSize);</span>
+<span class="fc" id="L48">            break;</span>
+        case BYTES:
+<span class="fc" id="L50">            buf = new UnifiedInputBufferX.Bytes(initialPageSize);</span>
+<span class="fc" id="L51">            break;</span>
+        default:
+<span class="nc" id="L53">            throw new IllegalArgumentException(&quot;invalid buffer type&quot;);</span>
+        }
+<span class="fc" id="L55">        return buf;</span>
+    }
+    protected static final char[] chars_make_char_array(CharSequence chars,
+                                                         int offset,
+                                                         int length)
+    {
+<span class="fc" id="L61">        char[] char_array = new char[length];</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        for (int ii=offset; ii&lt;length; ii++) {</span>
+<span class="fc" id="L63">            char_array[ii] = chars.charAt(ii);</span>
+        }
+<span class="fc" id="L65">        return char_array;</span>
+    }
+<span class="fc" id="L67">    private UnifiedInputBufferX(int initialPageSize) {</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (initialPageSize &lt; 0) {</span>
+<span class="nc" id="L69">            throw new IllegalArgumentException(&quot;page size must be &gt; 0&quot;);</span>
+        }
+<span class="fc" id="L71">        _page_size = initialPageSize;</span>
+<span class="fc" id="L72">        _buffers = new UnifiedDataPageX[10];</span>
+<span class="fc" id="L73">    }</span>
+
+    public abstract BufferType getType();
+    public abstract int maxValue();
+
+    public final void putCharAt(long fileOffset, int c) {
+<span class="nc bnc" id="L79" title="All 4 branches missed.">        if (c &lt; 0 || c &gt; maxValue()) throw new IllegalArgumentException(&quot;value (&quot;+c+&quot;)is out of range (0 to &quot;+maxValue()+&quot;)&quot;);</span>
+
+        // since we start at _curr the common case find the buffer immediately
+<span class="nc" id="L82">        UnifiedDataPageX page = null;</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        for (int ii=_buffer_current; ii&gt;=0; ii--) {</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">            if (_buffers[ii].containsOffset(fileOffset)) {</span>
+<span class="nc" id="L85">                page = _buffers[ii];</span>
+<span class="nc" id="L86">                break;</span>
+            }
+        }
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        if (page == null) throw new IllegalArgumentException();</span>
+<span class="nc" id="L90">        int offset = (int)(fileOffset - page.getStartingFileOffset());</span>
+<span class="nc" id="L91">        page.putValue(offset, c);</span>
+<span class="nc" id="L92">    }</span>
+
+    public final UnifiedDataPageX getCurrentPage() {
+<span class="fc" id="L95">        return _buffers[_buffer_current];</span>
+    }
+
+    public final int getCurrentPageIdx()   {
+<span class="fc" id="L99">        return _buffer_current;</span>
+    }
+
+    public final int getPageCount() {
+<span class="fc" id="L103">        return _buffer_count;</span>
+    }
+
+    public final void incLock() {
+<span class="fc" id="L107">        _locks++;</span>
+<span class="fc" id="L108">    }</span>
+    public final boolean decLock() {
+<span class="fc" id="L110">        _locks--;</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        return (_locks == 0);</span>
+    }
+
+    public final UnifiedDataPageX getPage(int pageIdx) {
+<span class="pc bpc" id="L115" title="2 of 4 branches missed.">        if (pageIdx &lt; 0 || pageIdx &gt;= _buffer_count) {</span>
+<span class="nc" id="L116">            throw new IndexOutOfBoundsException();</span>
+        }
+<span class="fc" id="L118">        return _buffers[pageIdx];</span>
+    }
+
+    protected final int getNextFilledPageIdx() {
+<span class="fc" id="L122">        int idx = _buffer_current + 1;</span>
+
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (idx &lt; _buffer_count) {</span>
+<span class="nc" id="L125">            UnifiedDataPageX p = _buffers[idx];</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">            if (p != null) {</span>
+<span class="nc" id="L127">                _buffer_current = idx;</span>
+<span class="nc" id="L128">                return idx;</span>
+            }
+        }
+<span class="fc" id="L131">        return -1;</span>
+    }
+
+    protected final UnifiedDataPageX getEmptyPageIdx() {
+<span class="fc" id="L135">        UnifiedDataPageX next = null;</span>
+
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (_buffer_count &lt; _buffers.length) {</span>
+<span class="fc" id="L138">            next = _buffers[_buffer_count];</span>
+        }
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (next == null) {</span>
+<span class="fc" id="L141">            next = make_page(_page_size);</span>
+        }
+        else {
+<span class="nc bnc" id="L144" title="All 4 branches missed.">            assert(_buffer_count == (_buffer_current + 1));</span>
+        }
+<span class="fc" id="L146">        return next;</span>
+    }
+
+    abstract protected UnifiedDataPageX make_page(int page_size);
+
+    protected final UnifiedDataPageX setCurrentPage(int idx, UnifiedDataPageX curr) {
+<span class="fc" id="L152">        setPage(idx, curr, true);</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        if (idx != _buffer_current) {</span>
+<span class="nc" id="L154">            _buffer_current = idx;</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">            if (idx &gt;= _buffer_count) {</span>
+<span class="nc" id="L156">                _buffer_count = idx + 1;</span>
+            }
+        }
+<span class="fc" id="L159">        UnifiedDataPageX p = _buffers[idx];</span>
+<span class="fc" id="L160">        return p;</span>
+    }
+
+    protected final void setPage(int idx, UnifiedDataPageX curr, boolean recycleOldPage)
+    {
+<span class="fc" id="L165">        int oldlen = _buffers.length;</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (idx &gt;= oldlen) {</span>
+<span class="nc" id="L167">            int newlen = oldlen * 2;</span>
+<span class="nc" id="L168">            UnifiedDataPageX[] newbuf = new UnifiedDataPageX[newlen];</span>
+<span class="nc" id="L169">            System.arraycopy(_buffers, 0, newbuf, 0, oldlen);</span>
+<span class="nc" id="L170">            _buffers = newbuf;</span>
+        }
+<span class="fc" id="L172">        UnifiedDataPageX prev = _buffers[idx];</span>
+<span class="fc" id="L173">        _buffers[idx] = curr;</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        if (idx &gt;= _buffer_count) {</span>
+<span class="fc" id="L175">            _buffer_count = idx + 1;</span>
+        }
+        // if the caller wants us to we'll hold onto this
+        // page for a bit, since it's now available
+<span class="pc bpc" id="L179" title="4 of 8 branches missed.">        if (recycleOldPage</span>
+         &amp;&amp; prev != null
+         &amp;&amp; prev != curr
+         &amp;&amp; (idx + 1) &lt; _buffers.length // it's not worth reallocating the _buffers array for this
+         ) {
+<span class="nc" id="L184">            _buffers[idx+1] = prev;</span>
+        }
+<span class="fc" id="L186">    }</span>
+
+    /**
+     * resets the buffer list to start at the current page
+     * this releases any &quot;extra&quot; pages.  This does hold
+     * on to 1 extra page, if there is one, since two pages
+     * if a common occurrence for values that cross the
+     * page boundary.
+     *
+     * when this exits there will be either just the current
+     * page in the buffer list or the current page and 1
+     * preallocated page just after it (in idx 1).
+     */
+    protected final void resetToCurrentPage()
+    {
+<span class="fc" id="L201">        int p0_idx = getCurrentPageIdx();</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">        if (p0_idx &gt; 0) {</span>
+            // this is a common &quot;do nothing&quot; case, it happens
+            // when we reset to the page and there are no saved
+            // pages - i.e. the mark is contained in curr
+<span class="nc" id="L206">            release_pages_to(p0_idx);</span>
+        }
+<span class="fc" id="L208">    }</span>
+
+    private final void release_pages_to(int p0_idx) {
+<span class="nc bnc" id="L211" title="All 4 branches missed.">        assert(p0_idx &gt; 0);</span>
+
+        // we'll try to save the now unneeded 0th empty page
+<span class="nc" id="L214">        UnifiedDataPageX empty_page = _buffers[0];</span>
+
+        // now bump all the page ptrs down to release the
+        // pages that precede the current page
+<span class="nc" id="L218">        int dst = 0;</span>
+<span class="nc" id="L219">        int src = p0_idx;</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        while (src&lt;_buffer_count) {</span>
+<span class="nc" id="L221">            _buffers[dst++] = _buffers[src++];</span>
+        }
+
+        // clear any trailing page ptrs
+<span class="nc" id="L225">        int end = _buffer_count + 1; // we may have an extra page ptr saved at buffer[count]</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        if (end &gt;= _buffers.length) {</span>
+<span class="nc" id="L227">            end = _buffers.length;</span>
+        }
+<span class="nc bnc" id="L229" title="All 2 branches missed.">        while (dst &lt; end) {</span>
+<span class="nc" id="L230">            _buffers[dst++] = null;</span>
+        }
+
+<span class="nc" id="L233">        _buffer_current -= p0_idx;</span>
+<span class="nc" id="L234">        _buffer_count -= p0_idx;</span>
+<span class="nc" id="L235">        _buffers[_buffer_count] = empty_page;</span>
+<span class="nc" id="L236">    }</span>
+
+    /**
+     * this clears all the pages out, except to save
+     * one page (unallocated)
+     *
+     */
+    protected final void clear() {
+<span class="fc" id="L244">        UnifiedDataPageX curr = getCurrentPage();</span>
+
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        for (int ii=0; ii&lt;_buffers.length; ii++) {</span>
+<span class="fc" id="L247">            _buffers[ii] = null;</span>
+        }
+
+        // curr is null when underlying stream is empty.
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        if (curr != null)</span>
+        {
+<span class="fc" id="L253">            _buffers[0] = curr;</span>
+<span class="fc" id="L254">            curr.reset(0);</span>
+        }
+
+<span class="fc" id="L257">        _buffer_count = 0;</span>
+<span class="fc" id="L258">        _buffer_current = 0;</span>
+<span class="fc" id="L259">    }</span>
+
+    static class Bytes extends UnifiedInputBufferX {
+        protected Bytes(int initialPageSize) {
+<span class="fc" id="L263">            super(initialPageSize);</span>
+<span class="fc" id="L264">        }</span>
+        protected Bytes(byte[] bytes, int offset, int length) {
+<span class="fc" id="L266">            super(length);</span>
+<span class="fc" id="L267">            _buffers[0] = new UnifiedDataPageX.Bytes(bytes, offset, length);</span>
+<span class="fc" id="L268">            _buffer_current = 0;</span>
+<span class="fc" id="L269">            _buffer_count = 1;</span>
+<span class="fc" id="L270">        }</span>
+        @Override
+<span class="nc" id="L272">        public final BufferType getType() { return BufferType.BYTES; }</span>
+
+        @Override
+        protected final UnifiedDataPageX make_page(int page_size) {
+<span class="fc" id="L276">            UnifiedDataPageX p = new UnifiedDataPageX.Bytes(page_size);</span>
+<span class="fc" id="L277">            return p;</span>
+        }
+
+        @Override
+<span class="fc" id="L281">        public final int maxValue() { return 0xff; }</span>
+
+    }
+    static class Chars extends UnifiedInputBufferX {
+        protected Chars(int initialPageSize) {
+<span class="fc" id="L286">            super(initialPageSize);</span>
+<span class="fc" id="L287">        }</span>
+        /** Retains a reference to the chars array! */
+        protected Chars(char[] chars, int offset, int length) {
+<span class="fc" id="L290">            super(offset + length);</span>
+<span class="fc" id="L291">            _buffers[0] = new UnifiedDataPageX.Chars(chars, offset, length);</span>
+<span class="fc" id="L292">            _buffer_current = 0;</span>
+<span class="fc" id="L293">            _buffer_count = 1;</span>
+
+<span class="fc" id="L295">        }</span>
+        /**
+         * Makes a copy of the {@link CharSequence}.
+         */
+        protected Chars(CharSequence chars, int offset, int length) {
+<span class="nc" id="L300">            this(chars_make_char_array(chars, offset, length), 0, length);</span>
+<span class="nc" id="L301">        }</span>
+        @Override
+<span class="nc" id="L303">        public final BufferType getType() { return BufferType.CHARS; }</span>
+
+        @Override
+        protected final UnifiedDataPageX make_page(int page_size) {
+<span class="fc" id="L307">            UnifiedDataPageX p = new UnifiedDataPageX.Chars(page_size);</span>
+<span class="fc" id="L308">            return p;</span>
+        }
+
+        @Override
+<span class="fc" id="L312">        public final int maxValue() { return 0xffff; }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

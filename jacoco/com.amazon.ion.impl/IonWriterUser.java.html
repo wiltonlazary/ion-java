@@ -1,0 +1,491 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonWriterUser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl</a> &gt; <span class="el_source">IonWriterUser.java</span></div><h1>IonWriterUser.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl;
+
+import static com.amazon.ion.SystemSymbols.ION_SYMBOL_TABLE;
+import static com.amazon.ion.SystemSymbols.ION_SYMBOL_TABLE_SID;
+
+import com.amazon.ion.IonCatalog;
+import com.amazon.ion.IonException;
+import com.amazon.ion.IonStruct;
+import com.amazon.ion.IonType;
+import com.amazon.ion.SymbolTable;
+import com.amazon.ion.SymbolToken;
+import com.amazon.ion.Timestamp;
+import com.amazon.ion.ValueFactory;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+
+/**
+ * &lt;p&gt;
+ * This writer handles the symbol table processing and
+ * provides default implementations for the list forms
+ * of the write methods as often the list form is not
+ * susceptible to optimization.
+ * &lt;/p&gt;
+ *
+ * &lt;p&gt;
+ * This writer has a ({@link #_system_writer}) to which the actual data is
+ * written, but data flows through the {@link #_current_writer} most of the
+ * time.
+ * &lt;/p&gt;
+ *
+ * &lt;p&gt;
+ * The critical responsibility here is the recognition of IVMs and local symbol
+ * tables. When the user starts writing a local symtab, the stream is diverted
+ * away from the {@link #_system_writer} into a temporary tree writer that
+ * collects the symtab data into an {@link IonStruct} instance.  When that
+ * struct is stepped-out, the diversion is stopped and the new
+ * {@link SymbolTable} is installed.
+ * &lt;/p&gt;
+ */
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">class IonWriterUser</span>
+    extends _Private_IonWriterBase
+    implements _Private_IonWriter
+{
+    /** Factory for constructing the DOM of local symtabs. Not null. */
+    private final ValueFactory _symtab_value_factory;
+
+    /** Used to make correct local symbol tables. May be null. */
+    private final IonCatalog _catalog;
+
+    /**
+     * The underlying system writer that writing the raw format (text, binary,
+     * or ion values).  Not null.
+     */
+    final IonWriterSystem _system_writer;
+
+    /**
+     * This will be either our {@link #_system_writer} or a symbol table writer
+     * depending on whether we're diverting the user values to a
+     * local symbol table ... or not.
+     * Not null.
+     */
+    IonWriterSystem _current_writer;
+
+    /**
+     * While the stream is diverted to collect local symtab data, it is
+     * being written to this instance.
+     * This is null IFF {@link #_current_writer} == {@link #_system_writer}.
+     */
+    private IonStruct _symbol_table_value;
+
+
+
+    /**
+     * Base constructor.
+     * &lt;p&gt;
+     * POSTCONDITION: {@link IonWriterUser#_system_writer} ==
+     * {@link #_current_writer} == systemWriter
+     *
+     * @param catalog may be null.
+     * @param symtabValueFactory must not be null.
+     * @param systemWriter must not be null.
+     */
+    IonWriterUser(IonCatalog catalog,
+                  ValueFactory symtabValueFactory,
+                  IonWriterSystem systemWriter)
+<span class="fc" id="L102">    {</span>
+<span class="fc" id="L103">        _symtab_value_factory = symtabValueFactory;</span>
+<span class="fc" id="L104">        _catalog = catalog;</span>
+
+<span class="pc bpc" id="L106" title="2 of 4 branches missed.">        assert systemWriter != null;</span>
+<span class="fc" id="L107">        _system_writer = systemWriter;</span>
+<span class="fc" id="L108">        _current_writer = systemWriter;</span>
+<span class="fc" id="L109">    }</span>
+
+
+    /**
+     * Constructor for text and binary writers.
+     * &lt;p&gt;
+     * POSTCONDITION: {@link IonWriterUser#_system_writer} ==
+     * {@link #_current_writer} == systemWriter
+     *
+     * @param catalog
+     *          may be null
+     * @param symtabValueFactory
+     *          must not be null
+     * @param systemWriter
+     *          must not be null
+     * @param symtab
+     *          must not be null
+     */
+    IonWriterUser(IonCatalog catalog,
+                  ValueFactory symtabValueFactory,
+                  IonWriterSystem systemWriter,
+                  SymbolTable symtab)
+    {
+<span class="fc" id="L132">        this(catalog, symtabValueFactory, systemWriter);</span>
+
+<span class="fc" id="L134">        SymbolTable defaultSystemSymtab =</span>
+<span class="fc" id="L135">            systemWriter.getDefaultSystemSymtab();</span>
+
+<span class="pc bpc" id="L137" title="1 of 4 branches missed.">        if (symtab.isLocalTable() || symtab != defaultSystemSymtab)</span>
+        {
+            try {
+<span class="fc" id="L140">                setSymbolTable(symtab);</span>
+            }
+<span class="nc" id="L142">            catch (IOException e) {</span>
+<span class="nc" id="L143">                throw new IonException(e);</span>
+<span class="fc" id="L144">            }</span>
+        }
+
+<span class="pc bpc" id="L147" title="3 of 6 branches missed.">        assert _system_writer == _current_writer &amp;&amp;</span>
+               _system_writer == systemWriter;
+<span class="fc" id="L149">    }</span>
+
+    //========================================================================
+
+    public IonCatalog getCatalog()
+    {
+<span class="fc" id="L155">        return _catalog;</span>
+    }
+
+    @Override
+    int findAnnotation(String name) {
+<span class="fc" id="L160">        return _current_writer.findAnnotation(name);</span>
+    }
+
+    @Override
+    public int getDepth()
+    {
+<span class="fc" id="L166">        return _current_writer.getDepth();</span>
+    }
+
+    public boolean isInStruct()
+    {
+<span class="fc" id="L171">        return _current_writer.isInStruct();</span>
+    }
+
+
+    public void flush() throws IOException
+    {
+<span class="fc" id="L177">        _current_writer.flush();</span>
+<span class="fc" id="L178">    }</span>
+
+    public void close() throws IOException
+    {
+        try
+        {
+            try
+            {
+<span class="fc bfc" id="L186" title="All 2 branches covered.">                if (getDepth() == 0) {</span>
+<span class="pc bpc" id="L187" title="2 of 4 branches missed.">                    assert(_current_writer == _system_writer);</span>
+<span class="fc" id="L188">                    finish();</span>
+                }
+            }
+            finally
+            {
+<span class="fc" id="L193">                _current_writer.close();</span>
+            }
+        }
+        finally
+        {
+<span class="fc" id="L198">            _system_writer.close();</span>
+        }
+<span class="fc" id="L200">    }</span>
+
+
+    public final void finish() throws IOException
+    {
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">        if (symbol_table_being_collected()) {</span>
+<span class="nc" id="L206">            throw new IllegalStateException(ERROR_FINISH_NOT_AT_TOP_LEVEL);</span>
+        }
+
+<span class="fc" id="L209">        _system_writer.finish();</span>
+<span class="fc" id="L210">    }</span>
+
+    //========================================================================
+
+    SymbolTable activeSystemSymbolTable()
+    {
+<span class="fc" id="L216">        return getSymbolTable().getSystemSymbolTable();</span>
+    }
+
+
+    private boolean symbol_table_being_collected()
+    {
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        return (_current_writer != _system_writer);</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Diverts the data stream to a temporary tree writer which collects
+     * local symtab data into an IonStruct from which we'll later construct a
+     * {@link SymbolTable} instance.
+     * &lt;/p&gt;
+     * &lt;p&gt;
+     * Once the value image of the symbol table is complete (which
+     * happens when the caller steps out of the containing struct)
+     * the diverted stream is abandonded and the symbol table gets constructed.
+     * &lt;/p&gt;
+     * &lt;p&gt;
+     * If there was a makeSymbolTable(Reader) this copy might be,
+     * at least partially, avoided.
+     * &lt;/p&gt;
+     */
+    private void open_local_symbol_table_copy()
+    {
+<span class="pc bpc" id="L243" title="2 of 4 branches missed.">        assert(! symbol_table_being_collected());</span>
+
+<span class="fc" id="L245">        _symbol_table_value = _symtab_value_factory.newEmptyStruct();</span>
+
+<span class="fc" id="L247">        SymbolToken[] anns = _system_writer.getTypeAnnotationSymbols();</span>
+<span class="fc" id="L248">        _system_writer.clearAnnotations();</span>
+
+<span class="fc" id="L250">        _symbol_table_value.setTypeAnnotationSymbols(anns);</span>
+
+<span class="fc" id="L252">        _current_writer = new IonWriterSystemTree(activeSystemSymbolTable(),</span>
+                                                  _catalog,
+                                                  _symbol_table_value,
+                                                  null /* initialIvmHandling */);
+<span class="fc" id="L256">    }</span>
+
+    /**
+     * Closes the diverted writer since the local symbol table
+     * is complete (i.e. the struct is closed, on {@link #stepOut()}).
+     */
+    private void close_local_symbol_table_copy() throws IOException
+    {
+<span class="pc bpc" id="L264" title="2 of 4 branches missed.">        assert(symbol_table_being_collected());</span>
+
+        // convert the struct we just wrote with the TreeWriter to a
+        // local symbol table
+<span class="fc" id="L268">        LocalSymbolTableAsStruct.Factory lstFactory =</span>
+<span class="fc" id="L269">            (LocalSymbolTableAsStruct.Factory)((_Private_ValueFactory)_symtab_value_factory).getLstFactory();</span>
+<span class="fc" id="L270">        SymbolTable symtab = lstFactory.newLocalSymtab(_catalog, _symbol_table_value);</span>
+
+<span class="fc" id="L272">        _symbol_table_value = null;</span>
+<span class="fc" id="L273">        _current_writer     = _system_writer;</span>
+
+        // now make this symbol table the current symbol table
+<span class="fc" id="L276">        this.setSymbolTable(symtab);</span>
+<span class="fc" id="L277">    }</span>
+
+
+    @Override
+    public final void setSymbolTable(SymbolTable symbols)
+        throws IOException
+    {
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">        if (symbols == null ||</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">            _Private_Utils.symtabIsSharedNotSystem(symbols))</span>
+        {
+<span class="nc" id="L287">            String message =</span>
+                &quot;symbol table must be local or system to be set, or reset&quot;;
+<span class="nc" id="L289">            throw new IllegalArgumentException(message);</span>
+        }
+
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">        if (getDepth() &gt; 0)</span>
+        {
+<span class="nc" id="L294">            String message =</span>
+                &quot;the symbol table cannot be set, or reset, while a container &quot; +
+                &quot;is open&quot;;
+<span class="nc" id="L297">            throw new IllegalStateException(message);</span>
+        }
+
+<span class="fc bfc" id="L300" title="All 2 branches covered.">        if (symbols.isSystemTable())</span>
+        {
+<span class="fc" id="L302">            writeIonVersionMarker(symbols);</span>
+        }
+        else
+        {
+<span class="fc" id="L306">            _system_writer.writeLocalSymtab(symbols);</span>
+        }
+<span class="fc" id="L308">    }</span>
+
+
+    public final SymbolTable getSymbolTable()
+    {
+<span class="fc" id="L313">        SymbolTable symbols = _system_writer.getSymbolTable();</span>
+<span class="fc" id="L314">        return symbols;</span>
+    }
+
+
+    @Override
+    final String assumeKnownSymbol(int sid)
+    {
+<span class="nc" id="L321">        return _system_writer.assumeKnownSymbol(sid);</span>
+    }
+
+    //========================================================================
+    // Field names
+
+
+    public final void setFieldName(String name)
+    {
+<span class="fc" id="L330">        _current_writer.setFieldName(name);</span>
+<span class="fc" id="L331">    }</span>
+
+    public final void setFieldNameSymbol(SymbolToken name)
+    {
+<span class="fc" id="L335">        _current_writer.setFieldNameSymbol(name);</span>
+<span class="fc" id="L336">    }</span>
+
+    @Override
+    public final boolean isFieldNameSet()
+    {
+<span class="fc" id="L341">        return _current_writer.isFieldNameSet();</span>
+    }
+
+
+    //========================================================================
+    // Annotations
+
+
+    public void addTypeAnnotation(String annotation)
+    {
+<span class="fc" id="L351">        _current_writer.addTypeAnnotation(annotation);</span>
+<span class="fc" id="L352">    }</span>
+
+    public void setTypeAnnotations(String... annotations)
+    {
+<span class="fc" id="L356">        _current_writer.setTypeAnnotations(annotations);</span>
+<span class="fc" id="L357">    }</span>
+
+    public void setTypeAnnotationSymbols(SymbolToken... annotations)
+    {
+<span class="fc" id="L361">        _current_writer.setTypeAnnotationSymbols(annotations);</span>
+<span class="fc" id="L362">    }</span>
+
+    @Override
+    String[] getTypeAnnotations()
+    {
+<span class="nc" id="L367">        return _current_writer.getTypeAnnotations();</span>
+    }
+
+    @Override
+    int[] getTypeAnnotationIds()
+    {
+<span class="nc" id="L373">        return _current_writer.getTypeAnnotationIds();</span>
+    }
+
+    final SymbolToken[] getTypeAnnotationSymbols()
+    {
+<span class="nc" id="L378">        return _current_writer.getTypeAnnotationSymbols();</span>
+    }
+
+    public void stepIn(IonType containerType) throws IOException
+    {
+        // see if it looks like we're starting a local symbol table
+<span class="fc bfc" id="L384" title="All 2 branches covered.">        if (containerType == IonType.STRUCT</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">            &amp;&amp; _current_writer.getDepth() == 0</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">            &amp;&amp; findAnnotation(ION_SYMBOL_TABLE) == 0)</span>
+        {
+<span class="fc" id="L388">            open_local_symbol_table_copy();</span>
+        }
+        else {
+            // if not we'll just pass the work on to whatever
+            // writer is currently in scope
+<span class="fc" id="L393">            _current_writer.stepIn(containerType);</span>
+        }
+<span class="fc" id="L395">    }</span>
+
+    public void stepOut() throws IOException
+    {
+<span class="fc bfc" id="L399" title="All 4 branches covered.">        if (symbol_table_being_collected() &amp;&amp; _current_writer.getDepth() == 1)</span>
+        {
+<span class="fc" id="L401">            close_local_symbol_table_copy();</span>
+        }
+        else {
+<span class="fc" id="L404">            _current_writer.stepOut();</span>
+        }
+<span class="fc" id="L406">    }</span>
+
+    public void writeBlob(byte[] value, int start, int len) throws IOException
+    {
+<span class="fc" id="L410">        _current_writer.writeBlob(value, start, len);</span>
+<span class="fc" id="L411">    }</span>
+
+    public void writeBool(boolean value) throws IOException
+    {
+<span class="fc" id="L415">        _current_writer.writeBool(value);</span>
+<span class="fc" id="L416">    }</span>
+
+    public void writeClob(byte[] value, int start, int len) throws IOException
+    {
+<span class="fc" id="L420">        _current_writer.writeClob(value, start, len);</span>
+<span class="fc" id="L421">    }</span>
+
+    @Override
+    public void writeDecimal(BigDecimal value) throws IOException
+    {
+<span class="fc" id="L426">        _current_writer.writeDecimal(value);</span>
+<span class="fc" id="L427">    }</span>
+
+    public void writeFloat(double value) throws IOException
+    {
+<span class="fc" id="L431">        _current_writer.writeFloat(value);</span>
+<span class="fc" id="L432">    }</span>
+
+    @SuppressWarnings(&quot;cast&quot;)
+    public void writeInt(int value) throws IOException
+    {
+<span class="nc" id="L437">        _current_writer.writeInt((long)value);</span>
+<span class="nc" id="L438">    }</span>
+
+    public void writeInt(long value) throws IOException
+    {
+<span class="fc" id="L442">        _current_writer.writeInt(value);</span>
+<span class="fc" id="L443">    }</span>
+
+    public void writeInt(BigInteger value) throws IOException
+    {
+<span class="fc" id="L447">        _current_writer.writeInt(value);</span>
+<span class="fc" id="L448">    }</span>
+
+    public void writeNull(IonType type) throws IOException
+    {
+<span class="fc" id="L452">        _current_writer.writeNull(type);</span>
+<span class="fc" id="L453">    }</span>
+
+    public void writeString(String value) throws IOException
+    {
+<span class="fc" id="L457">        _current_writer.writeString(value);</span>
+<span class="fc" id="L458">    }</span>
+
+    @Override
+    final void writeSymbol(int symbolId) throws IOException
+    {
+<span class="fc" id="L463">        _current_writer.writeSymbol(symbolId);</span>
+<span class="fc" id="L464">    }</span>
+
+    public final void writeSymbol(String value) throws IOException
+    {
+<span class="fc" id="L468">        _current_writer.writeSymbol(value);</span>
+<span class="fc" id="L469">    }</span>
+
+
+    final void writeIonVersionMarker(SymbolTable systemSymtab)
+        throws IOException
+    {
+<span class="fc" id="L475">        _current_writer.writeIonVersionMarker(systemSymtab);</span>
+<span class="fc" id="L476">    }</span>
+
+    @Override
+    public final void writeIonVersionMarker()
+        throws IOException
+    {
+<span class="fc" id="L482">        _current_writer.writeIonVersionMarker();</span>
+<span class="fc" id="L483">    }</span>
+
+
+    public void writeTimestamp(Timestamp value) throws IOException
+    {
+<span class="fc" id="L488">        _current_writer.writeTimestamp(value);</span>
+<span class="fc" id="L489">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,1779 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BlockedBuffer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl</a> &gt; <span class="el_source">BlockedBuffer.java</span></div><h1>BlockedBuffer.java</h1><pre class="source lang-java linenums">
+/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl;
+import com.amazon.ion.IonException;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.SortedSet;
+import java.util.TreeSet;
+/**
+ * This implements a blocked byte buffer and both an input and output stream
+ * that operates over it. It is designed to be able to be randomly accessed.
+ * The output steam supports both inserting data (with &quot;stretching&quot;) in the
+ * middle of the stream and over-write.  The output steam also supports remove
+ * which shrinks the overall data buffer. The underlying buffer is backed by
+ * one or more byte arrays to minimize data movement.
+ * &lt;p&gt;
+ * It is also meant to be reused, so that it does not have to pressure the
+ * GC, if that is desirable.
+ */
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">final class BlockedBuffer</span>
+{
+    ///////////////////////////////////////////////////////////////////////////////
+    //
+    // updatable, insertable, and possibly fragmented byte buffer
+    //
+    // these manage the set of memory (byte) buffers
+    ArrayList&lt;bbBlock&gt;  _blocks;
+    int                 _next_block_position;   // next position in _blocks for active block, may be less than _blocks.size()
+    int                 _lastCapacity;          // used to allocate new blocks
+    int                 _buf_limit;             // high water mark of _position
+    int                 _version;
+    int                 _mutation_version;
+    Object              _mutator;
+// BUGBUG - this is just a test, it shouldn't be in checked in code
+static final boolean test_with_no_version_checking = false;
+    void start_mutate(Object caller, int version) {
+        if (test_with_no_version_checking) return;
+<span class="pc bpc" id="L56" title="2 of 4 branches missed.">        if (_mutation_version != 0 || _mutator != null)</span>
+<span class="nc" id="L57">            throw new BlockedBufferException(&quot;lock conflict&quot;);</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (version != _version)</span>
+<span class="nc" id="L59">            throw new BlockedBufferException(&quot;version conflict on update&quot;);</span>
+<span class="fc" id="L60">        _mutator = caller;</span>
+<span class="fc" id="L61">        _mutation_version = version;</span>
+<span class="fc" id="L62">    }</span>
+    int end_mutate(Object caller) {
+        if (test_with_no_version_checking) return _version;
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (_version != _mutation_version)</span>
+<span class="nc" id="L66">            throw new BlockedBufferException(&quot;version mismatch failure&quot;);</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (caller != _mutator)</span>
+<span class="nc" id="L68">            throw new BlockedBufferException(&quot;caller mismatch failure&quot;);</span>
+<span class="fc" id="L69">        _version = _mutation_version + 1;</span>
+<span class="fc" id="L70">        _mutation_version = 0;</span>
+<span class="fc" id="L71">        _mutator = null;</span>
+<span class="fc" id="L72">        return _version;</span>
+    }
+    boolean mutation_in_progress(Object caller, int version) {
+        if (test_with_no_version_checking) return false;
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (_mutation_version != version)</span>
+<span class="nc" id="L77">            throw new BlockedBufferException(&quot;unexpected update lock conflict&quot;);</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (caller != _mutator)</span>
+<span class="nc" id="L79">            throw new BlockedBufferException(&quot;caller mismatch failure&quot;);</span>
+<span class="fc" id="L80">        return true;</span>
+    }
+    int getVersion() {
+<span class="fc" id="L83">        return _version;</span>
+    }
+<span class="fc" id="L85">    static boolean debugValidation = false;</span>
+    static int _defaultBlockSizeMin;
+    static int _defaultBlockSizeUpperLimit;
+    static {
+<span class="fc" id="L89">        resetParameters();</span>
+<span class="fc" id="L90">    }</span>
+    public static void resetParameters() {
+<span class="fc" id="L92">        debugValidation = false;</span>
+<span class="fc" id="L93">        _defaultBlockSizeMin = 4096 * 8;</span>
+<span class="fc" id="L94">        _defaultBlockSizeUpperLimit = 4096 * 8;</span>
+<span class="fc" id="L95">    }</span>
+<span class="pc" id="L96">    public int _blockSizeMin = _defaultBlockSizeMin;</span>
+<span class="pc" id="L97">    public int _blockSizeUpperLimit = _defaultBlockSizeUpperLimit;</span>
+    static void setBlockSizeParameters(int min, int max,
+                                              boolean intenseValidation) {
+<span class="nc" id="L100">        debugValidation = intenseValidation;</span>
+<span class="nc" id="L101">        setBlockSizeParameters(min, max);</span>
+<span class="nc" id="L102">    }</span>
+    public static void setBlockSizeParameters(int min, int max) {
+<span class="pc bpc" id="L104" title="2 of 4 branches missed.">        if (min &lt; 0 || max &lt; min) {</span>
+<span class="nc" id="L105">            throw new IllegalArgumentException();</span>
+        }
+<span class="fc" id="L107">        _defaultBlockSizeMin           = min;</span>
+<span class="fc" id="L108">        _defaultBlockSizeUpperLimit    = max;</span>
+<span class="fc" id="L109">        return;</span>
+    }
+    ///////////////////////////////////////////////////////////////////////////
+    /**
+     * Creates a new buffer without preallocating any space.
+     */
+<span class="fc" id="L115">    public BlockedBuffer() {</span>
+<span class="fc" id="L116">        start_mutate(this, 0);</span>
+<span class="fc" id="L117">        init(0, null);</span>
+<span class="fc" id="L118">        end_mutate(this);</span>
+<span class="fc" id="L119">    }</span>
+    /**
+     * Creates a new buffer, preallocating some initial capacity.
+     *
+     * @param initialSize the number of bytes to allocate.
+     */
+<span class="nc" id="L125">    public BlockedBuffer(int initialSize) {</span>
+<span class="nc" id="L126">        start_mutate(this, 0);</span>
+<span class="nc" id="L127">        init(initialSize, null);</span>
+<span class="nc" id="L128">        end_mutate(this);</span>
+<span class="nc" id="L129">    }</span>
+    /**
+     * Creates a new buffer, assuming ownership of given data.
+     * &lt;em&gt;This method assumes ownership of the &lt;code&gt;data&lt;/code&gt; array&lt;/em&gt;
+     * and will modify it at will.
+     *
+     * @param data the initial data to be buffered.
+     *
+     * @throws NullPointerException if buffer is null.
+     */
+<span class="nc" id="L139">    public BlockedBuffer(byte[] data) {</span>
+<span class="nc" id="L140">        start_mutate(this, 0);</span>
+<span class="nc" id="L141">        init(0, new bbBlock(data));</span>
+<span class="nc" id="L142">        _buf_limit = data.length;</span>
+<span class="nc" id="L143">        end_mutate(this);</span>
+<span class="nc" id="L144">    }</span>
+    /**
+     * Creates a new buffer containing all data remaining on an
+     * {@link InputStream}.  The stream is closed before returning.
+     *
+     * @param data must not be null.
+     *
+     * @throws IOException
+     */
+    public BlockedBuffer(InputStream data)
+        throws IOException
+<span class="nc" id="L155">    {</span>
+<span class="nc" id="L156">        IonBinary.Writer writer = new IonBinary.Writer(this);</span>
+        try {
+<span class="nc" id="L158">            writer.write(data);</span>
+        }
+        finally {
+<span class="nc" id="L161">            data.close();</span>
+        }
+<span class="nc" id="L163">    }</span>
+    /**
+     * creates a logical copy of the buffer.  This does not preserve
+     * the position state and is equivalent to constructing a new
+     * buffer from the old by getting the bytes from the original
+     * and writing them to a new buffer.
+     */
+    @Override
+    public BlockedBuffer clone()
+    {
+<span class="nc" id="L173">        BlockedBuffer clone = new BlockedBuffer(this._buf_limit);</span>
+<span class="nc" id="L174">        int end = this._buf_limit;</span>
+<span class="nc" id="L175">        bbBlock dst_block = clone._blocks.get(0);</span>
+<span class="nc" id="L176">        int dst_offset = 0;</span>
+<span class="nc" id="L177">        int dst_limit = dst_block.blockCapacity();</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        for (int ii=0; ii&lt;this._blocks.size(); ii++) {</span>
+<span class="nc" id="L179">            bbBlock src_block = this._blocks.get(ii);</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">            if (src_block._limit &lt; 1) continue; // see if there's any interesting data in this block</span>
+<span class="nc" id="L181">            int src_end = src_block._limit + src_block._offset;</span>
+<span class="nc" id="L182">            int to_copy = src_block._limit;</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">            if (to_copy &gt; dst_limit - dst_offset) {</span>
+<span class="nc" id="L184">                to_copy = dst_limit - dst_offset;</span>
+            }
+<span class="nc" id="L186">            System.arraycopy(src_block._buffer, 0, dst_block._buffer, dst_offset, to_copy);</span>
+<span class="nc" id="L187">            dst_offset += to_copy;</span>
+            // the cloned BlockedBuffer should be able to hold all the data
+            // in it's single block
+<span class="nc bnc" id="L190" title="All 4 branches missed.">            assert dst_offset &lt;= dst_limit;</span>
+            // see if we're done (and break out in that case)
+<span class="nc bnc" id="L192" title="All 2 branches missed.">            if (src_end &gt;= end) break;</span>
+        }
+<span class="nc" id="L194">        dst_block._limit = dst_offset;</span>
+<span class="nc" id="L195">        clone._buf_limit = dst_offset;</span>
+<span class="nc" id="L196">        return clone;</span>
+    }
+    /**
+     * Initializes the various members such as the block arraylist
+     * the initial block and the various values like the block size upper limit.
+     * @param initialSize or 0
+     * @param initialBlock or null
+     * @return bbBlock the initial current block
+     */
+    private bbBlock init(int initialSize, bbBlock initialBlock)
+    {
+<span class="fc" id="L207">        this._lastCapacity = BlockedBuffer._defaultBlockSizeMin;</span>
+<span class="fc" id="L208">        this._blockSizeUpperLimit = BlockedBuffer._defaultBlockSizeUpperLimit;</span>
+<span class="pc bpc" id="L209" title="3 of 4 branches missed.">        while (this._lastCapacity &lt; initialSize &amp;&amp;</span>
+               this._lastCapacity &lt; this._blockSizeUpperLimit)
+        {
+<span class="nc" id="L212">            this.nextBlockSize(this, 0);</span>
+        }
+<span class="fc" id="L214">        int count = initialSize / this._lastCapacity;</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">        if (initialBlock != null) count = 1;</span>
+<span class="fc" id="L216">        this._blocks = new ArrayList&lt;bbBlock&gt;(count);</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if (initialBlock == null) {</span>
+<span class="fc" id="L218">            initialBlock = new bbBlock(this.nextBlockSize(this, 0));</span>
+        }
+<span class="fc" id="L220">        this._blocks.add(initialBlock);</span>
+<span class="fc" id="L221">        this._next_block_position = 1;</span>
+        // create any preallocated blocks (following _next_block_position)
+        bbBlock b;
+<span class="fc" id="L224">        for (int need = initialSize - initialBlock.blockCapacity()</span>
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">           ; need &gt; 0</span>
+<span class="nc" id="L226">           ; need -= b.blockCapacity()</span>
+        ) {
+<span class="nc" id="L228">            b = new bbBlock(this.nextBlockSize(this, 0));</span>
+<span class="nc" id="L229">            b._idx = -1;</span>
+<span class="nc" id="L230">            this._blocks.add(b);</span>
+        }
+<span class="fc" id="L232">        return initialBlock;</span>
+    }
+    /**
+     * Gets the number of bytes of content in this buffer.
+     * This isn't the same as its capacity.
+     */
+    public final int size() {
+<span class="fc" id="L239">        return _buf_limit;</span>
+    }
+    /**
+     * empties the entire contents of the buffer
+     */
+    private void clear(Object caller, int version) {
+<span class="pc bpc" id="L245" title="2 of 4 branches missed.">        assert mutation_in_progress(caller, version);</span>
+<span class="fc" id="L246">        _buf_limit = 0;</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        for (int ii=0; ii&lt;_blocks.size(); ii++) {</span>
+<span class="fc" id="L248">            _blocks.get(ii).clearBlock();</span>
+            // _blocks.get(ii)._idx = -1; this is done in clearBlock()
+        }
+<span class="fc" id="L251">        bbBlock first = _blocks.get(0);</span>
+<span class="fc" id="L252">        first._idx = 0;                        // cas: 26 dec 2008</span>
+<span class="fc" id="L253">        first._offset = 0;</span>
+<span class="fc" id="L254">        first._limit = 0;</span>
+<span class="fc" id="L255">        _next_block_position = 1;</span>
+<span class="fc" id="L256">        return;</span>
+    }
+    /**
+     * treat the limit as the end of file
+     */
+    bbBlock truncate(Object caller, int version, int pos) {
+<span class="pc bpc" id="L262" title="2 of 4 branches missed.">        assert mutation_in_progress(caller, version);</span>
+<span class="pc bpc" id="L263" title="2 of 4 branches missed.">        if (0 &gt; pos || pos &gt; this._buf_limit )</span>
+<span class="nc" id="L264">            throw new IllegalArgumentException();</span>
+        // clear out all the blocks in use from the last in use
+        // to the block where the eof will be located
+<span class="fc" id="L267">        bbBlock b = null;</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">        for (int idx = this._next_block_position - 1; idx &gt;= 0; idx--) {</span>
+<span class="fc" id="L269">            b = this._blocks.get(idx);</span>
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">            if (b._offset &lt;= pos) break;</span>
+<span class="nc" id="L271">            b.clearBlock();</span>
+        }
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">        if (b == null) {</span>
+<span class="nc" id="L274">            throw new IllegalStateException(&quot;block missing at position &quot;+pos);</span>
+        }
+        // reset the next block position to account for this.
+<span class="fc" id="L277">        this._next_block_position = b._idx + 1;</span>
+        // on the block where eof is, set it's limit appropriately
+<span class="fc" id="L279">        b._limit = pos - b._offset;</span>
+        // set the overall buffer limits
+<span class="fc" id="L281">        this._buf_limit = pos;</span>
+<span class="fc" id="L282">        b = this.findBlockForRead(pos, version, b, pos);</span>
+<span class="fc" id="L283">        return b;</span>
+    }
+    private bbBlock addBlock(Object caller, int version, int idx, int offset,
+                             int needed)
+    {
+<span class="pc bpc" id="L288" title="2 of 4 branches missed.">        assert mutation_in_progress(caller, version);</span>
+<span class="fc" id="L289">        bbBlock newblock = null;</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">        for (int ii=this._next_block_position; ii &lt; this._blocks.size(); ii++)</span>
+        {
+<span class="fc" id="L292">            bbBlock tmpblock = this._blocks.get(this._next_block_position);</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">            if (tmpblock._buffer.length &gt;= needed) {</span>
+<span class="fc" id="L294">                this._blocks.remove(this._next_block_position);</span>
+<span class="fc" id="L295">                newblock = tmpblock;</span>
+<span class="fc" id="L296">                break;</span>
+            }
+        }
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        if (newblock == null) {</span>
+            // if there's nothing big enough to recycle
+            // so we have to really make more space
+<span class="fc" id="L302">            int bufcapacity = 0;</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">            if (needed &gt; _blockSizeUpperLimit) {</span>
+<span class="fc" id="L304">                bufcapacity = needed;</span>
+            }
+            else {
+<span class="fc bfc" id="L307" title="All 2 branches covered.">                while (bufcapacity &lt; needed) {</span>
+<span class="fc" id="L308">                    bufcapacity = this.nextBlockSize(caller, version);</span>
+                }
+            }
+<span class="fc" id="L311">            newblock = new bbBlock(bufcapacity);</span>
+        }
+        // if the caller didn't specify an index
+        // we'll have to find out where this goes
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">        if (idx == -1) {</span>
+<span class="nc bnc" id="L316" title="All 2 branches missed.">            for (idx = 0; idx &lt; this._next_block_position; idx++) {</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">                if (this._blocks.get(idx)._offset &lt; 0) {</span>
+<span class="nc" id="L318">                    break;</span>
+                }
+<span class="nc bnc" id="L320" title="All 2 branches missed.">                if (offset &gt;= this._blocks.get(idx)._offset) {</span>
+<span class="nc" id="L321">                    break;</span>
+                }
+            }
+        }
+        // initialize the buffer and add it to the list in the right spot
+<span class="fc" id="L326">        newblock._idx = idx;</span>
+<span class="fc" id="L327">        newblock._offset = offset;</span>
+<span class="fc" id="L328">        _blocks.add(idx, newblock);</span>
+<span class="fc" id="L329">        _next_block_position++;</span>
+        // if this isn't the last buffer, bump the idx of the trailing buffers
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">        for (int ii = idx + 1; ii &lt; _next_block_position; ii++) {</span>
+<span class="nc" id="L332">            this._blocks.get(ii)._idx = ii;</span>
+        }
+<span class="fc" id="L334">        return newblock;</span>
+    }
+    private int nextBlockSize(Object caller, int version)
+    {
+<span class="pc bpc" id="L338" title="2 of 4 branches missed.">        assert mutation_in_progress(caller, version);</span>
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">        if (_lastCapacity == 0) {</span>
+<span class="nc" id="L340">            _lastCapacity = _blockSizeMin;</span>
+        }
+<span class="fc bfc" id="L342" title="All 2 branches covered.">        else if (_lastCapacity &lt; _blockSizeUpperLimit) {</span>
+<span class="fc" id="L343">            _lastCapacity *= 2;</span>
+        }
+<span class="fc" id="L345">        return _lastCapacity;</span>
+    }
+    // starts with (pos, 0, _next_block_position) so we're really
+    // looking in blocks with indices from lo to (hi-1) inclusive
+    final bbBlock findBlockHelper(int pos, int lo, int hi)
+    {
+        bbBlock block;
+        int     ii;
+<span class="fc bfc" id="L353" title="All 2 branches covered.">        if ((hi - lo) &lt;= 3) {</span>
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">            for (ii=lo; ii&lt;hi; ii++) {</span>
+<span class="fc" id="L355">                block = this._blocks.get(ii);</span>
+<span class="fc bfc" id="L356" title="All 2 branches covered.">                if (pos &gt; block._offset + block._limit) continue;</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">                if (block.containsForRead(pos)) {</span>
+<span class="fc" id="L358">                    return block;</span>
+                }
+<span class="pc bpc" id="L360" title="1 of 2 branches missed.">                if (block._offset &gt;= pos) break;</span>
+            }
+<span class="nc" id="L362">            return this._blocks.get(ii - 1);    // this will always be &gt; 0</span>
+        }
+<span class="fc" id="L364">        int mid = (hi + lo) / 2;</span>
+<span class="fc" id="L365">        block = this._blocks.get(mid);</span>
+<span class="pc bpc" id="L366" title="2 of 4 branches missed.">        assert block != null;</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        if (block._offset &gt; pos) {</span>
+<span class="fc" id="L368">            return findBlockHelper(pos, lo, mid);</span>
+        }
+<span class="fc" id="L370">        return findBlockHelper(pos, mid, hi);</span>
+    }
+    /**
+     * find the block where this offset (newPosition) has already
+     * been written. Typically the caller will set _curr to be the
+     * returned block.
+     * @param pos global position to be read from
+     * @return curr block ready to be read from
+     */
+    bbBlock findBlockForRead(Object caller, int version, bbBlock curr, int pos)
+    {
+<span class="pc bpc" id="L381" title="3 of 6 branches missed.">        assert pos &gt;= 0 &amp;&amp; &quot;buffer positions are never negative&quot;.length() &gt; 0;</span>
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">        if (pos &gt; this._buf_limit) {</span>
+<span class="nc" id="L383">            throw new BlockedBufferException(&quot;invalid position&quot;);</span>
+        }
+<span class="pc bpc" id="L385" title="2 of 4 branches missed.">        assert _validate();</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">        if (curr != null) {</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">            if (curr.containsForRead(pos)) {</span>
+<span class="fc" id="L388">                return curr;</span>
+            }
+<span class="fc bfc" id="L390" title="All 4 branches covered.">            if (pos == this._buf_limit &amp;&amp; (pos - curr._offset) == curr._limit) {</span>
+<span class="fc" id="L391">                return curr;</span>
+            }
+        }
+<span class="fc bfc" id="L394" title="All 2 branches covered.">        boolean at_eof = (pos == this._buf_limit);</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">        if (at_eof) {</span>
+            // if this is the last block actually in use
+            // and we're looking for the eof position then
+            // we can check for the &quot;last byte not quite
+            // written yet&quot; case, which is fine
+<span class="fc" id="L400">            bbBlock block = this._blocks.get(this._next_block_position - 1);</span>
+<span class="pc bpc" id="L401" title="1 of 2 branches missed.">            if (block.containsForWrite(pos)) return block;</span>
+<span class="nc" id="L402">        }</span>
+        else {
+<span class="fc" id="L404">            bbBlock block = this.findBlockHelper(pos, 0, this._next_block_position);</span>
+<span class="fc" id="L405">            return block;</span>
+        }
+<span class="nc" id="L407">        throw new BlockedBufferException(&quot;valid position can't be found!&quot;);</span>
+    }
+        /**
+     * find the block where this offset (newPosition) should be written.
+     * typicall the caller will set _curr to be the returned block.
+     * @param pos global position to be written to
+     * @return curr block ready to be written to
+     */
+    bbBlock findBlockForWrite(Object caller, int version, bbBlock curr, int pos)
+    {
+<span class="pc bpc" id="L417" title="2 of 4 branches missed.">        assert mutation_in_progress(caller, version);</span>
+<span class="pc bpc" id="L418" title="3 of 6 branches missed.">        assert (pos &gt;= 0 &amp;&amp; &quot;invalid position, positions must be &gt;= 0&quot;.length() &gt; 0);</span>
+<span class="pc bpc" id="L419" title="1 of 2 branches missed.">        if (pos &gt; this._buf_limit + 1) {</span>
+<span class="nc" id="L420">            throw new BlockedBufferException(&quot;writes must be contiguous&quot;);</span>
+        }
+<span class="pc bpc" id="L422" title="2 of 4 branches missed.">        assert _validate();</span>
+<span class="pc bpc" id="L423" title="1 of 4 branches missed.">        if (curr != null &amp;&amp; curr.hasRoomToWrite(pos, 1) == true) {</span>
+<span class="pc bpc" id="L424" title="2 of 4 branches missed.">            if (curr._offset + curr._limit == pos &amp;&amp; curr._idx &lt; this._next_block_position) {</span>
+<span class="fc" id="L425">                bbBlock b = this._blocks.get(curr._idx + 1);</span>
+<span class="pc bpc" id="L426" title="1 of 2 branches missed.">                if (b.containsForWrite(pos)) {</span>
+<span class="fc" id="L427">                    curr = b;</span>
+                }
+            }
+<span class="fc" id="L430">            return curr;</span>
+        }
+        // we're not going to write into curr, so find out the right block
+        bbBlock block;
+<span class="fc bfc" id="L434" title="All 2 branches covered.">        if (pos == this._buf_limit) {</span>
+            // if we're at the limit the only possible (existing) block
+            // will be the very last block - shortcut to optimize append
+<span class="pc bpc" id="L437" title="2 of 4 branches missed.">            assert this._next_block_position &gt; 0;</span>
+<span class="fc" id="L438">            block = this._blocks.get(this._next_block_position - 1);</span>
+        }
+<span class="pc bpc" id="L440" title="2 of 4 branches missed.">        else if (curr != null &amp;&amp; pos == curr._offset + curr._limit) {</span>
+            // if our current position is exactly at the end (and we already know
+            // we can't write into this block if we can write at all we'll have
+            // to write into the next block (inner blocks can't be 0 bytes long)
+<span class="fc" id="L444">            block = this._blocks.get(curr._idx + 1);</span>
+        }
+        else {
+            // since we're not at the limit and we don't have a current block
+            // we'll go find the block in the list (this is an abnormal case)
+            // since append if usual for writing
+<span class="nc" id="L450">            block = findBlockHelper(pos, 0, this._next_block_position);</span>
+        }
+<span class="pc bpc" id="L452" title="2 of 4 branches missed.">        assert block != null;</span>
+<span class="pc bpc" id="L453" title="2 of 4 branches missed.">        assert block.containsForWrite(pos);</span>
+        // chech our candidate block to see if it's the one we'd write into
+<span class="fc bfc" id="L455" title="All 2 branches covered.">        if (block.hasRoomToWrite(pos, 1)) {</span>
+<span class="fc" id="L456">            return block;</span>
+        }
+        // at this point, we can't use _curr in any event so we can just
+        // move on to the next block since findHelper will have returned
+        // either the right block (which it didn't) or the one just in
+        // front of the right block - so let's see if there is an allocated
+        // block just following this
+<span class="pc bpc" id="L463" title="1 of 2 branches missed.">        if (block._idx &lt; this._next_block_position - 1) {</span>
+<span class="nc" id="L464">            block = this._blocks.get(block._idx + 1);</span>
+<span class="nc" id="L465">            return block;</span>
+        }
+        // there wasn't a following block (actually a common case when
+        // you're appending) so we have to go ahead an actually add a new block
+<span class="fc" id="L469">        int newIdx = block._idx + 1;</span>
+<span class="pc bpc" id="L470" title="2 of 4 branches missed.">        assert newIdx == this._next_block_position;</span>
+<span class="fc" id="L471">        bbBlock ret =  this.addBlock(caller</span>
+                            ,version
+                            ,newIdx
+                            ,pos
+<span class="fc" id="L475">                            ,this.nextBlockSize(caller, version)</span>
+               );
+<span class="fc" id="L477">        return ret;</span>
+    }
+    /**
+     * dispatcher for the various forms of insert we encounter
+     * calls one of the four helpers depending on the case
+     * that is needed to inser here
+     * @param len number of bytes to make space for
+     * @return int number of bytes inserted
+     */
+    int insert(Object caller, int version, bbBlock curr, int pos, int len)
+    {
+<span class="pc bpc" id="L488" title="2 of 4 branches missed.">        assert mutation_in_progress(caller, version);</span>
+        // DEBUG: int amountMoved = 0;
+        // DEBUG: int before = this._buf_limit;
+        // DEBUG: assert _validate();
+        // if there's room in the current block - just
+        // move the &quot;trailing&quot; bytes down and we're done
+<span class="fc" id="L494">        int neededSpace = len - curr.unusedBlockCapacity();</span>
+<span class="fc bfc" id="L495" title="All 2 branches covered.">        if (neededSpace &lt;= 0) {</span>
+            // we have all the space we need in the current block
+            // DEBUG: amountMoved =
+<span class="fc" id="L498">            insertInCurrOnly(caller, version, curr, pos, len);</span>
+        }
+        else {
+            // we'll need at least some additional space beyond the curr
+            // block, see if there's room in the
+            // next one, otherwise we'll make more (blocks)
+<span class="fc" id="L504">            bbBlock next = null;</span>
+<span class="fc bfc" id="L505" title="All 2 branches covered.">            if (curr._idx &lt; this._next_block_position - 1) {</span>
+                // if there is another block
+<span class="fc" id="L507">                next = this._blocks.get(curr._idx + 1);</span>
+            }
+<span class="fc bfc" id="L509" title="All 2 branches covered.">            if (next != null &amp;&amp;</span>
+<span class="fc bfc" id="L510" title="All 2 branches covered.">                (neededSpace &lt;= next.unusedBlockCapacity())</span>
+            ) {
+                // with the addition of the free space in the following block we have enough
+                // DEBUG: amountMoved =
+<span class="fc" id="L514">                insertInCurrAndNext(caller, version, curr, pos, len, next);</span>
+            }
+            else {
+                // we'll have to make one or more new blocks
+                // first figure out much will be in the first
+                // and last blocks (i.e. ignoring the whole
+                // blocks
+<span class="fc" id="L521">                int lenNeededInLastAddedBlock = neededSpace % _blockSizeUpperLimit;</span>
+<span class="fc" id="L522">                int tailLen = curr.bytesAvailableToRead(pos);</span>
+<span class="fc bfc" id="L523" title="All 2 branches covered.">                if (lenNeededInLastAddedBlock &lt; tailLen) lenNeededInLastAddedBlock = tailLen;</span>
+<span class="pc bpc" id="L524" title="1 of 4 branches missed.">                if (lenNeededInLastAddedBlock &lt; neededSpace</span>
+                 &amp;&amp; neededSpace &lt; this._blockSizeUpperLimit) {
+                    // if we need less than the largest block then we should
+                    // make *one* block with all of the needed space
+<span class="nc" id="L528">                    lenNeededInLastAddedBlock = neededSpace;</span>
+                }
+<span class="fc" id="L530">                bbBlock newblock = insertMakeNewTailBlock(caller, version, curr, lenNeededInLastAddedBlock);</span>
+                // now see if the curr block and this newblock have enough
+                // available space to do the job, and if there's some trailing
+                // data from curr that will end up staying in curr
+<span class="fc" id="L534">                if (len &lt;= (curr.unusedBlockCapacity()</span>
+<span class="fc bfc" id="L535" title="All 2 branches covered.">                           + newblock.unusedBlockCapacity())</span>
+                ) {
+                    // insert this as a zero length block immediately  after _curr
+                    // insertBlock also adjusts the trailing blocks idx values
+<span class="fc" id="L539">                    insertBlock(newblock);</span>
+                    // now pretend we just have the &quot;push into the next block&quot; case
+                    // DEBUG: amountMoved =
+<span class="fc" id="L542">                    insertInCurrAndNext(caller, version, curr, pos, len, newblock);</span>
+                }
+                else {
+                    // and last we have the case of having to insert more than 1 block
+                    // which means all of the trailing bytes in _curr move into the last
+                    // block
+                    // DEBUG: amountMoved =
+<span class="fc" id="L549">                    insertAsManyBlocksAsNeeded(caller, version, curr, pos, len, newblock);</span>
+                }
+            }
+        }
+        // DEBUG: if (this._buf_limit - before != len
+        // DEBUG: || amountMoved != len) {
+        // DEBUG: throw new BlockedBufferException(&quot;insert went wrong #1 !!!&quot;);
+        // DEBUG: }
+<span class="pc bpc" id="L557" title="2 of 4 branches missed.">        assert _validate();</span>
+<span class="fc" id="L558">        return len;</span>
+    }
+    /**
+     *  this handles insert when there's enough room in the
+     *  current block
+     */
+    private int insertInCurrOnly(Object caller, int version, bbBlock curr, int pos, int len)
+    {
+<span class="pc bpc" id="L566" title="2 of 4 branches missed.">        assert mutation_in_progress(caller, version);</span>
+        // the space we need is available right in the block
+<span class="pc bpc" id="L568" title="2 of 4 branches missed.">        assert curr.unusedBlockCapacity() &gt;= len;</span>
+<span class="fc" id="L569">        System.arraycopy(curr._buffer, curr.blockOffsetFromAbsolute(pos)</span>
+<span class="fc" id="L570">                         ,curr._buffer, curr.blockOffsetFromAbsolute(pos) + len, curr.bytesAvailableToRead(pos));</span>
+<span class="fc" id="L571">        curr._limit += len;</span>
+<span class="fc" id="L572">        this.adjustOffsets(curr._idx, len, 0);</span>
+<span class="fc" id="L573">        notifyInsert(pos, len);</span>
+<span class="fc" id="L574">        return len;</span>
+    }
+    private int insertInCurrAndNext(Object caller, int version, bbBlock curr, int pos, int len, bbBlock next)
+    {
+<span class="pc bpc" id="L578" title="2 of 4 branches missed.">        assert mutation_in_progress(caller, version);</span>
+        // DEBUG: int amountMoved = 0;
+        // all the space we need (len) fits in these two blocks
+<span class="pc bpc" id="L581" title="2 of 4 branches missed.">        assert curr.unusedBlockCapacity() + next.unusedBlockCapacity() &gt;= len;</span>
+        // and we need to use space in both of these blocks
+<span class="pc bpc" id="L583" title="2 of 4 branches missed.">        assert curr.unusedBlockCapacity() &lt; len;</span>
+<span class="fc" id="L584">        int availableToRead = curr.bytesAvailableToRead(pos);</span>
+<span class="fc" id="L585">        int tailInCurr = availableToRead;</span>
+<span class="fc" id="L586">        int deltaOfNextData = len - curr.unusedBlockCapacity();</span>
+<span class="fc" id="L587">        int tailCopiedToNext = deltaOfNextData;</span>
+<span class="fc bfc" id="L588" title="All 2 branches covered.">        if (tailCopiedToNext &gt; availableToRead) {</span>
+<span class="fc" id="L589">            tailCopiedToNext = availableToRead;</span>
+        }
+        // first we copy the data in the next block down to make room
+        // for data we're pushing off the end of the _curr block
+        // if we need to, there may not be any data in the next block
+<span class="fc bfc" id="L594" title="All 2 branches covered.">        if (next._limit &gt; 0) {</span>
+<span class="fc" id="L595">            System.arraycopy(next._buffer, 0, next._buffer, deltaOfNextData, next._limit);</span>
+        }
+<span class="fc" id="L597">        next._limit += deltaOfNextData;</span>
+        // DEBUG: amountMoved += deltaOfNextData;
+        // next we copy the data from the tail of _curr into the front of next
+        // since we don't have room for it any longer in the _curr block
+        // but it is possible that there is not tail at all (pos == limit)
+<span class="pc bpc" id="L602" title="1 of 2 branches missed.">        if (tailCopiedToNext &gt; 0) {</span>
+<span class="fc" id="L603">            System.arraycopy(curr._buffer, curr._limit - tailCopiedToNext</span>
+                            , next._buffer, deltaOfNextData - tailCopiedToNext, tailCopiedToNext);
+        }
+        // finally if there's any tail left in the _curr block we copy that
+        // down to the end of the _curr block (if all of the tail moved into
+        // the next block nothing happens here
+<span class="fc" id="L609">        int leftInCurr = tailInCurr - tailCopiedToNext;</span>
+<span class="fc bfc" id="L610" title="All 2 branches covered.">        if (leftInCurr &gt; 0) {</span>
+<span class="fc" id="L611">            int blockPosition = curr.blockOffsetFromAbsolute(pos);</span>
+<span class="fc" id="L612">            System.arraycopy(curr._buffer, blockPosition</span>
+                            ,curr._buffer, blockPosition + len, leftInCurr);
+        }
+        // finally if we reused from space in _curr (between _limit and the unreserved capacity)
+        // we adjust for that as well as the space adjusted in the newblock
+<span class="fc" id="L617">        int addedInCurr = curr.unusedBlockCapacity();</span>
+<span class="fc bfc" id="L618" title="All 2 branches covered.">        if (addedInCurr &gt; 0) {</span>
+<span class="fc" id="L619">            curr._limit += addedInCurr;</span>
+            // DEBUG: amountMoved += addedInCurr;
+<span class="fc" id="L621">            next._offset += addedInCurr;</span>
+        }
+<span class="pc bpc" id="L623" title="2 of 4 branches missed.">        assert (curr.blockOffsetFromAbsolute(pos) + tailCopiedToNext + addedInCurr + leftInCurr) == curr._limit;</span>
+<span class="fc" id="L624">        this.adjustOffsets(next._idx, len, 0);</span>
+<span class="fc" id="L625">        notifyInsert(pos, len);</span>
+        // DEBUG: if (amountMoved != len) {
+        // DEBUG: throw new BlockedBufferException(&quot;insert went wrong #4 !!!&quot;);
+        // DEBUG: }
+<span class="fc" id="L629">        return len;</span>
+    }
+    private bbBlock insertMakeNewTailBlock(Object caller, int version, bbBlock curr, int minimumBlockSize)
+    {
+<span class="pc bpc" id="L633" title="2 of 4 branches missed.">        assert mutation_in_progress(caller, version);</span>
+        // needed is the amount of data we'll put into the
+        // final added block (which is actually added first)
+<span class="fc" id="L636">        int newblocksize = minimumBlockSize;</span>
+<span class="fc bfc" id="L637" title="All 2 branches covered.">        if (newblocksize &lt; _blockSizeUpperLimit) {</span>
+            // if we don't need an oversize block then find a block
+            // size that will be big enough
+<span class="pc bpc" id="L640" title="1 of 2 branches missed.">            while ((newblocksize = this.nextBlockSize(caller, version)) &lt; minimumBlockSize) {</span>
+                // bump up requested block capacity until we get
+                // at least enough to hold the request, or we
+                // hit the max blocksize whichever comes first
+            }
+        }
+        // allocate and initialize a new block that will be the
+        // tail of our interesting blocks
+<span class="fc" id="L648">        bbBlock newblock = new bbBlock(newblocksize);</span>
+<span class="fc" id="L649">        newblock._idx = curr._idx + 1;</span>
+<span class="fc" id="L650">        newblock._offset = curr._offset + curr._limit; // we'll adjust this later like any existing block</span>
+<span class="fc" id="L651">        return newblock;</span>
+    }
+    private int insertAsManyBlocksAsNeeded(Object caller, int version, bbBlock curr, int pos, int len, bbBlock newLastBlock)
+    {
+<span class="pc bpc" id="L655" title="2 of 4 branches missed.">        assert mutation_in_progress(caller, version);</span>
+        // DEBUG: int amountAllocated = 0;
+        // DEBUG: int origPos = this._buf_position;
+        // this is the case where the old tail is pushed entirely out of the
+        // old block into a new trailing block and then as many whole new
+        // blocks as needed (which maybe none) are inserted between these two
+<span class="fc" id="L661">        bbBlock oldCurr = curr;</span>
+<span class="fc" id="L662">        int   oldPosition = curr.blockOffsetFromAbsolute(pos);</span>
+<span class="fc" id="L663">        int   oldBlockTail = curr._limit - oldPosition;</span>
+<span class="fc" id="L664">        int   newSpaceInCurr = curr.unusedBlockCapacity();</span>
+        // adjust the curr blocks limit
+<span class="fc" id="L666">        curr._limit += newSpaceInCurr;</span>
+        // DEBUG: amountAllocated += newSpaceInCurr;
+<span class="fc" id="L668">        int   newoffset = curr._offset + curr._limit;</span>
+<span class="fc" id="L669">        int   spaceNeededInMiddle = len - newSpaceInCurr - newLastBlock._buffer.length;</span>
+<span class="fc" id="L670">        int   addedblocks = 0;</span>
+<span class="fc" id="L671">        bbBlock newblock = null;</span>
+<span class="pc bpc" id="L672" title="2 of 4 branches missed.">        assert (spaceNeededInMiddle &gt; 0);  // this is the &quot;as many as needed&quot; case not &quot;this and next&quot;</span>
+        // add blocks until we're ready for the last block
+<span class="fc bfc" id="L674" title="All 2 branches covered.">        while (spaceNeededInMiddle &gt; 0) {</span>
+<span class="fc" id="L675">            addedblocks++;</span>
+<span class="fc" id="L676">            newblock = new bbBlock(this.nextBlockSize(caller, version));</span>
+<span class="fc" id="L677">            newblock._limit = newblock._buffer.length;</span>
+<span class="fc bfc" id="L678" title="All 2 branches covered.">            if (newblock._limit &gt; spaceNeededInMiddle) newblock._limit = spaceNeededInMiddle;</span>
+            // DEBUG: amountAllocated += newblock._limit;
+<span class="fc" id="L680">            newblock._idx = curr._idx + addedblocks;</span>
+<span class="fc" id="L681">            newblock._offset = newoffset;</span>
+<span class="fc" id="L682">            this._blocks.add(newblock._idx, newblock);</span>
+<span class="fc" id="L683">            spaceNeededInMiddle -= newblock._limit;</span>
+<span class="fc" id="L684">            newoffset += newblock._limit;</span>
+        }
+        // add the last block
+<span class="fc" id="L687">        addedblocks++;</span>
+<span class="fc" id="L688">        newblock = newLastBlock;</span>
+<span class="fc" id="L689">        newblock._limit = newblock._buffer.length;</span>
+        // DEBUG: amountAllocated += newblock._limit;
+<span class="fc" id="L691">        newblock._idx = curr._idx + addedblocks;</span>
+<span class="fc" id="L692">        newblock._offset = newoffset;</span>
+<span class="fc" id="L693">        this._blocks.add(newblock._idx, newblock);</span>
+        // DEBUG: assert (amountAllocated == len);
+        // now adjust the trailing blocks
+<span class="fc" id="L696">        adjustOffsets(newblock._idx, len, addedblocks);</span>
+<span class="fc" id="L697">        notifyInsert(pos, len);</span>
+        // now we copy the tail of the _curr block to the end of the space
+        // note that this only works because the tail is being copied to
+        // an altogether different block in the buffer, so it can't overlap
+<span class="pc bpc" id="L701" title="1 of 2 branches missed.">        if (oldBlockTail &gt; 0) {</span>
+<span class="fc" id="L702">            System.arraycopy(oldCurr._buffer, oldPosition, newLastBlock._buffer, newLastBlock._limit - oldBlockTail, oldBlockTail);</span>
+        }
+        // DEBUG: assert this.position() == origPos;
+        // DEBUG: assert (amountAllocated == len);
+<span class="fc" id="L706">        return len;</span>
+    }
+    private void insertBlock(bbBlock newblock) {
+        // in both cases we need to insert the new block after _curr
+        // and adjust the idx values to go with that
+<span class="fc" id="L711">        this._blocks.add(newblock._idx, newblock);</span>
+<span class="fc" id="L712">        _next_block_position++;</span>
+<span class="fc bfc" id="L713" title="All 2 branches covered.">        for (int ii=newblock._idx + 1; ii &lt; this._next_block_position; ii++) {</span>
+<span class="fc" id="L714">            this._blocks.get(ii)._idx++;</span>
+        }
+<span class="fc" id="L716">    }</span>
+    private void adjustOffsets(int lastidx, int addedBytes, int addedBlocks) {
+        bbBlock b;
+        // now we adjust the trailing offsets
+<span class="pc bpc" id="L720" title="3 of 4 branches missed.">        if (addedBytes != 0 || addedBlocks != 0) {</span>
+<span class="fc" id="L721">            this._next_block_position += addedBlocks;</span>
+<span class="fc bfc" id="L722" title="All 2 branches covered.">            for (int ii=lastidx + 1; ii &lt; this._next_block_position; ii++) {</span>
+<span class="fc" id="L723">                b = this._blocks.get(ii);</span>
+<span class="fc" id="L724">                b._offset += addedBytes;</span>
+<span class="fc" id="L725">                b._idx += addedBlocks;</span>
+            }
+<span class="fc" id="L727">            this._buf_limit += addedBytes;</span>
+        }
+<span class="fc" id="L729">    }</span>
+    bbBlock remove(Object caller, int version, bbBlock curr, int pos, int len)
+    {
+<span class="pc bpc" id="L732" title="2 of 4 branches missed.">        assert mutation_in_progress(caller, version);</span>
+<span class="pc bpc" id="L733" title="1 of 2 branches missed.">        if (len == 0) return curr;</span>
+<span class="pc bpc" id="L734" title="2 of 4 branches missed.">        if (len &lt; 0 || (pos + len) &gt; this._buf_limit) {</span>
+<span class="nc" id="L735">            throw new IllegalArgumentException();</span>
+        }
+<span class="fc" id="L737">        int     amountToRemove = len;</span>
+<span class="fc" id="L738">        int     removedBlocks = 0;</span>
+<span class="fc" id="L739">        int     startingIdx = curr._idx;</span>
+<span class="fc" id="L740">        int     currIdx = curr._idx;</span>
+<span class="fc" id="L741">        bbBlock currBlock = curr;</span>
+<span class="pc bpc" id="L742" title="2 of 4 branches missed.">        assert (curr._offset &lt;= pos);</span>
+<span class="pc bpc" id="L743" title="2 of 4 branches missed.">        assert (pos - curr._offset &lt;= curr._limit);</span>
+<span class="pc bpc" id="L744" title="2 of 4 branches missed.">        assert _validate();</span>
+        // this is to simply eliminate a big edge case
+<span class="pc bpc" id="L746" title="1 of 4 branches missed.">        if (pos == 0 &amp;&amp; len == this._buf_limit) {</span>
+<span class="fc" id="L747">            this.clear(caller, version);</span>
+<span class="fc" id="L748">            notifyRemove(0, len);</span>
+<span class="fc" id="L749">            return null;</span>
+        }
+        // remove from the initial block
+<span class="fc" id="L752">        int currBlockPosition = currBlock.blockOffsetFromAbsolute(pos);</span>
+<span class="fc" id="L753">        int removedFromThisBlock = currBlock._limit - currBlockPosition;</span>
+<span class="fc bfc" id="L754" title="All 2 branches covered.">        if (removedFromThisBlock &gt; amountToRemove) removedFromThisBlock = amountToRemove;</span>
+<span class="pc bpc" id="L755" title="1 of 2 branches missed.">        if (removedFromThisBlock == currBlock._limit) {</span>
+            // we'll be removing the whole block in the whole block loop below
+<span class="nc" id="L757">            startingIdx--;  // so we have to back up on to fix the next block that will</span>
+                            // &quot;fall&quot; down into the soon to be emptied slot here
+        }
+        else {
+            // we always copy into position, and we copy whatever is still
+            // left in the end of the block
+<span class="fc" id="L763">            int moveAmount = currBlock._limit - currBlockPosition - removedFromThisBlock;</span>
+<span class="fc bfc" id="L764" title="All 2 branches covered.">            if (moveAmount &gt; 0) {</span>
+<span class="fc" id="L765">                System.arraycopy(currBlock._buffer, currBlock._limit - moveAmount</span>
+                                ,currBlock._buffer, currBlockPosition, moveAmount);
+            }
+<span class="fc" id="L768">            amountToRemove -= removedFromThisBlock;</span>
+<span class="fc" id="L769">            currBlock._limit -= removedFromThisBlock;</span>
+<span class="fc bfc" id="L770" title="All 2 branches covered.">            if (amountToRemove &gt; 0) {</span>
+                // when we're on the last block, there'll be nothing to remove,
+                // and no block to get either
+<span class="fc" id="L773">                currIdx = currBlock._idx + 1;</span>
+<span class="fc" id="L774">                currBlock = this._blocks.get(currIdx);</span>
+            }
+        }
+<span class="fc bfc" id="L777" title="All 4 branches covered.">        while (amountToRemove &gt; 0 &amp;&amp; amountToRemove &gt;= currBlock._limit) {</span>
+<span class="fc" id="L778">            amountToRemove -= currBlock._limit;</span>
+            // remove the whole block - so first hang onto a reference
+<span class="fc" id="L780">            bbBlock temp = currBlock;</span>
+<span class="fc" id="L781">            this._blocks.remove(currIdx);</span>
+<span class="fc" id="L782">            removedBlocks++;</span>
+<span class="fc" id="L783">            temp.clearBlock();</span>
+<span class="fc" id="L784">            this._blocks.add(temp); // dump it at the end (marked as not in use)</span>
+            // and we don't move currIdx because we bumped it out of the whole array
+<span class="pc bpc" id="L786" title="1 of 2 branches missed.">            if (currIdx &lt; this._next_block_position - removedBlocks) {</span>
+<span class="fc" id="L787">                currBlock = this._blocks.get(currIdx);</span>
+            }
+<span class="nc bnc" id="L789" title="All 2 branches missed.">            else if (currIdx &gt; 0) {</span>
+<span class="nc" id="L790">                currIdx--;</span>
+<span class="nc" id="L791">                currBlock = this._blocks.get(currIdx);</span>
+            }
+            else {
+<span class="nc" id="L794">                throw new BlockedBufferException(&quot;fatal - no current block!&quot;);</span>
+            }
+<span class="fc" id="L796">        }</span>
+<span class="fc bfc" id="L797" title="All 2 branches covered.">        if (amountToRemove &gt; 0) {</span>
+<span class="pc bpc" id="L798" title="2 of 4 branches missed.">            assert amountToRemove &lt; currBlock._limit;</span>
+<span class="fc" id="L799">            System.arraycopy(currBlock._buffer, amountToRemove</span>
+                            ,currBlock._buffer, 0, currBlock._limit - amountToRemove);
+<span class="pc bpc" id="L801" title="2 of 4 branches missed.">            assert amountToRemove &lt; currBlock._limit;</span>
+<span class="fc" id="L802">            currBlock._limit -= amountToRemove;</span>
+<span class="fc" id="L803">            currBlock._offset += amountToRemove;</span>
+        }
+        // we'll even adjust the offset of the first block (if it's the last as well)
+<span class="fc" id="L806">        adjustOffsets(startingIdx, -len, -removedBlocks);</span>
+<span class="fc" id="L807">        notifyRemove(pos, len);</span>
+        // DEBUG: int shouldBe = 0;
+        // DEBUG: int is = currBlock._offset;
+        // DEBUG: if (currBlock._idx &gt; 0) {
+        // DEBUG:     shouldBe = this._blocks.get(currBlock._idx - 1)._offset + this._blocks.get(currBlock._idx - 1)._limit;
+        // DEBUG:     if (currIdx != startingIdx) assert (shouldBe == this._buf_position);
+        // DEBUG: }
+        // DEBUG: int delta = shouldBe - is;
+        // DEBUG: assert(delta == 0);
+<span class="pc bpc" id="L816" title="2 of 4 branches missed.">        assert _validate();</span>
+<span class="fc" id="L817">        return currBlock;</span>
+    }
+    static int _validate_count;
+    public boolean _validate() {
+<span class="fc" id="L821">        int pos = 0;</span>
+        int idx;
+<span class="fc" id="L823">        boolean err = false;</span>
+<span class="fc" id="L824">        _validate_count++;</span>
+<span class="fc bfc" id="L825" title="All 2 branches covered.">        if ((_validate_count % 128) != 0) return true;</span>
+        // you can change the 0 below (in from of the -2) to be the validation counter
+        // which reported the failure and the test will be true when _validate() is
+        // called on the last GOOD check.
+<span class="pc bpc" id="L829" title="1 of 2 branches missed.">        if (_validate_count == 30 -2) {</span>
+            // used to set breakpoints on particular calls for validation
+<span class="nc bnc" id="L831" title="All 2 branches missed.">            err = (_validate_count &lt; 0);</span>
+        }
+<span class="fc bfc" id="L833" title="All 2 branches covered.">        for (idx=0; idx&lt;this._blocks.size(); idx++) {</span>
+<span class="fc" id="L834">            bbBlock b = this._blocks.get(idx);</span>
+<span class="fc bfc" id="L835" title="All 2 branches covered.">            if (b._idx == -1) break;</span>
+<span class="pc bpc" id="L836" title="1 of 2 branches missed.">            if (b._idx != idx) {</span>
+<span class="nc" id="L837">                System.out.println(&quot;block &quot;+idx+&quot;: index is wrong&quot; +</span>
+                                   &quot;, it is &quot;+b._idx+
+                                   &quot; it should be &quot;+idx);
+<span class="nc" id="L840">                err = true;</span>
+            }
+<span class="pc bpc" id="L842" title="1 of 2 branches missed.">            if (b._offset != pos) {</span>
+<span class="nc" id="L843">                System.out.println(&quot;block &quot;+idx+&quot;: starting offset is wrong&quot;+</span>
+                                   &quot;, it is &quot;+b._offset+
+                                   &quot; should be &quot;+pos);
+<span class="nc" id="L846">                err = true;</span>
+            }
+            // else because there's no point in using a bad reserved value to check the limit
+<span class="pc bpc" id="L849" title="2 of 4 branches missed.">            else if (b._limit &lt; 0 || b._limit &gt; b._buffer.length /* - b._reserved */ ) {</span>
+<span class="nc" id="L850">                System.out.println(&quot;block &quot;+idx+&quot;: &quot;+</span>
+                                   &quot;limit is out of range&quot;+
+                                   &quot;, it is &quot;+b._limit+
+                                   &quot; should be between 0 and &quot;+ (b._buffer.length /* - b._reserved */));
+<span class="nc" id="L854">                err = true;</span>
+            }
+<span class="fc bfc" id="L856" title="All 2 branches covered.">            else if (b._limit == 0) {</span>
+<span class="pc bpc" id="L857" title="2 of 4 branches missed.">                if ( ! (b._idx == (this._next_block_position - 1)</span>
+                     &amp;&amp; b._offset == this._buf_limit)
+                ) {
+<span class="nc" id="L860">                    System.out.println(&quot;block &quot;+idx+&quot;: &quot;+</span>
+                                       &quot;has a ZERO limit&quot;);
+<span class="nc" id="L862">                    err = true;</span>
+                }
+            }
+<span class="fc" id="L865">            pos += b._limit;</span>
+        }
+<span class="pc bpc" id="L867" title="1 of 2 branches missed.">        if (idx != this._next_block_position) {</span>
+<span class="nc" id="L868">            System.out.println(&quot;next block position is wrong, is &quot;+this._next_block_position+&quot; should be &quot;+idx);</span>
+<span class="nc" id="L869">            err = true;</span>
+        }
+<span class="fc bfc" id="L871" title="All 2 branches covered.">        for (idx++; idx&lt;this._blocks.size(); idx++) {</span>
+<span class="fc" id="L872">            bbBlock b = this._blocks.get(idx);</span>
+<span class="pc bpc" id="L873" title="1 of 2 branches missed.">            if (b._offset != -1) {</span>
+<span class="nc" id="L874">                System.out.println(&quot;block &quot;+idx+&quot;: (in freed range) has non -1 offset, offset is &quot;+b._offset);</span>
+<span class="nc" id="L875">                err = true;</span>
+            }
+        }
+<span class="pc bpc" id="L878" title="1 of 2 branches missed.">        if (pos != this._buf_limit) {</span>
+<span class="nc" id="L879">            System.out.println(&quot;buffer _buf_limit: &quot;+</span>
+                               &quot;limit is incorrect&quot;+
+                               &quot;, it is &quot;+this._buf_limit+
+                               &quot; should be &quot;+ pos);
+<span class="nc" id="L883">            err = true;</span>
+        }
+<span class="pc bpc" id="L885" title="1 of 2 branches missed.">        if (this._next_block_position &gt; 0) {</span>
+<span class="fc" id="L886">            bbBlock last = this._blocks.get(this._next_block_position - 1);</span>
+<span class="pc bpc" id="L887" title="1 of 2 branches missed.">            if (last._offset + last._limit != this._buf_limit){</span>
+<span class="nc" id="L888">                System.out.println(&quot;last block &quot;+last._idx+&quot; limit isn't &quot;+</span>
+                                   &quot;_buf_limit (&quot;+this._buf_limit+&quot;): &quot;+
+                                   &quot; calc'd last block limit is &quot;
+                                   +       last._offset +&quot; + &quot;+ last._limit
+                                   +&quot; = &quot;+(last._offset + last._limit)
+                                   );
+<span class="nc" id="L894">                err = true;</span>
+            }
+        }
+<span class="pc bpc" id="L897" title="2 of 6 branches missed.">        if (this._buf_limit &lt; 0 || (this._buf_limit &gt; 0 &amp;&amp; this._next_block_position &lt; 1)){</span>
+<span class="nc" id="L898">            System.out.println(&quot;this._buf_limit &quot;+ this._buf_limit+ &quot; is invalid&quot;);</span>
+<span class="nc" id="L899">            err = true;</span>
+        }
+<span class="pc bpc" id="L901" title="1 of 2 branches missed.">        if (err == true) {</span>
+<span class="nc" id="L902">            System.out.println(&quot;failed with validation count = &quot; + _validate_count);</span>
+        }
+<span class="pc bpc" id="L904" title="1 of 2 branches missed.">        return err == false;  // validate is true if all is ok so that assert _validate(); works as expected</span>
+    }
+<span class="pc bpc" id="L906" title="1 of 2 branches missed.">    final static class bbBlock {</span>
+        public int     _idx;
+        public int     _offset;
+        public int     _limit;
+        public byte[]  _buffer;
+<span class="fc" id="L911">        public bbBlock(int capacity) {</span>
+<span class="fc" id="L912">            _buffer = new byte[capacity];</span>
+<span class="fc" id="L913">        }</span>
+        /**
+         * Assumes ownership of an array to create a new block.  The data
+         * within the buffer is maintained.
+         *
+         * @param buffer contains the data for the block.
+         *
+         * @throws NullPointerException if buffer is null.
+         */
+<span class="nc" id="L922">        bbBlock(byte[] buffer) {</span>
+<span class="nc" id="L923">            _buffer = buffer;</span>
+<span class="nc" id="L924">            _limit = buffer.length;</span>
+<span class="nc" id="L925">        }</span>
+        public bbBlock clearBlock() {
+<span class="fc" id="L927">            _idx = -1;</span>
+<span class="fc" id="L928">            _offset = -1;</span>
+<span class="fc" id="L929">            _limit = 0;</span>
+<span class="fc" id="L930">            return this;</span>
+        }
+        /**
+         * maximimum number of bytes that can be held in this block.
+         */
+        final int blockCapacity() {
+<span class="pc bpc" id="L936" title="2 of 4 branches missed.">            assert this._offset &gt;= 0;</span>
+<span class="fc" id="L937">            return this._buffer.length ;</span>
+        }
+        /**
+         * maximimum number of bytes that can be appended in this block currently.
+         */
+        final int unusedBlockCapacity() {
+<span class="pc bpc" id="L943" title="2 of 4 branches missed.">            assert this._offset &gt;= 0;</span>
+<span class="fc" id="L944">            return this._buffer.length - this._limit;</span>
+        }
+        /**
+         * Gets the number of bytes between the current position and the
+         * writable capacity of this block.
+         * @param pos absolute position
+         */
+        final int bytesAvailableToWrite(int pos) {
+<span class="nc bnc" id="L952" title="All 4 branches missed.">            assert this._offset &gt;= 0;</span>
+<span class="nc" id="L953">            return this._buffer.length - (pos - _offset);</span>
+        }
+        /**
+         * Gets the number of, as yet, unused bytes in this block.  That's the number
+         * of bytes that can be inserted into this block without overflowing, or the
+         * number of bytes between the current position and the end of the written bytes
+         * in this block
+         * @param pos absolute position
+         */
+        public final int bytesAvailableToRead(int pos) {
+<span class="pc bpc" id="L963" title="2 of 4 branches missed.">            assert this._offset &gt;= 0;</span>
+<span class="fc" id="L964">            return this._limit - (pos - _offset);</span>
+        }
+        /**
+         * is there space between position and capacity?
+         * @param pos absolute position
+         * @param needed
+         * @return boolean
+         */
+        final boolean hasRoomToWrite(int pos, int needed) {
+<span class="pc bpc" id="L973" title="2 of 4 branches missed.">            assert this._offset &gt;= 0;</span>
+<span class="fc bfc" id="L974" title="All 2 branches covered.">            return (needed &lt;= (this._buffer.length - (pos - _offset)));</span>
+        }
+        final boolean containsForRead(int pos) {
+<span class="pc bpc" id="L977" title="2 of 4 branches missed.">            assert this._offset &gt;= 0;</span>
+<span class="fc bfc" id="L978" title="All 4 branches covered.">            return (pos &gt;= _offset &amp;&amp; pos &lt; _offset + _limit);</span>
+        }
+        final boolean containsForWrite(int pos) {
+<span class="pc bpc" id="L981" title="2 of 4 branches missed.">            assert this._offset &gt;= 0;</span>
+<span class="pc bpc" id="L982" title="2 of 4 branches missed.">            return (pos &gt;= _offset &amp;&amp; pos &lt;= _offset + _limit);</span>
+        }
+        final int blockOffsetFromAbsolute(int pos) {
+<span class="pc bpc" id="L985" title="2 of 4 branches missed.">            assert this._offset &gt;= 0;</span>
+<span class="fc" id="L986">            return pos - _offset;</span>
+        }
+    }
+    public interface Monitor
+    {
+        public boolean notifyInsert(int pos, int len);
+        public boolean notifyRemove(int pos, int len);
+        public int     getMemberIdOffset();
+    }
+    private final static class PositionMonitor implements Monitor
+    {
+        int _pos;
+<span class="fc" id="L998">        PositionMonitor(int pos) { _pos = pos; }</span>
+<span class="fc" id="L999">        public int getMemberIdOffset() { return _pos; }</span>
+<span class="nc" id="L1000">        public boolean notifyInsert(int pos, int len) { return false; }</span>
+<span class="nc" id="L1001">        public boolean notifyRemove(int pos, int len) { return false; }</span>
+    }
+    private final static class CompareMonitor implements Comparator&lt;Monitor&gt; {
+<span class="fc" id="L1004">        static CompareMonitor instance = new CompareMonitor();</span>
+        private CompareMonitor() {}
+        static CompareMonitor getComparator()
+        {
+<span class="fc" id="L1008">            return instance;</span>
+        }
+        public int compare(Monitor arg0, Monitor arg1)
+        {
+<span class="fc" id="L1012">            return arg0.getMemberIdOffset() - arg1.getMemberIdOffset();</span>
+        }
+    }
+<span class="pc" id="L1015">    TreeSet&lt;Monitor&gt; _updatelist = new TreeSet&lt;Monitor&gt;(CompareMonitor.getComparator());</span>
+    public void notifyRegister(Monitor item) {
+<span class="nc" id="L1017">        _updatelist.add(item);</span>
+<span class="nc" id="L1018">    }</span>
+    public void notifyUnregister(Monitor item) {
+<span class="nc" id="L1020">        _updatelist.remove(item);</span>
+<span class="nc" id="L1021">    }</span>
+    public void notifyInsert(int pos, int len) {
+<span class="pc bpc" id="L1023" title="1 of 2 branches missed.">        if (len == 0) return;</span>
+<span class="fc" id="L1024">        PositionMonitor pm = new PositionMonitor(pos);</span>
+<span class="fc" id="L1025">        SortedSet&lt;Monitor&gt; follows = _updatelist.tailSet(pm);</span>
+<span class="pc bpc" id="L1026" title="1 of 2 branches missed.">        for (Monitor m : follows) {</span>
+<span class="nc bnc" id="L1027" title="All 2 branches missed.">            if (m.notifyInsert(pos, len)) {</span>
+<span class="nc" id="L1028">                follows.remove(m);</span>
+            }
+<span class="nc" id="L1030">        }</span>
+<span class="fc" id="L1031">    }</span>
+    public void notifyRemove(int pos, int len) {
+<span class="pc bpc" id="L1033" title="1 of 2 branches missed.">        if (len == 0) return;</span>
+<span class="fc" id="L1034">        PositionMonitor pm = new PositionMonitor(pos);</span>
+<span class="fc" id="L1035">        SortedSet&lt;Monitor&gt; follows = _updatelist.tailSet(pm);</span>
+<span class="pc bpc" id="L1036" title="1 of 2 branches missed.">        for (Monitor m : follows) {</span>
+<span class="nc bnc" id="L1037" title="All 2 branches missed.">            if (m.notifyRemove(pos, len)) {</span>
+<span class="nc" id="L1038">                follows.remove(m);</span>
+            }
+<span class="nc" id="L1040">        }</span>
+<span class="fc" id="L1041">    }</span>
+    /**
+     * Reads data from a byte buffer, keeps a local position and
+     * a current block.  Snaps a buffer length on creation;
+     */
+<span class="pc bpc" id="L1046" title="1 of 2 branches missed.">    public static class BlockedByteInputStream extends java.io.InputStream</span>
+    {
+        BlockedBuffer _buf;
+        int           _pos;
+        int           _mark;
+        bbBlock       _curr;
+        int           _blockPosition;
+        int           _version;
+        /**
+         * @param bb blocked buffer to read from
+         */
+        public BlockedByteInputStream(BlockedBuffer bb)
+        {
+<span class="fc" id="L1059">            this(0, bb);</span>
+<span class="fc" id="L1060">        }</span>
+        /**
+         * @param bb blocked buffer to read from
+         * @param pos initial offset to read
+         */
+        public BlockedByteInputStream(BlockedBuffer bb, int pos)
+        {
+<span class="nc" id="L1067">            this(pos, bb);</span>
+<span class="nc" id="L1068">        }</span>
+        /**
+         * @param pos initial offset to read
+         * @param end is the local limit, or -1 (_end_unspecified)
+         * @param bb blocked buffer to read from
+          */
+        private BlockedByteInputStream(int pos, BlockedBuffer bb)
+<span class="fc" id="L1075">        {</span>
+<span class="pc bpc" id="L1076" title="1 of 2 branches missed.">            if (bb == null) throw new IllegalArgumentException();</span>
+<span class="fc" id="L1077">            _version = bb.getVersion();</span>
+<span class="fc" id="L1078">            _buf = bb;</span>
+<span class="fc" id="L1079">            _set_position(pos);</span>
+<span class="fc" id="L1080">            _mark = -1;</span>
+<span class="fc" id="L1081">        }</span>
+        @Override
+        public final void mark(int readlimit) {
+<span class="nc" id="L1084">            this._mark = this._pos;</span>
+<span class="nc" id="L1085">        }</span>
+        @Override
+        public final void reset() throws IOException {
+<span class="nc bnc" id="L1088" title="All 2 branches missed.">            if (this._mark == -1) throw new IOException(&quot;mark not set&quot;);</span>
+<span class="nc" id="L1089">            _set_position(this._mark);</span>
+<span class="nc" id="L1090">        }</span>
+        /**
+         * the current offset in the buffer
+         */
+        public final int position() {
+<span class="nc" id="L1095">            return this._pos;</span>
+        }
+        /**
+         * this forces a version sync with the underlying blocked buffer.
+         * The current position is lost during this call.
+         *
+         */
+        public final void sync() throws IOException
+        {
+<span class="pc bpc" id="L1104" title="1 of 2 branches missed.">            if (_buf == null) throw new IOException(&quot;stream is closed&quot;);</span>
+<span class="fc" id="L1105">            _version = _buf.getVersion();</span>
+<span class="fc" id="L1106">            _curr = null;</span>
+<span class="fc" id="L1107">            _pos = 0;</span>
+<span class="fc" id="L1108">        }</span>
+        /**
+         * debug api to force check for internal validity of the
+         * underlying buffer
+         */
+        public final boolean _validate() {
+<span class="fc" id="L1114">            return this._buf._validate();</span>
+        }
+        /**
+         * sets the position of the stream to be pos. The next operation
+         * (such as read) will return the byte at that offset.
+         * @param pos new offset to read from
+         * @return this stream
+         */
+        public final BlockedByteInputStream setPosition(int pos) throws IOException
+        {
+<span class="pc bpc" id="L1124" title="1 of 2 branches missed.">            if (_buf == null) throw new IOException(&quot;stream is closed&quot;);</span>
+<span class="fc" id="L1125">            fail_on_version_change();</span>
+<span class="pc bpc" id="L1126" title="2 of 4 branches missed.">            if (pos &lt; 0 || pos &gt; _buf.size()) {</span>
+<span class="nc" id="L1127">                throw new IllegalArgumentException();</span>
+            }
+            // call our unfailing private method to do the real work
+<span class="fc" id="L1130">            _set_position(pos);</span>
+<span class="fc" id="L1131">            fail_on_version_change();</span>
+<span class="fc" id="L1132">            return this;</span>
+        }
+        private final void _set_position(int pos)
+        {
+<span class="fc" id="L1136">            _pos = pos;</span>
+<span class="fc" id="L1137">            _curr = _buf.findBlockForRead(this, _version, _curr, pos);</span>
+<span class="fc" id="L1138">            _blockPosition = _pos - _curr._offset;</span>
+<span class="fc" id="L1139">        }</span>
+        /**
+         * closes the steam and clears its reference to the
+         * byte buffer.  Once closed it cannot be used.
+         */
+        @Override
+        public final void close() throws IOException
+        {
+<span class="nc" id="L1147">            this._buf = null;</span>
+<span class="nc" id="L1148">            this._pos = -1;</span>
+<span class="nc" id="L1149">        }</span>
+        public final int writeTo(OutputStream out, int len) throws IOException
+        {
+<span class="pc bpc" id="L1152" title="1 of 2 branches missed.">            if (_buf == null) throw new IOException(&quot;stream is closed&quot;);</span>
+<span class="fc" id="L1153">            fail_on_version_change();</span>
+<span class="pc bpc" id="L1154" title="1 of 2 branches missed.">            if (_pos &gt; _buf.size()) throw new IllegalArgumentException();</span>
+
+<span class="fc" id="L1156">            int startingPos = _pos;</span>
+<span class="fc" id="L1157">            int localEnd = _pos + len;</span>
+<span class="pc bpc" id="L1158" title="1 of 2 branches missed.">            if (localEnd &gt; _buf.size()) localEnd = _buf.size();</span>
+<span class="pc bpc" id="L1159" title="2 of 4 branches missed.">            assert(_curr.blockOffsetFromAbsolute(_pos) == _blockPosition);</span>
+
+<span class="fc bfc" id="L1161" title="All 2 branches covered.">            while (_pos &lt; localEnd) {</span>
+<span class="fc" id="L1162">                int available = _curr._limit - _blockPosition;</span>
+<span class="fc bfc" id="L1163" title="All 2 branches covered.">                boolean partial_read = available &gt; localEnd - _pos;</span>
+<span class="fc bfc" id="L1164" title="All 2 branches covered.">                if (partial_read) {</span>
+<span class="fc" id="L1165">                    available = localEnd - _pos;</span>
+                }
+
+<span class="fc" id="L1168">                out.write(_curr._buffer, _blockPosition, available);</span>
+<span class="fc" id="L1169">                _pos += available;</span>
+<span class="fc bfc" id="L1170" title="All 2 branches covered.">                if (partial_read) {</span>
+<span class="fc" id="L1171">                    _blockPosition += available;</span>
+<span class="fc" id="L1172">                    break;</span>
+                }
+<span class="fc" id="L1174">                _curr = _buf.findBlockForRead(this, _version, _curr, _pos);</span>
+<span class="fc" id="L1175">                _blockPosition =_curr.blockOffsetFromAbsolute(_pos);</span>
+<span class="fc" id="L1176">            }</span>
+
+<span class="fc" id="L1178">            fail_on_version_change();</span>
+<span class="fc" id="L1179">            return _pos - startingPos;</span>
+        }
+
+        public final int writeTo(ByteWriter out, int len) throws IOException
+        {
+<span class="nc bnc" id="L1184" title="All 2 branches missed.">            if (_buf == null) throw new IOException(&quot;stream is closed&quot;);</span>
+<span class="nc" id="L1185">            fail_on_version_change();</span>
+<span class="nc bnc" id="L1186" title="All 2 branches missed.">            if (_pos &gt; _buf.size()) throw new IllegalArgumentException();</span>
+
+<span class="nc" id="L1188">            int startingPos = _pos;</span>
+<span class="nc" id="L1189">            int localEnd = _pos + len;</span>
+<span class="nc bnc" id="L1190" title="All 2 branches missed.">            if (localEnd &gt; _buf.size()) localEnd = _buf.size();</span>
+<span class="nc bnc" id="L1191" title="All 4 branches missed.">            assert(_curr.blockOffsetFromAbsolute(_pos) == _blockPosition);</span>
+
+<span class="nc bnc" id="L1193" title="All 2 branches missed.">            while (_pos &lt; localEnd) {</span>
+<span class="nc" id="L1194">                int available = _curr._limit - _blockPosition;</span>
+<span class="nc bnc" id="L1195" title="All 2 branches missed.">                boolean partial_read = available &gt; localEnd - _pos;</span>
+<span class="nc bnc" id="L1196" title="All 2 branches missed.">                if (partial_read) {</span>
+<span class="nc" id="L1197">                    available = localEnd - _pos;</span>
+                }
+<span class="nc" id="L1199">                out.write(_curr._buffer, _blockPosition, available);</span>
+<span class="nc" id="L1200">                _pos += available;</span>
+<span class="nc bnc" id="L1201" title="All 2 branches missed.">                if (partial_read) {</span>
+<span class="nc" id="L1202">                    _blockPosition += available;</span>
+<span class="nc" id="L1203">                    break;</span>
+                }
+<span class="nc" id="L1205">                _curr = _buf.findBlockForRead(this, _version, _curr, _pos);</span>
+<span class="nc" id="L1206">                _blockPosition =_curr.blockOffsetFromAbsolute(_pos);</span>
+<span class="nc" id="L1207">            }</span>
+
+<span class="nc" id="L1209">            fail_on_version_change();</span>
+<span class="nc" id="L1210">            return _pos - startingPos;</span>
+        }
+
+        /**
+         * reads (up to) {@code len} bytes from the buffer and copies them into
+         * the user supplied byte array (bytes) starting at offset
+         * off in the users array.  This returns the number of bytes
+         * read, which may be less than the number requested if
+         * there is not enough data available in the buffer.
+         *
+         * @throws IndexOutOfBoundsException
+         *   if {@code (dst.length - offset) &lt; len}
+         */
+        @Override
+        public final int read(byte[] bytes, int offset, int len) throws IOException
+        {
+<span class="nc bnc" id="L1226" title="All 2 branches missed.">            if (_buf == null) throw new IOException(&quot;stream is closed&quot;);</span>
+<span class="nc" id="L1227">            fail_on_version_change();</span>
+<span class="nc bnc" id="L1228" title="All 2 branches missed.">            if (_pos &gt; _buf.size()) throw new IllegalArgumentException();</span>
+<span class="nc" id="L1229">            int startingPos = _pos;</span>
+<span class="nc" id="L1230">            int localEnd = _pos + len;</span>
+<span class="nc bnc" id="L1231" title="All 2 branches missed.">            if (localEnd &gt; _buf.size()) localEnd = _buf.size();</span>
+<span class="nc bnc" id="L1232" title="All 2 branches missed.">            while (_pos &lt; localEnd) {</span>
+<span class="nc" id="L1233">                bbBlock block = _curr;</span>
+<span class="nc" id="L1234">                int block_offset = _blockPosition;</span>
+<span class="nc" id="L1235">                int available = block._limit - _blockPosition;</span>
+<span class="nc bnc" id="L1236" title="All 2 branches missed.">                if (available &gt; localEnd - _pos) {</span>
+                    // we aren't emptying this block so adjust our location
+<span class="nc" id="L1238">                    available = localEnd - _pos;</span>
+<span class="nc" id="L1239">                    _blockPosition += available;</span>
+                }
+                else {
+                    // TODO can't we just move to the next block?
+<span class="nc" id="L1243">                    _curr = _buf.findBlockForRead(this, _version, _curr, _pos + available);</span>
+<span class="nc" id="L1244">                    _blockPosition = 0;</span>
+                }
+<span class="nc" id="L1246">                System.arraycopy(block._buffer, block_offset, bytes, offset, available);</span>
+<span class="nc" id="L1247">                _pos += available;</span>
+<span class="nc" id="L1248">                offset += available;</span>
+<span class="nc" id="L1249">            }</span>
+<span class="nc" id="L1250">            fail_on_version_change();</span>
+<span class="nc" id="L1251">            return _pos - startingPos;</span>
+        }
+        /**
+         * reads the next byte in the buffer.  This returns -1
+         * if there is no data available to be read.
+         */
+        @Override
+        public final int read() throws IOException
+        {
+<span class="pc bpc" id="L1260" title="1 of 2 branches missed.">            if (_buf == null) {</span>
+<span class="nc" id="L1261">                throw new IOException(&quot;input stream is closed&quot;);</span>
+            }
+<span class="fc" id="L1263">            fail_on_version_change();</span>
+<span class="pc bpc" id="L1264" title="1 of 2 branches missed.">            if (_pos &gt;= _buf.size()) return -1;</span>
+<span class="fc bfc" id="L1265" title="All 2 branches covered.">            if (_blockPosition &gt;= _curr._limit) {</span>
+<span class="fc" id="L1266">                _curr = this._buf.findBlockForRead(this, _version, _curr, _pos);</span>
+<span class="fc" id="L1267">                _blockPosition = 0;</span>
+            }
+<span class="fc" id="L1269">            int nextByte = (0xff &amp; _curr._buffer[_blockPosition]);</span>
+<span class="fc" id="L1270">            _blockPosition++;</span>
+<span class="fc" id="L1271">            _pos++;</span>
+<span class="fc" id="L1272">            fail_on_version_change();</span>
+<span class="fc" id="L1273">            return nextByte;</span>
+        }
+        private final void fail_on_version_change() throws IOException
+        {
+<span class="pc bpc" id="L1277" title="1 of 2 branches missed.">            if (_buf.getVersion() != _version) {</span>
+<span class="nc" id="L1278">                this.close();</span>
+<span class="nc" id="L1279">                throw new BlockedBufferException(&quot;buffer has been changed!&quot;);</span>
+            }
+<span class="fc" id="L1281">        }</span>
+        @Override
+        public final long skip(long n) throws IOException
+        {
+<span class="nc bnc" id="L1285" title="All 4 branches missed.">            if (n &lt; 0 || n &gt; Integer.MAX_VALUE) throw new IllegalArgumentException(&quot;we only handle buffer less than &quot;+Integer.MAX_VALUE+&quot; bytes in length&quot;);</span>
+<span class="nc bnc" id="L1286" title="All 2 branches missed.">            if (_buf == null) throw new IOException(&quot;stream is closed&quot;);</span>
+<span class="nc" id="L1287">            fail_on_version_change();</span>
+<span class="nc bnc" id="L1288" title="All 2 branches missed.">            if (_pos &gt;= _buf.size()) return -1;</span>
+<span class="nc" id="L1289">            int len = (int)n;</span>
+<span class="nc bnc" id="L1290" title="All 2 branches missed.">            if (len == 0) return 0;</span>
+<span class="nc" id="L1291">            int startingPos = _pos;</span>
+<span class="nc" id="L1292">            int localEnd = _pos + len;</span>
+<span class="nc bnc" id="L1293" title="All 2 branches missed.">            if (localEnd &gt; _buf.size()) localEnd = _buf.size();</span>
+            // if we run off the end of this block, we need to update
+            // our current block ( _curr ) we'll update the block position
+            // in any event (once we know the right block, of course)
+<span class="nc bnc" id="L1297" title="All 2 branches missed.">            if (localEnd &gt; _blockPosition + _curr._offset) {</span>
+<span class="nc" id="L1298">                _curr = _buf.findBlockForRead(this, _version, _curr, localEnd);</span>
+            }
+<span class="nc" id="L1300">            _blockPosition = localEnd - _curr._offset;</span>
+<span class="nc" id="L1301">            _pos = localEnd;</span>
+<span class="nc" id="L1302">            fail_on_version_change();</span>
+<span class="nc" id="L1303">            return _pos - startingPos;</span>
+        }
+    }
+    /**
+     * Reads data from a byte buffer, keeps a local position and
+     * a current block.  Snaps a buffer length on creation;
+     */
+<span class="pc bpc" id="L1310" title="1 of 2 branches missed.">    public static class BlockedByteOutputStream extends java.io.OutputStream</span>
+    {
+        BlockedBuffer _buf;
+        int           _pos;
+        bbBlock       _curr;
+        int           _blockPosition;
+        int           _version;
+        /**
+         * creates writable stream (OutputStream) that writes
+         * to a fresh blocked buffer.  The stream is initially
+         * position at offset 0.
+         */
+<span class="nc" id="L1322">        public BlockedByteOutputStream() {</span>
+<span class="nc" id="L1323">            _buf = new BlockedBuffer();</span>
+<span class="nc" id="L1324">            _version = _buf.getVersion();</span>
+<span class="nc" id="L1325">            _set_position(0);</span>
+<span class="nc" id="L1326">        }</span>
+        /**
+         * creates writable stream (OutputStream) that writes
+         * to the supplied byte buffer.  The stream is initially
+         * position at offset 0.
+         * @param bb blocked buffer to write to
+         */
+<span class="fc" id="L1333">        public BlockedByteOutputStream(BlockedBuffer bb) {</span>
+<span class="fc" id="L1334">            _buf = bb;</span>
+<span class="fc" id="L1335">            _version = _buf.getVersion();</span>
+<span class="fc" id="L1336">            _set_position(0);</span>
+<span class="fc" id="L1337">        }</span>
+        /**
+         * creates writable stream (OutputStream) that can write
+         * to the supplied byte buffer.  The stream is initially
+         * position at offset off.
+         * @param bb blocked buffer to write to
+         * @param off initial offset to write to
+         */
+<span class="nc" id="L1345">        public BlockedByteOutputStream(BlockedBuffer bb, int off) {</span>
+<span class="nc bnc" id="L1346" title="All 6 branches missed.">            if (bb == null || off &lt; 0 || off &gt; bb.size() ) {</span>
+<span class="nc" id="L1347">                throw new IllegalArgumentException();</span>
+            }
+<span class="nc" id="L1349">            _buf = bb;</span>
+<span class="nc" id="L1350">            _version = _buf.getVersion();</span>
+<span class="nc" id="L1351">            _set_position(0);</span>
+<span class="nc" id="L1352">        }</span>
+        /**
+         * the current offset in the buffer
+         */
+        public final int position() {
+<span class="fc" id="L1357">            return this._pos;</span>
+        }
+        /**
+         * this forces a version sync with the underlying blocked buffer.
+         * The current position is lost during this call.
+         *
+         */
+        public final void sync() throws IOException
+        {
+<span class="nc bnc" id="L1366" title="All 2 branches missed.">            if (_buf == null) throw new IOException(&quot;stream is closed&quot;);</span>
+<span class="nc" id="L1367">            _version = _buf.getVersion();</span>
+<span class="nc" id="L1368">            _pos = 0;</span>
+<span class="nc" id="L1369">            _curr = null;</span>
+<span class="nc" id="L1370">        }</span>
+        /**
+         * debug api to force check for internal validity of the
+         * underlying buffer
+         */
+        public final boolean _validate() {
+<span class="nc" id="L1376">            return this._buf._validate();</span>
+        }
+        /**
+         * repositions this stream in the buffer.  The next
+         * read, write, or insert operation will take place
+         * at the specified position.  The position must
+         * be within the contiguous range of written bytes,
+         * including the pseudo end of file character just
+         * past the end, which can be written on and returns
+         * -1 if read.
+         */
+        public final BlockedByteOutputStream setPosition(int pos) throws IOException
+        {
+<span class="pc bpc" id="L1389" title="1 of 2 branches missed.">            if (_buf == null) throw new IOException(&quot;stream is closed&quot;);</span>
+<span class="fc" id="L1390">            fail_on_version_change();</span>
+<span class="pc bpc" id="L1391" title="2 of 4 branches missed.">            if (pos &lt; 0 || pos &gt; _buf.size()) {</span>
+<span class="nc" id="L1392">                throw new IllegalArgumentException();</span>
+            }
+<span class="fc" id="L1394">            this._set_position(pos);</span>
+<span class="fc" id="L1395">            fail_on_version_change();</span>
+<span class="fc" id="L1396">            return this;</span>
+        }
+        private final void _set_position(int pos)
+        {
+<span class="fc" id="L1400">            _pos = pos;</span>
+<span class="fc" id="L1401">            _curr = _buf.findBlockForRead(this, _version, _curr, pos);</span>
+<span class="fc" id="L1402">            _blockPosition = _pos - _curr._offset;</span>
+<span class="fc" id="L1403">            return;</span>
+        }
+        /**
+         * closes the steam and clears its reference to the
+         * byte buffer.  Once closed it cannot be used.
+         */
+        @Override
+        public final void close() throws IOException
+        {
+<span class="nc" id="L1412">            this._buf = null;</span>
+<span class="nc" id="L1413">            this._pos = -1;</span>
+<span class="nc" id="L1414">            return;</span>
+        }
+        /**
+         * Inserts space and writes 1 byte to the current
+         * position in this output stream.  Only the low
+         * order byte of the passed in int is written the
+         * high order bits are ignored.
+         */
+        @Override
+        public final void write(int b) throws IOException
+        {
+<span class="pc bpc" id="L1425" title="1 of 2 branches missed.">            if (_buf == null) throw new IOException(&quot;stream is closed&quot;);</span>
+<span class="fc" id="L1426">            _buf.start_mutate(this, _version);</span>
+<span class="fc" id="L1427">            _write(b);</span>
+<span class="fc" id="L1428">            _version = _buf.end_mutate(this);</span>
+<span class="fc" id="L1429">            return;</span>
+        }
+        final void start_write() {
+<span class="nc" id="L1432">            _buf.start_mutate(this, _version);</span>
+<span class="nc" id="L1433">        }</span>
+        final void end_write() {
+<span class="nc" id="L1435">            _version = _buf.end_mutate(this);</span>
+<span class="nc" id="L1436">        }</span>
+        final void _write(int b) throws IOException
+        {
+<span class="pc bpc" id="L1439" title="1 of 2 branches missed.">            if (bytesAvailableToWriteInCurr(_pos) &lt; 1) {</span>
+<span class="nc" id="L1440">                _curr = _buf.findBlockForWrite(this, _version, _curr, _pos);</span>
+<span class="nc bnc" id="L1441" title="All 4 branches missed.">                assert _curr._offset == _pos;</span>
+<span class="nc" id="L1442">                _blockPosition = 0;</span>
+            }
+<span class="fc" id="L1444">            _curr._buffer[_blockPosition++] = (byte)(b &amp; 0xff);</span>
+<span class="fc" id="L1445">            _pos++;</span>
+<span class="pc bpc" id="L1446" title="1 of 2 branches missed.">            if (_blockPosition &gt; _curr._limit) {</span>
+<span class="fc" id="L1447">                _curr._limit = _blockPosition;</span>
+<span class="pc bpc" id="L1448" title="1 of 2 branches missed.">                if (_pos &gt; _buf._buf_limit ) _buf._buf_limit = _pos;</span>
+            }
+<span class="fc" id="L1450">        }</span>
+        private final int bytesAvailableToWriteInCurr(int pos) {
+<span class="pc bpc" id="L1452" title="2 of 4 branches missed.">            assert _curr != null;</span>
+<span class="pc bpc" id="L1453" title="2 of 4 branches missed.">            assert _curr._offset &lt;= pos;</span>
+<span class="pc bpc" id="L1454" title="2 of 4 branches missed.">            assert _curr._offset + _curr._limit &gt;= pos;</span>
+<span class="fc bfc" id="L1455" title="All 2 branches covered.">            if (_curr._idx &lt; this._buf._next_block_position - 1) {</span>
+<span class="fc" id="L1456">                return _curr.bytesAvailableToRead(pos);</span>
+            }
+<span class="fc" id="L1458">            int ret = _curr._buffer.length - (pos - _curr._offset);</span>
+<span class="fc" id="L1459">            return ret; // _curr.bytesAvailableToWrite(pos);</span>
+        }
+        /**
+         * Writes len bytes from the specified byte array starting
+         * at in the user array at offset off to the current position
+         * in this output stream.
+         */
+        @Override
+        public final void write(byte[] b, int off, int len) throws IOException
+        {
+<span class="pc bpc" id="L1469" title="1 of 2 branches missed.">            if (_buf == null) throw new IOException(&quot;stream is closed&quot;);</span>
+<span class="fc" id="L1470">            _buf.start_mutate(this, _version);</span>
+<span class="fc" id="L1471">            _write(b, off, len);</span>
+<span class="fc" id="L1472">            _version = _buf.end_mutate(this);</span>
+<span class="fc" id="L1473">        }</span>
+        private final void _write(byte[] b, int off, int len)
+        {
+<span class="fc" id="L1476">            int end_b = off + len;</span>
+<span class="fc bfc" id="L1477" title="All 2 branches covered.">            while (off &lt; end_b)</span>
+            {
+<span class="fc" id="L1479">                int writeInThisBlock = bytesAvailableToWriteInCurr(_pos);</span>
+<span class="fc bfc" id="L1480" title="All 2 branches covered.">                if (writeInThisBlock &gt; end_b - off) {</span>
+<span class="fc" id="L1481">                    writeInThisBlock = end_b - off;</span>
+                }
+<span class="pc bpc" id="L1483" title="2 of 4 branches missed.">                assert writeInThisBlock &gt;= 0;</span>
+<span class="pc bpc" id="L1484" title="1 of 2 branches missed.">                if (writeInThisBlock &gt; 0) {</span>
+<span class="fc" id="L1485">                    System.arraycopy(b, off, _curr._buffer, _blockPosition, writeInThisBlock);</span>
+<span class="fc" id="L1486">                    off += writeInThisBlock;</span>
+<span class="fc" id="L1487">                    _pos += writeInThisBlock;</span>
+<span class="fc" id="L1488">                    _blockPosition += writeInThisBlock;</span>
+<span class="fc bfc" id="L1489" title="All 2 branches covered.">                    if (_blockPosition &gt; _curr._limit) {</span>
+<span class="fc" id="L1490">                        _curr._limit = _blockPosition;</span>
+<span class="pc bpc" id="L1491" title="1 of 2 branches missed.">                        if (_pos &gt; _buf._buf_limit) _buf._buf_limit = _pos;</span>
+                    }
+                    else {
+<span class="pc bpc" id="L1494" title="2 of 4 branches missed.">                        assert _pos &lt;= _buf._buf_limit;</span>
+                    }
+                }
+<span class="fc bfc" id="L1497" title="All 2 branches covered.">                if (off &gt;= end_b) break;</span>
+
+<span class="fc" id="L1499">                _curr = _buf.findBlockForWrite(this, _version, _curr, _pos);</span>
+<span class="fc" id="L1500">                _blockPosition = _curr.blockOffsetFromAbsolute(_pos);</span>
+<span class="pc bpc" id="L1501" title="4 of 6 branches missed.">                assert _curr._offset == _pos || off &gt;= end_b;</span>
+<span class="fc" id="L1502">            }</span>
+<span class="fc" id="L1503">        }</span>
+        /**
+         * Writes bytes from the specified byte stream from its current
+         * stream position to the end of the stream.  Writing the bytes
+         * to the current position in this output stream.
+         * @throws IOException
+         */
+        public final void write(InputStream bytestream) throws IOException
+        {
+<span class="nc bnc" id="L1512" title="All 2 branches missed.">            if (_buf == null) throw new IOException(&quot;stream is closed&quot;);</span>
+<span class="nc" id="L1513">            _buf.start_mutate(this, _version);</span>
+<span class="nc" id="L1514">            _write(bytestream, -1);</span>
+<span class="nc" id="L1515">            _version = _buf.end_mutate(this);</span>
+<span class="nc" id="L1516">        }</span>
+        /**
+         * Writes bytes from the specified byte stream from its current
+         * stream position up to length bytes from the stream.  Writing the
+         * bytes to the current position in this output stream.
+         * @throws IOException
+         */
+        public final void write(InputStream bytestream, int len) throws IOException
+        {
+<span class="nc bnc" id="L1525" title="All 2 branches missed.">            if (_buf == null) throw new IOException(&quot;stream is closed&quot;);</span>
+<span class="nc" id="L1526">            _buf.start_mutate(this, _version);</span>
+<span class="nc" id="L1527">            _write(bytestream, len);</span>
+<span class="nc" id="L1528">            _version = _buf.end_mutate(this);</span>
+<span class="nc" id="L1529">        }</span>
+        /**
+         * helper to write data.  This does not check input arguments.
+         * @param bytestream source of the data
+         * @param len number of bytes to read from the input stream, -1 for all
+         * @throws IOException
+         */
+        private final void _write(InputStream bytestream, int len) throws IOException
+        {
+<span class="nc bnc" id="L1538" title="All 2 branches missed.">            if (len == 0) return;</span>
+
+<span class="nc" id="L1540">            int written = 0;</span>
+<span class="nc bnc" id="L1541" title="All 2 branches missed.">            boolean read_all = (len == -1);</span>
+
+            for (;;)
+            {
+<span class="nc" id="L1545">                int writeInThisBlock = bytesAvailableToWriteInCurr(_pos);</span>
+<span class="nc bnc" id="L1546" title="All 4 branches missed.">                assert writeInThisBlock &gt;= 0;</span>
+
+<span class="nc bnc" id="L1548" title="All 2 branches missed.">                int to_read = read_all ? writeInThisBlock : len;</span>
+<span class="nc bnc" id="L1549" title="All 2 branches missed.">                if (to_read &gt; writeInThisBlock) {</span>
+<span class="nc" id="L1550">                    to_read = writeInThisBlock;</span>
+                }
+<span class="nc" id="L1552">                int len_read = bytestream.read(_curr._buffer, _blockPosition, to_read);</span>
+<span class="nc bnc" id="L1553" title="All 2 branches missed.">                if (len_read == -1) break;</span>
+<span class="nc bnc" id="L1554" title="All 2 branches missed.">                if (len_read &gt; 0) {</span>
+<span class="nc" id="L1555">                    _pos += len_read;</span>
+<span class="nc" id="L1556">                    _blockPosition += len_read;</span>
+<span class="nc bnc" id="L1557" title="All 2 branches missed.">                    if (_blockPosition &gt; _curr._limit) {</span>
+<span class="nc" id="L1558">                        _curr._limit = _blockPosition;</span>
+<span class="nc bnc" id="L1559" title="All 2 branches missed.">                        if (_pos &gt; _buf._buf_limit) _buf._buf_limit = _pos;</span>
+                    }
+                    else {
+<span class="nc bnc" id="L1562" title="All 4 branches missed.">                        assert _pos &lt;= _buf._buf_limit;</span>
+                    }
+                }
+
+<span class="nc bnc" id="L1566" title="All 2 branches missed.">                if (len_read == writeInThisBlock) {</span>
+<span class="nc" id="L1567">                    _curr = _buf.findBlockForWrite(this, _version, _curr, _pos);</span>
+<span class="nc" id="L1568">                    _blockPosition = _curr.blockOffsetFromAbsolute(_pos);</span>
+<span class="nc bnc" id="L1569" title="All 6 branches missed.">                    assert _curr._offset == _pos || written &lt; len_read;</span>
+                }
+                else {
+<span class="nc bnc" id="L1572" title="All 4 branches missed.">                    assert len_read &lt; writeInThisBlock;</span>
+                }
+<span class="nc bnc" id="L1574" title="All 2 branches missed.">                if (!read_all) {</span>
+<span class="nc" id="L1575">                    len -= len_read;</span>
+<span class="nc bnc" id="L1576" title="All 2 branches missed.">                    if (len &lt; 1) break;</span>
+                }
+<span class="nc" id="L1578">            }</span>
+<span class="nc" id="L1579">        }</span>
+        /**
+         * Inserts the amount space requested at the current
+         * position in this output stream.  No data is written
+         * into the output stream.
+         */
+        public final void insert(int len) throws IOException
+        {
+<span class="pc bpc" id="L1587" title="1 of 2 branches missed.">            if (_buf == null) throw new IOException(&quot;stream is closed&quot;);</span>
+<span class="pc bpc" id="L1588" title="1 of 2 branches missed.">            if (len &lt; 0) {</span>
+<span class="nc" id="L1589">                throw new IllegalArgumentException();</span>
+            }
+<span class="pc bpc" id="L1591" title="1 of 2 branches missed.">            if (len &gt; 0) {</span>
+<span class="fc" id="L1592">                _buf.start_mutate(this, _version);</span>
+<span class="fc" id="L1593">                _buf.insert(this, _version, _curr, _pos, len);</span>
+<span class="fc" id="L1594">                _version = _buf.end_mutate(this);</span>
+            }
+<span class="fc" id="L1596">            return;</span>
+        }
+        /**
+         * Inserts space and writes 1 byte to the current
+         * position in this output stream.  Only the low
+         * order byte of the passed in int is written the
+         * high order bits are ignored.
+         */
+        public final void insert(byte b) throws IOException
+        {
+<span class="nc bnc" id="L1606" title="All 2 branches missed.">            if (_buf == null) throw new IOException(&quot;stream is closed&quot;);</span>
+<span class="nc" id="L1607">            _buf.start_mutate(this, _version);</span>
+<span class="nc" id="L1608">            _buf.insert(this, _version, _curr, _pos, 1);</span>
+<span class="nc" id="L1609">            _write(b);</span>
+<span class="nc" id="L1610">            _version = _buf.end_mutate(this);</span>
+<span class="nc" id="L1611">        }</span>
+        /**
+         * Inserts space and writes len bytes from the specified
+         * byte array starting at in the user array at offset off
+         * to the current position in this output stream.
+         */
+        public final void insert(byte[] b, int off, int len) throws IOException
+        {
+<span class="pc bpc" id="L1619" title="1 of 2 branches missed.">            if (_buf == null) throw new IOException(&quot;stream is closed&quot;);</span>
+<span class="fc" id="L1620">            _buf.start_mutate(this, _version);</span>
+<span class="fc" id="L1621">            _buf.insert(this, _version, _curr, _pos, len);</span>
+<span class="fc" id="L1622">            _write(b, off, len);</span>
+<span class="fc" id="L1623">            _version = _buf.end_mutate(this);</span>
+<span class="fc" id="L1624">        }</span>
+        /**
+         * Inserts space and writes len bytes from the specified
+         * byte array starting at in the user array at offset off
+         * to the current position in this output stream.
+         */
+        public final void remove(int len) throws IOException
+        {
+<span class="pc bpc" id="L1632" title="1 of 2 branches missed.">            if (_buf == null) throw new IOException(&quot;stream is closed&quot;);</span>
+<span class="fc" id="L1633">            _buf.start_mutate(this, _version);</span>
+<span class="fc" id="L1634">            _curr = _buf.remove(this, _version, _curr, _pos, len);</span>
+<span class="fc" id="L1635">            _version = _buf.end_mutate(this);</span>
+<span class="fc" id="L1636">        }</span>
+        /**
+         * trucates the buffer at the current location after this
+         * call the last previously written or read byte will be
+         * the end of the buffer.
+         */
+        public final void truncate() throws IOException
+        {
+<span class="pc bpc" id="L1644" title="1 of 2 branches missed.">            if (_buf == null) throw new IOException(&quot;stream is closed&quot;);</span>
+<span class="fc bfc" id="L1645" title="All 2 branches covered.">            if (this._buf._buf_limit == _pos) return;</span>
+<span class="fc" id="L1646">            _buf.start_mutate(this, _version);</span>
+<span class="fc" id="L1647">            _curr = _buf.truncate(this, _version, _pos);</span>
+<span class="fc" id="L1648">            _version = _buf.end_mutate(this);</span>
+<span class="fc" id="L1649">        }</span>
+        private final void fail_on_version_change() throws IOException
+        {
+<span class="pc bpc" id="L1652" title="1 of 2 branches missed.">            if (_buf.getVersion() != _version) {</span>
+<span class="nc" id="L1653">                this.close();</span>
+<span class="nc" id="L1654">                throw new BlockedBufferException(&quot;buffer has been changed!&quot;);</span>
+            }
+<span class="fc" id="L1656">        }</span>
+    }
+    public static class BlockedBufferException extends IonException
+    {
+        private static final long serialVersionUID = 1582507845614969389L;
+<span class="nc" id="L1661">        public BlockedBufferException() { super(); }</span>
+<span class="nc" id="L1662">        public BlockedBufferException(String message) { super(message); }</span>
+        public BlockedBufferException(String message, Throwable cause) {
+<span class="nc" id="L1664">            super(message, cause);</span>
+<span class="nc" id="L1665">        }</span>
+<span class="nc" id="L1666">        public BlockedBufferException(Throwable cause) { super(cause); }</span>
+    }
+    public static class BufferedOutputStream
+        extends OutputStream
+    {
+        BlockedBuffer           _buffer;
+        BlockedByteOutputStream _writer;
+        public BufferedOutputStream() {
+<span class="fc" id="L1674">            this(new BlockedBuffer());</span>
+<span class="fc" id="L1675">        }</span>
+<span class="fc" id="L1676">        public BufferedOutputStream(BlockedBuffer buffer) {</span>
+<span class="fc" id="L1677">            _buffer = buffer;</span>
+<span class="fc" id="L1678">            _writer = new BlockedByteOutputStream(_buffer);</span>
+<span class="fc" id="L1679">        }</span>
+        /**
+         * Gets the size in bytes of this binary data.
+         * This is generally needed before calling {@link #getBytes()} or
+         * {@link #getBytes(byte[], int, int)}.
+         *
+         * @return the size in bytes.
+         */
+        public int byteSize()
+        {
+<span class="fc" id="L1689">            return _buffer.size();</span>
+        }
+        /**
+         * Copies the current contents of this writer as a new byte array holding
+         * Ion binary-encoded data.
+         * This allocates an array of the size needed to exactly
+         * hold the output and copies the entire value to it.
+         *
+         * @return the byte array with the writers output
+         * @throws IOException
+         */
+        public byte[] getBytes()
+            throws IOException
+        {
+<span class="fc" id="L1703">            int size = byteSize();</span>
+<span class="fc" id="L1704">            ByteArrayOutputStream byteStream = new ByteArrayOutputStream(size);</span>
+<span class="fc" id="L1705">            writeBytes(byteStream);</span>
+<span class="fc" id="L1706">            byte[] bytes = byteStream.toByteArray();</span>
+<span class="fc" id="L1707">            return bytes;</span>
+        }
+        /**
+         * Copies the current contents of the writer to a given byte array
+         * array.  This starts writing to the array at offset and writes
+         * up to len bytes.
+         * If this writer is not able to stop in the middle of its
+         * work this may overwrite the array and later throw and exception.
+         *
+         * @param bytes users byte array to write into
+         * @param offset initial offset in the array to write into
+         * @param len maximum number of bytes to write from offset on
+         * @return number of bytes written
+         * @throws IOException
+         */
+        public int getBytes(byte[] bytes, int offset, int len)
+            throws IOException
+        {
+<span class="nc" id="L1725">            SimpleByteBuffer outbuf = new SimpleByteBuffer(bytes, offset, len);</span>
+<span class="nc" id="L1726">            OutputStream     writer = (OutputStream)outbuf.getWriter();</span>
+<span class="nc" id="L1727">            int              written = writeBytes(writer);</span>
+<span class="nc" id="L1728">            return written;</span>
+        }
+        /**
+         * Writes the current contents of the writer to the output
+         * stream.  This is only valid if the writer is not in the
+         * middle of writing a container.
+         *
+         * @param userstream OutputStream to write the bytes to
+         * @return int length of bytes written
+         * @throws IOException
+         */
+        public int writeBytes(OutputStream userstream)
+            throws IOException
+        {
+<span class="fc" id="L1742">            int limit = _buffer.size();</span>
+<span class="fc" id="L1743">            int pos = 0;</span>
+<span class="fc" id="L1744">            int version = _buffer.getVersion();</span>
+<span class="fc" id="L1745">            bbBlock curr = null;</span>
+<span class="fc" id="L1746">            _buffer.start_mutate(this, version);</span>
+<span class="fc bfc" id="L1747" title="All 2 branches covered.">            while (pos &lt; limit) {</span>
+<span class="fc" id="L1748">                curr = _buffer.findBlockForRead(this, version, curr, pos);</span>
+<span class="pc bpc" id="L1749" title="1 of 2 branches missed.">                if (curr == null) {</span>
+<span class="nc" id="L1750">                    throw new IOException(&quot;buffer missing expected bytes&quot;);</span>
+                }
+<span class="fc" id="L1752">                int len = curr.bytesAvailableToRead(pos);</span>
+<span class="pc bpc" id="L1753" title="1 of 2 branches missed.">                if (len &lt;= 0) {</span>
+<span class="nc" id="L1754">                    throw new IOException(&quot;buffer missing expected bytes&quot;);</span>
+                }
+<span class="fc" id="L1756">                userstream.write(curr._buffer, 0, len);</span>
+<span class="fc" id="L1757">                pos += len;</span>
+<span class="fc" id="L1758">            }</span>
+<span class="fc" id="L1759">            _buffer.end_mutate(this);</span>
+<span class="fc" id="L1760">            return pos;</span>
+        }
+        @Override
+        public void write(int b) throws IOException
+        {
+<span class="fc" id="L1765">            _writer.write(b);</span>
+<span class="fc" id="L1766">        }</span>
+        @Override
+        public void write(byte[] bytes) throws IOException
+        {
+<span class="fc" id="L1770">            write(bytes, 0, bytes.length);</span>
+<span class="fc" id="L1771">        }</span>
+        @Override
+        public void write(byte[] bytes, int off, int len) throws IOException
+        {
+<span class="fc" id="L1775">            _writer.write(bytes, off, len);</span>
+<span class="fc" id="L1776">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

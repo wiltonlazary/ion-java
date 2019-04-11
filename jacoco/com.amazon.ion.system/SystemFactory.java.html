@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SystemFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.system</a> &gt; <span class="el_source">SystemFactory.java</span></div><h1>SystemFactory.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.system;
+
+import com.amazon.ion.IonCatalog;
+import com.amazon.ion.IonSystem;
+
+/**
+ * The factory for creating {@link IonSystem}s.
+ * Most applications will only have one or two system instances;
+ * see {@link IonSystem} for important constraints.
+ * &lt;p&gt;
+ * Most long-lived applications will want to provide a custom
+ * {@link IonCatalog} implementation rather than using the default
+ * {@link SimpleCatalog}.
+ *
+ * @deprecated Use the more configurable {@link IonSystemBuilder} instead.
+ */
+@Deprecated
+<span class="nc" id="L33">public final class SystemFactory</span>
+{
+    /**
+     * Constructs a new system instance with a default configuration.
+     * &lt;p&gt;
+     * The catalog used by the new instance will be a {@link SimpleCatalog}
+     * with no initial entries, so please be aware of the limitations of that
+     * class.
+     *
+     * @return a new {@link IonSystem} instance; not null.
+     *
+     * @deprecated Use {@link IonSystemBuilder IonSystemBuilder.standard().build()} instead.
+     */
+    @Deprecated
+    public static IonSystem newSystem()
+    {
+<span class="nc" id="L49">        return IonSystemBuilder.standard().build();</span>
+    }
+
+    /**
+     * Constructs a new system instance with the given catalog.
+     *
+     * @param catalog the catalog to use in the new system.
+     *   If null, a new {@link SimpleCatalog} will be used.
+     * @return a new {@link IonSystem} instance; not null.
+     *
+     * @deprecated Use {@link IonSystemBuilder IonSystemBuilder.standard().withCatalog(catalog).build()} instead.
+     */
+    @Deprecated
+    public static IonSystem newSystem(IonCatalog catalog)
+    {
+<span class="nc" id="L64">        return IonSystemBuilder.standard().withCatalog(catalog).build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonWriterSystemTextMarkup.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl</a> &gt; <span class="el_source">IonWriterSystemTextMarkup.java</span></div><h1>IonWriterSystemTextMarkup.java</h1><pre class="source lang-java linenums">
+/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl;
+
+import com.amazon.ion.IonType;
+import com.amazon.ion.SymbolTable;
+import com.amazon.ion.SymbolToken;
+import com.amazon.ion.Timestamp;
+import com.amazon.ion.util._Private_FastAppendable;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+
+class IonWriterSystemTextMarkup extends IonWriterSystemText {
+
+    /**
+     * myTypeBeingWritten is used to communicate the type of the data that was
+     * requested to be written via a write&lt;Type&gt; to the subsequent methods that
+     * need to know the type for calling callbacks.
+     * It is not used when writing containers, or separators, since the type of
+     * container is passed in by the user, or can be obtained via
+     * getContainer().
+     */
+    private IonType               myTypeBeingWritten;
+    private final _Private_MarkupCallback  myCallback;
+
+    public IonWriterSystemTextMarkup(SymbolTable defaultSystemSymtab,
+                                     _Private_IonTextWriterBuilder options,
+                                     _Private_FastAppendable out)
+    {
+<span class="fc" id="L45">        this(defaultSystemSymtab, options, out, options.getCallbackBuilder());</span>
+<span class="fc" id="L46">    }</span>
+
+    private IonWriterSystemTextMarkup(SymbolTable defaultSystemSymtab,
+                                     _Private_IonTextWriterBuilder options,
+                                     _Private_FastAppendable out,
+                                     _Private_CallbackBuilder builder)
+    {
+<span class="fc" id="L53">        this(defaultSystemSymtab, options, builder.build(out));</span>
+<span class="fc" id="L54">    }</span>
+
+    private IonWriterSystemTextMarkup(SymbolTable defaultSystemSymtab,
+                                     _Private_IonTextWriterBuilder options,
+                                     _Private_MarkupCallback callback)
+    {
+<span class="fc" id="L60">        super(defaultSystemSymtab, options, callback.getAppendable());</span>
+<span class="fc" id="L61">        myCallback = callback;</span>
+<span class="fc" id="L62">    }</span>
+
+    @Override
+    void startValue()
+        throws IOException
+    {
+<span class="fc" id="L68">        super.startValue();</span>
+<span class="fc" id="L69">        myCallback.beforeValue(myTypeBeingWritten);</span>
+<span class="fc" id="L70">    }</span>
+
+    @Override
+    void closeValue()
+        throws IOException
+    {
+<span class="fc" id="L76">        myCallback.afterValue(myTypeBeingWritten);</span>
+<span class="fc" id="L77">        super.closeValue();</span>
+<span class="fc" id="L78">    }</span>
+
+    @Override
+    protected void writeFieldNameToken(SymbolToken sym)
+        throws IOException
+    {
+<span class="fc" id="L84">        myCallback.beforeFieldName(myTypeBeingWritten, sym);</span>
+<span class="fc" id="L85">        super.writeFieldNameToken(sym);</span>
+<span class="fc" id="L86">        myCallback.afterFieldName(myTypeBeingWritten, sym);</span>
+<span class="fc" id="L87">    }</span>
+
+    @Override
+    protected void writeAnnotations(SymbolToken[] annotations)
+        throws IOException
+    {
+<span class="fc" id="L93">        myCallback.beforeAnnotations(myTypeBeingWritten);</span>
+<span class="fc" id="L94">        super.writeAnnotations(annotations);</span>
+<span class="fc" id="L95">        myCallback.afterAnnotations(myTypeBeingWritten);</span>
+<span class="fc" id="L96">    }</span>
+
+    @Override
+    protected void writeAnnotationToken(SymbolToken sym)
+        throws IOException
+    {
+<span class="fc" id="L102">        myCallback.beforeEachAnnotation(myTypeBeingWritten, sym);</span>
+<span class="fc" id="L103">        super.writeAnnotationToken(sym);</span>
+<span class="fc" id="L104">        myCallback.afterEachAnnotation(myTypeBeingWritten, sym);</span>
+<span class="fc" id="L105">    }</span>
+
+    @Override
+    protected boolean writeSeparator(boolean followingLongString)
+        throws IOException
+    {
+        // Determine the type of the container.
+<span class="fc" id="L112">        IonType containerType = getContainer();</span>
+        // Don't set beingWritten, because writeSeparator is called during the
+        // writing of another value, and it would mess up the other callbacks
+
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        if (_pending_separator) {</span>
+<span class="fc" id="L117">            myCallback.beforeSeparator(containerType);</span>
+        }
+
+<span class="fc" id="L120">        followingLongString = super.writeSeparator(followingLongString);</span>
+
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (_pending_separator) {</span>
+<span class="fc" id="L123">            myCallback.afterSeparator(containerType);</span>
+        }
+<span class="fc" id="L125">        return followingLongString;</span>
+    }
+
+    @Override
+    public void stepIn(IonType containerType)
+        throws IOException
+    {
+<span class="fc" id="L132">        myTypeBeingWritten = containerType;</span>
+<span class="fc" id="L133">        super.stepIn(containerType);</span>
+<span class="fc" id="L134">        myCallback.afterStepIn(containerType);</span>
+<span class="fc" id="L135">        myTypeBeingWritten = null;</span>
+<span class="fc" id="L136">    }</span>
+
+    @Override
+    public void stepOut()
+        throws IOException
+    {
+<span class="fc" id="L142">        myTypeBeingWritten = getContainer();</span>
+<span class="fc" id="L143">        myCallback.beforeStepOut(myTypeBeingWritten);</span>
+<span class="fc" id="L144">        super.stepOut();</span>
+<span class="fc" id="L145">        myTypeBeingWritten = null;</span>
+<span class="fc" id="L146">    }</span>
+
+    // ================ Customer Methods for writing Ion data. ================
+
+    @Override
+    public void writeBlob(byte[] value, int start, int len)
+        throws IOException
+    {
+<span class="fc" id="L154">        myTypeBeingWritten = IonType.BLOB;</span>
+<span class="fc" id="L155">        super.writeBlob(value, start, len);</span>
+<span class="fc" id="L156">        myTypeBeingWritten = null;</span>
+<span class="fc" id="L157">    }</span>
+
+    @Override
+    public void writeBool(boolean value)
+        throws IOException
+    {
+<span class="fc" id="L163">        myTypeBeingWritten = IonType.BOOL;</span>
+<span class="fc" id="L164">        super.writeBool(value);</span>
+<span class="fc" id="L165">        myTypeBeingWritten = null;</span>
+<span class="fc" id="L166">    }</span>
+
+    @Override
+    public void writeClob(byte[] value, int start, int len)
+        throws IOException
+    {
+<span class="fc" id="L172">        myTypeBeingWritten = IonType.CLOB;</span>
+<span class="fc" id="L173">        super.writeClob(value, start, len);</span>
+<span class="fc" id="L174">        myTypeBeingWritten = null;</span>
+<span class="fc" id="L175">    }</span>
+
+    @Override
+    public void writeDecimal(BigDecimal value)
+        throws IOException
+    {
+<span class="fc" id="L181">        myTypeBeingWritten = IonType.DECIMAL;</span>
+<span class="fc" id="L182">        super.writeDecimal(value);</span>
+<span class="fc" id="L183">        myTypeBeingWritten = null;</span>
+<span class="fc" id="L184">    }</span>
+
+    @Override
+    public void writeFloat(double value)
+        throws IOException
+    {
+<span class="fc" id="L190">        myTypeBeingWritten = IonType.FLOAT;</span>
+<span class="fc" id="L191">        super.writeFloat(value);</span>
+<span class="fc" id="L192">        myTypeBeingWritten = null;</span>
+<span class="fc" id="L193">    }</span>
+
+    @Override
+    public void writeInt(long value)
+        throws IOException
+    {
+<span class="nc" id="L199">        myTypeBeingWritten = IonType.INT;</span>
+<span class="nc" id="L200">        super.writeInt(value);</span>
+<span class="nc" id="L201">        myTypeBeingWritten = null;</span>
+<span class="nc" id="L202">    }</span>
+
+    @Override
+    public void writeInt(BigInteger value)
+        throws IOException
+    {
+<span class="fc" id="L208">        myTypeBeingWritten = IonType.INT;</span>
+<span class="fc" id="L209">        super.writeInt(value);</span>
+<span class="fc" id="L210">        myTypeBeingWritten = null;</span>
+<span class="fc" id="L211">    }</span>
+
+    @Override
+    public void writeNull()
+        throws IOException
+    {
+<span class="nc" id="L217">        myTypeBeingWritten = IonType.NULL;</span>
+<span class="nc" id="L218">        super.writeNull();</span>
+<span class="nc" id="L219">        myTypeBeingWritten = null;</span>
+<span class="nc" id="L220">    }</span>
+
+    @Override
+    public void writeNull(IonType type)
+        throws IOException
+    {
+<span class="fc" id="L226">        myTypeBeingWritten = type;</span>
+<span class="fc" id="L227">        super.writeNull(type);</span>
+<span class="fc" id="L228">        myTypeBeingWritten = null;</span>
+<span class="fc" id="L229">    }</span>
+
+    @Override
+    public void writeString(String value)
+        throws IOException
+    {
+<span class="fc" id="L235">        myTypeBeingWritten = IonType.STRING;</span>
+<span class="fc" id="L236">        super.writeString(value);</span>
+<span class="fc" id="L237">        myTypeBeingWritten = null;</span>
+<span class="fc" id="L238">    }</span>
+
+    @Override
+    public void writeSymbolAsIs(String value)
+        throws IOException
+    {
+<span class="fc" id="L244">        myTypeBeingWritten = IonType.SYMBOL;</span>
+<span class="fc" id="L245">        super.writeSymbolAsIs(value);</span>
+<span class="fc" id="L246">        myTypeBeingWritten = null;</span>
+<span class="fc" id="L247">    }</span>
+
+    @Override
+    public void writeSymbolAsIs(int value)
+        throws IOException
+    {
+<span class="fc" id="L253">        myTypeBeingWritten = IonType.SYMBOL;</span>
+<span class="fc" id="L254">        super.writeSymbolAsIs(value);</span>
+<span class="fc" id="L255">        myTypeBeingWritten = null;</span>
+<span class="fc" id="L256">    }</span>
+
+    @Override
+    public void writeTimestamp(Timestamp value)
+        throws IOException
+    {
+<span class="fc" id="L262">        myTypeBeingWritten = IonType.TIMESTAMP;</span>
+<span class="fc" id="L263">        super.writeTimestamp(value);</span>
+<span class="fc" id="L264">        myTypeBeingWritten = null;</span>
+<span class="fc" id="L265">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

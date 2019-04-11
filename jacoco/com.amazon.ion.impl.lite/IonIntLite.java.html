@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonIntLite.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl.lite</a> &gt; <span class="el_source">IonIntLite.java</span></div><h1>IonIntLite.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl.lite;
+
+import com.amazon.ion.IntegerSize;
+import com.amazon.ion.IonInt;
+import com.amazon.ion.IonType;
+import com.amazon.ion.IonWriter;
+import com.amazon.ion.NullValueException;
+import com.amazon.ion.ValueVisitor;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+
+
+
+final class IonIntLite
+    extends IonValueLite
+    implements IonInt
+{
+<span class="fc" id="L34">    static private final BigInteger LONG_MIN_VALUE =</span>
+<span class="fc" id="L35">        BigInteger.valueOf(Long.MIN_VALUE);</span>
+
+<span class="fc" id="L37">    static private final BigInteger LONG_MAX_VALUE =</span>
+<span class="fc" id="L38">        BigInteger.valueOf(Long.MAX_VALUE);</span>
+
+<span class="fc" id="L40">    private static final int HASH_SIGNATURE =</span>
+<span class="fc" id="L41">        IonType.INT.toString().hashCode();</span>
+
+
+    // This mask combines the IS_BOOL_TRUE (0x08) and IS_IVM (0x10)
+    // masks from IonValueLite. Those flags are never relevant for
+    // IonInts, which makes them safe for reuse here.
+    private static final int INT_SIZE_MASK  = 0x18;
+    private static final int INT_SIZE_SHIFT = 0x03;
+
+<span class="fc" id="L50">    private static final IntegerSize[] SIZES = IntegerSize.values();</span>
+
+    private long _long_value;
+    private BigInteger _big_int_value;
+
+    /**
+     * Constructs a &lt;code&gt;null.int&lt;/code&gt; element.
+     */
+    IonIntLite(ContainerlessContext context, boolean isNull)
+    {
+<span class="fc" id="L60">        super(context, isNull);</span>
+<span class="fc" id="L61">    }</span>
+
+    IonIntLite(IonIntLite existing, IonContext context)
+    {
+<span class="fc" id="L65">        super(existing, context);</span>
+<span class="fc" id="L66">        this._long_value    = existing._long_value;</span>
+<span class="fc" id="L67">        this._big_int_value = existing._big_int_value;</span>
+<span class="fc" id="L68">    }</span>
+
+    @Override
+    IonIntLite clone(IonContext context)
+    {
+<span class="fc" id="L73">        return new IonIntLite(this, context);</span>
+    }
+
+    @Override
+    public IonIntLite clone()
+    {
+<span class="fc" id="L79">        return clone(ContainerlessContext.wrap(getSystem()));</span>
+    }
+
+    @Override
+    int hashCode(SymbolTableProvider symbolTableProvider)
+    {
+<span class="fc" id="L85">        int result = HASH_SIGNATURE;</span>
+
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (!isNullValue())  {</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            if (_big_int_value == null)</span>
+            {
+<span class="fc" id="L90">                long lv = longValue();</span>
+                // Throw away top 32 bits if they're not interesting.
+                // Otherwise n and -(n+1) get the same hash code.
+<span class="fc" id="L93">                result ^= (int) lv;</span>
+<span class="fc" id="L94">                int hi_word = (int) (lv &gt;&gt;&gt; 32);</span>
+<span class="fc bfc" id="L95" title="All 4 branches covered.">                if (hi_word != 0 &amp;&amp; hi_word != -1)  {</span>
+<span class="fc" id="L96">                    result ^= hi_word;</span>
+                }
+<span class="fc" id="L98">            }</span>
+            else
+            {
+<span class="fc" id="L101">                result = _big_int_value.hashCode();</span>
+            }
+        }
+
+<span class="fc" id="L105">        return hashTypeAnnotations(result, symbolTableProvider);</span>
+    }
+
+    @Override
+    public IonType getType()
+    {
+<span class="fc" id="L111">        return IonType.INT;</span>
+    }
+
+    public int intValue()
+        throws NullValueException
+    {
+<span class="fc" id="L117">        validateThisNotNull();</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        if (_big_int_value == null)</span>
+        {
+<span class="fc" id="L120">            return (int)_long_value;</span>
+        }
+<span class="fc" id="L122">        return _big_int_value.intValue();</span>
+    }
+
+    public long longValue()
+        throws NullValueException
+    {
+<span class="fc" id="L128">        validateThisNotNull();</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        if (_big_int_value == null)</span>
+        {
+<span class="fc" id="L131">            return _long_value;</span>
+        }
+<span class="fc" id="L133">        return _big_int_value.longValue();</span>
+    }
+
+    public BigInteger bigIntegerValue()
+        throws NullValueException
+    {
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (isNullValue()) {</span>
+<span class="fc" id="L140">            return null;</span>
+        }
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (_big_int_value == null)</span>
+        {
+<span class="fc" id="L144">            return BigInteger.valueOf(_long_value);</span>
+        }
+<span class="fc" id="L146">        return _big_int_value;</span>
+    }
+
+    public void setValue(int value)
+    {
+<span class="fc" id="L151">        setValue((long)value);</span>
+<span class="fc" id="L152">    }</span>
+
+    public void setValue(long value)
+    {
+<span class="fc" id="L156">        checkForLock();</span>
+<span class="fc" id="L157">        doSetValue(value, false);</span>
+<span class="fc" id="L158">    }</span>
+
+    public void setValue(Number value)
+    {
+<span class="fc" id="L162">        checkForLock();</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        if (value == null)</span>
+        {
+<span class="fc" id="L165">            doSetValue(0, true);</span>
+        }
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        else if (value instanceof BigInteger)</span>
+        {
+<span class="fc" id="L169">            BigInteger big = (BigInteger) value;</span>
+<span class="fc" id="L170">            doSetValue(big);</span>
+<span class="fc" id="L171">        }</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        else if (value instanceof BigDecimal)</span>
+        {
+<span class="fc" id="L174">            BigDecimal bd = (BigDecimal) value;</span>
+<span class="fc" id="L175">            doSetValue(bd.toBigInteger());</span>
+<span class="fc" id="L176">        }</span>
+        else
+        {
+            // XXX this is essentially a narrowing conversion
+            // for some types of numbers
+<span class="nc" id="L181">            doSetValue(value.longValue(), false);</span>
+        }
+<span class="fc" id="L183">    }</span>
+
+    @Override
+    final void writeBodyTo(IonWriter writer, SymbolTableProvider symbolTableProvider)
+        throws IOException
+    {
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        if (isNullValue())</span>
+        {
+<span class="fc" id="L191">            writer.writeNull(IonType.INT);</span>
+        }
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        else if (_big_int_value != null)</span>
+        {
+<span class="fc" id="L195">            writer.writeInt(_big_int_value);</span>
+        }
+        else
+        {
+<span class="fc" id="L199">            writer.writeInt(_long_value);</span>
+        }
+<span class="fc" id="L201">    }</span>
+
+    private void doSetValue(long value, boolean isNull)
+    {
+<span class="fc" id="L205">        _long_value = value;</span>
+<span class="fc" id="L206">        _big_int_value = null;</span>
+<span class="fc" id="L207">        _isNullValue(isNull);</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        if (!isNull)</span>
+        {
+<span class="fc bfc" id="L210" title="All 4 branches covered.">            if (value &lt; Integer.MIN_VALUE || value &gt; Integer.MAX_VALUE)</span>
+            {
+                // fits in long
+<span class="fc" id="L213">                setSize(IntegerSize.LONG);</span>
+            }
+            else
+            {
+                // fits in int
+<span class="fc" id="L218">                setSize(IntegerSize.INT);</span>
+            }
+        }
+<span class="fc" id="L221">    }</span>
+
+    private void doSetValue(BigInteger value) {
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        if ((value.compareTo(LONG_MIN_VALUE) &lt; 0) ||</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">            (value.compareTo(LONG_MAX_VALUE) &gt; 0))</span>
+        {
+<span class="fc" id="L227">            setSize(IntegerSize.BIG_INTEGER);</span>
+<span class="fc" id="L228">            _long_value = 0L;</span>
+<span class="fc" id="L229">            _big_int_value = value;</span>
+<span class="fc" id="L230">            _isNullValue(false);</span>
+        }
+        else {
+<span class="fc" id="L233">            doSetValue(value.longValue(), false);</span>
+        }
+<span class="fc" id="L235">    }</span>
+
+    private void setSize(IntegerSize size)
+    {
+<span class="fc" id="L239">        _setMetadata(size.ordinal(), INT_SIZE_MASK, INT_SIZE_SHIFT);</span>
+<span class="fc" id="L240">    }</span>
+
+    @Override
+    public void accept(ValueVisitor visitor) throws Exception
+    {
+<span class="fc" id="L245">        visitor.visit(this);</span>
+<span class="fc" id="L246">    }</span>
+
+    public IntegerSize getIntegerSize()
+    {
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        if (isNullValue())</span>
+        {
+<span class="fc" id="L252">            return null;</span>
+        }
+<span class="fc" id="L254">        return SIZES[_getMetadata(INT_SIZE_MASK, INT_SIZE_SHIFT)];</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

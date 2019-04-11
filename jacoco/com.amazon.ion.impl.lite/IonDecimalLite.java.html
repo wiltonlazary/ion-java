@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonDecimalLite.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl.lite</a> &gt; <span class="el_source">IonDecimalLite.java</span></div><h1>IonDecimalLite.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl.lite;
+
+import com.amazon.ion.Decimal;
+import com.amazon.ion.IonDecimal;
+import com.amazon.ion.IonType;
+import com.amazon.ion.IonWriter;
+import com.amazon.ion.NullValueException;
+import com.amazon.ion.ValueVisitor;
+import java.io.IOException;
+import java.math.BigDecimal;
+
+
+final class IonDecimalLite
+    extends IonValueLite
+    implements IonDecimal
+{
+<span class="fc" id="L32">    private static final int HASH_SIGNATURE =</span>
+<span class="fc" id="L33">        IonType.DECIMAL.toString().hashCode();</span>
+
+<span class="fc" id="L35">    private static final int NEGATIVE_ZERO_HASH_SIGNATURE =</span>
+<span class="fc" id="L36">        &quot;NEGATIVE ZERO&quot;.hashCode();</span>
+
+
+    public static boolean isNegativeZero(float value)
+    {
+<span class="nc bnc" id="L41" title="All 2 branches missed.">        if (value != 0) return false;</span>
+        // TODO perhaps use Float.compare() instead?
+<span class="nc bnc" id="L43" title="All 2 branches missed.">        if ((Float.floatToRawIntBits(value) &amp; 0x80000000) == 0) return false; // test the sign bit</span>
+<span class="nc" id="L44">        return true;</span>
+    }
+
+    public static boolean isNegativeZero(double value)
+    {
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        if (value != 0) return false;</span>
+        // TODO perhaps use Double.compare() instead?
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        if ((Double.doubleToLongBits(value) &amp; 0x8000000000000000L) == 0) return false;</span>
+<span class="nc" id="L52">        return true;</span>
+    }
+
+    private BigDecimal _decimal_value;
+
+    /**
+     * Constructs a &lt;code&gt;null.decimal&lt;/code&gt; element.
+     */
+    IonDecimalLite(ContainerlessContext context, boolean isNull)
+    {
+<span class="fc" id="L62">        super(context, isNull);</span>
+<span class="fc" id="L63">    }</span>
+
+    IonDecimalLite(IonDecimalLite existing, IonContext context)
+    {
+<span class="fc" id="L67">        super(existing, context);</span>
+        // we can shallow copy as BigDecimal is immutable
+<span class="fc" id="L69">        this._decimal_value = existing._decimal_value;</span>
+<span class="fc" id="L70">    }</span>
+
+    @Override
+    IonDecimalLite clone(IonContext parentContext)
+    {
+<span class="fc" id="L75">        return new IonDecimalLite(this, parentContext);</span>
+    }
+
+    @Override
+    public IonDecimalLite clone()
+    {
+<span class="fc" id="L81">        return clone(ContainerlessContext.wrap(getSystem()));</span>
+    }
+
+    @Override
+    int hashCode(SymbolTableProvider symbolTableProvider)
+    {
+<span class="fc" id="L87">        int result = HASH_SIGNATURE;</span>
+
+        // This is consistent with Decimal.equals(Object), and with Equivalence
+        // strict equality checks between two IonDecimals.
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (!isNullValue())  {</span>
+<span class="fc" id="L92">            Decimal dec = decimalValue();</span>
+<span class="fc" id="L93">            result ^= dec.hashCode();</span>
+
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            if (dec.isNegativeZero())</span>
+            {
+<span class="fc" id="L97">                result ^= NEGATIVE_ZERO_HASH_SIGNATURE;</span>
+            }
+        }
+
+<span class="fc" id="L101">        return hashTypeAnnotations(result, symbolTableProvider);</span>
+    }
+
+    @Override
+    public IonType getType()
+    {
+<span class="fc" id="L107">        return IonType.DECIMAL;</span>
+    }
+
+
+    public float floatValue()
+        throws NullValueException
+    {
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (_isNullValue()) throw new NullValueException();</span>
+<span class="fc" id="L115">        float f = _decimal_value.floatValue();</span>
+<span class="fc" id="L116">        return f;</span>
+    }
+
+    public double doubleValue()
+        throws NullValueException
+    {
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (_isNullValue()) throw new NullValueException();</span>
+<span class="fc" id="L123">        double d = _decimal_value.doubleValue();</span>
+<span class="fc" id="L124">        return d;</span>
+    }
+
+    public BigDecimal bigDecimalValue()
+        throws NullValueException
+    {
+<span class="fc" id="L130">        return Decimal.bigDecimalValue(_decimal_value); // Works for null.</span>
+    }
+
+    public Decimal decimalValue()
+        throws NullValueException
+    {
+<span class="fc" id="L136">        return Decimal.valueOf(_decimal_value); // Works for null.</span>
+    }
+
+    public void setValue(long value)
+    {
+        // base setValue will check for the lock
+<span class="fc" id="L142">        setValue(Decimal.valueOf(value));</span>
+<span class="fc" id="L143">    }</span>
+
+    public void setValue(float value)
+    {
+        // base setValue will check for the lock
+<span class="fc" id="L148">        setValue(Decimal.valueOf(value));</span>
+<span class="fc" id="L149">    }</span>
+
+    public void setValue(double value)
+    {
+        // base setValue will check for the lock
+<span class="fc" id="L154">        setValue(Decimal.valueOf(value));</span>
+<span class="fc" id="L155">    }</span>
+
+    public void setValue(BigDecimal value)
+    {
+<span class="fc" id="L159">        checkForLock();</span>
+<span class="fc" id="L160">        _decimal_value = value;</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        _isNullValue(value == null);</span>
+<span class="fc" id="L162">    }</span>
+
+    @Override
+    final void writeBodyTo(IonWriter writer, SymbolTableProvider symbolTableProvider)
+        throws IOException
+    {
+<span class="fc" id="L168">        writer.writeDecimal(_decimal_value);</span>
+<span class="fc" id="L169">    }</span>
+
+    @Override
+    public void accept(ValueVisitor visitor) throws Exception
+    {
+<span class="fc" id="L174">        visitor.visit(this);</span>
+<span class="fc" id="L175">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

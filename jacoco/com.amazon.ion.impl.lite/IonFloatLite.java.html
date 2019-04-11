@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonFloatLite.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl.lite</a> &gt; <span class="el_source">IonFloatLite.java</span></div><h1>IonFloatLite.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl.lite;
+
+import com.amazon.ion.Decimal;
+import com.amazon.ion.IonFloat;
+import com.amazon.ion.IonType;
+import com.amazon.ion.IonWriter;
+import com.amazon.ion.NullValueException;
+import com.amazon.ion.ValueVisitor;
+import java.io.IOException;
+import java.math.BigDecimal;
+
+
+final class IonFloatLite
+    extends IonValueLite
+    implements IonFloat
+{
+<span class="fc" id="L32">    private static final int HASH_SIGNATURE =</span>
+<span class="fc" id="L33">        IonType.FLOAT.toString().hashCode();</span>
+
+    private Double _float_value;
+
+    /**
+     * Constructs a &lt;code&gt;null.float&lt;/code&gt; element.
+     */
+    IonFloatLite(ContainerlessContext context, boolean isNull)
+    {
+<span class="fc" id="L42">        super(context, isNull);</span>
+<span class="fc" id="L43">    }</span>
+
+    IonFloatLite(IonFloatLite existing, IonContext context)
+    {
+<span class="fc" id="L47">        super(existing, context);</span>
+        // shallow copy as Double is immutable
+<span class="fc" id="L49">        this._float_value = existing._float_value;</span>
+<span class="fc" id="L50">    }</span>
+
+    @Override
+    IonFloatLite clone(IonContext context)
+    {
+<span class="fc" id="L55">        return new IonFloatLite(this, context);</span>
+    }
+
+    @Override
+    public IonFloatLite clone()
+    {
+<span class="fc" id="L61">        return clone(ContainerlessContext.wrap(getSystem()));</span>
+    }
+
+    @Override
+    int hashCode(SymbolTableProvider symbolTableProvider)
+    {
+<span class="fc" id="L67">        int result = HASH_SIGNATURE;</span>
+
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (!isNullValue())  {</span>
+<span class="fc" id="L70">            long bits = Double.doubleToLongBits(doubleValue());</span>
+<span class="fc" id="L71">            result ^= (int) ((bits &gt;&gt;&gt; 32) ^ bits);</span>
+        }
+
+<span class="fc" id="L74">        return hashTypeAnnotations(result, symbolTableProvider);</span>
+    }
+
+    @Override
+    public IonType getType()
+    {
+<span class="fc" id="L80">        return IonType.FLOAT;</span>
+    }
+
+
+    public float floatValue()
+        throws NullValueException
+    {
+<span class="fc" id="L87">        validateThisNotNull();</span>
+<span class="fc" id="L88">        return _float_value.floatValue();</span>
+    }
+
+    public double doubleValue()
+        throws NullValueException
+    {
+<span class="fc" id="L94">        validateThisNotNull();</span>
+<span class="fc" id="L95">        return _float_value.doubleValue();</span>
+    }
+
+    public BigDecimal bigDecimalValue()
+        throws NullValueException
+    {
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (isNullValue()) {</span>
+<span class="fc" id="L102">            return null;</span>
+        }
+<span class="fc" id="L104">        return Decimal.valueOf(_float_value.doubleValue());</span>
+    }
+
+    public void setValue(float value)
+    {
+        // base set value will check for the lock
+<span class="fc" id="L110">        setValue(new Double(value));</span>
+<span class="fc" id="L111">    }</span>
+
+    public void setValue(double value)
+    {
+        // base setValue will check for the lock
+<span class="fc" id="L116">        setValue(new Double(value));</span>
+<span class="fc" id="L117">    }</span>
+
+    public void setValue(BigDecimal value)
+    {
+<span class="fc" id="L121">        checkForLock();</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (value == null)</span>
+        {
+<span class="fc" id="L124">            _float_value = null;</span>
+<span class="fc" id="L125">            _isNullValue(true);</span>
+        }
+        else
+        {
+<span class="nc" id="L129">            setValue(value.doubleValue());</span>
+        }
+<span class="fc" id="L131">    }</span>
+
+    public void setValue(Double d)
+    {
+<span class="fc" id="L135">        checkForLock();</span>
+<span class="fc" id="L136">        _float_value = d;</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        _isNullValue(d == null);</span>
+<span class="fc" id="L138">    }</span>
+
+    @Override
+    final void writeBodyTo(IonWriter writer, SymbolTableProvider symbolTableProvider)
+        throws IOException
+    {
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        if (isNullValue())</span>
+        {
+<span class="fc" id="L146">            writer.writeNull(IonType.FLOAT);</span>
+        }
+        else
+        {
+<span class="fc" id="L150">            writer.writeFloat(_float_value);</span>
+        }
+<span class="fc" id="L152">    }</span>
+
+    public boolean isNumericValue()
+    {
+<span class="fc bfc" id="L156" title="All 6 branches covered.">        return !(isNullValue() || _float_value.isNaN() || _float_value.isInfinite());</span>
+    }
+
+    @Override
+    public void accept(ValueVisitor visitor) throws Exception
+    {
+<span class="fc" id="L162">        visitor.visit(this);</span>
+<span class="fc" id="L163">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

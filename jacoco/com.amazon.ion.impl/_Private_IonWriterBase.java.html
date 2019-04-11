@@ -1,0 +1,498 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>_Private_IonWriterBase.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl</a> &gt; <span class="el_source">_Private_IonWriterBase.java</span></div><h1>_Private_IonWriterBase.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl;
+
+import com.amazon.ion.IonReader;
+import com.amazon.ion.IonType;
+import com.amazon.ion.IonValue;
+import com.amazon.ion.IonWriter;
+import com.amazon.ion.SymbolTable;
+import com.amazon.ion.SymbolToken;
+import com.amazon.ion.Timestamp;
+import com.amazon.ion.UnknownSymbolException;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.util.Date;
+
+/**
+ * NOT FOR APPLICATION USE!
+ * &lt;p&gt;
+ * Base type for Ion writers.  This handles the writeIonEvents and provides default
+ * handlers for the list forms of write.  This also resolves symbols if a symbol
+ * table is available (which it will not be if the underlying writer is a system
+ * writer).
+ */
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">public abstract class _Private_IonWriterBase</span>
+    implements IonWriter, _Private_ReaderWriter
+{
+    protected static final String ERROR_MISSING_FIELD_NAME =
+        &quot;IonWriter.setFieldName() must be called before writing a value into a struct.&quot;;
+
+    static final String ERROR_FINISH_NOT_AT_TOP_LEVEL =
+        &quot;IonWriter.finish() can only be called at top-level.&quot;;
+
+    private static final boolean _debug_on = false;
+
+
+
+    /**
+     * Returns the current depth of containers the writer is at.  This is
+     * 0 if the writer is at top-level.
+     * @return int depth of container nesting
+     */
+    protected abstract int getDepth();
+
+
+    //========================================================================
+    // Context management
+
+
+    /**
+     * Write an Ion version marker symbol to the output.  This
+     * is the $ion_1_0 value currently (in later versions the
+     * number may change).  In text output this appears as the
+     * text symbol.  In binary this will be the symbol id if
+     * the writer is in a list, sexp or struct.  If the writer
+     * is currently at the top level this will write the
+     * &quot;magic cookie&quot; value.
+     *
+     *  Writing a version marker will reset the symbol table
+     *  to be the system symbol table.
+     */
+    abstract void writeIonVersionMarker() throws IOException;
+
+    /**
+     * Sets the symbol table to use for encoding to be the passed
+     * in symbol table.  The can only be done between top-level values.
+     * As symbols are written
+     * this symbol table is used to resolve them.  If the symbols
+     * are undefined this symbol table is updated to include them
+     * as local symbols.  The updated symbol table will be
+     * written before any of the local values are emitted.
+     * &lt;p&gt;
+     * If the symbol table is the system symbol table an Ion
+     * version marker will be written to the output.  If symbols
+     * not in the system symbol table are written a local
+     * symbol table will be created and written before the
+     * current top level value.
+     *
+     * @param symbols base symbol table for encoding. Must not be null.
+     * @throws IllegalArgumentException if symbols is null or a shared symbol
+     * table, or if this writer isn't at top level.
+     */
+    public abstract void setSymbolTable(SymbolTable symbols)
+        throws IOException;
+
+
+    /**
+     * Translates a symbol using the current symtab.
+     *
+     * @return not null.
+     *
+     * @throws UnknownSymbolException if the text is unknown.
+     *
+     * @see SymbolTable#findKnownSymbol(int)
+     */
+    abstract String assumeKnownSymbol(int sid);
+
+
+    //========================================================================
+    // Field names
+
+
+    /**
+     * Returns true if the field name has been set either through setFieldName or
+     * setFieldId.  This is generally more efficient than calling getFieldName or
+     * getFieldId and checking the return type as it does not need to resolve the
+     * name through a symbol table.  This returns false if the field name has not
+     * been set.
+     * @return true if a field name has been set false otherwise
+     */
+    public abstract boolean isFieldNameSet();
+
+
+    //========================================================================
+    // Annotations
+
+    /**
+     * Returns the given annotation's index in the value's annotations list, or -1 if not present.
+     * @param name the annotation to find.
+     * @return the index or -1.
+     */
+    abstract int findAnnotation(String name);
+
+
+    /**
+     * Gets the current list of pending annotations.
+     * This is the contents of the current {@code annotations} array
+     * of this writer.
+     * &lt;p&gt;
+     * If the annotations were set as IDs they
+     * will be converted if a symbol table is available.  In the event
+     * a symbol table is not available a null array will be returned.
+     * If no annotations are set a 0 length array will be returned.
+     * &lt;p&gt;
+     * @return pending type annotations as strings, null if the
+     * annotations cannot be expressed as strings.
+     */
+    abstract String[] getTypeAnnotations();
+
+
+    /**
+     * Gets the current list of pending annotations.
+     * This is the contents of the current {@code annotations} array
+     * of this writer.
+     * &lt;p&gt;
+     * If the annotations were set as string they
+     * will be converted to symbol IDs (ints) if a symbol table is
+     * available.  In the event a symbol table is not available a
+     * null array will be returned.
+     * If no annotations are set a 0 length array will be returned.
+     * &lt;p&gt;
+     * @return pending type annotations as symbol ID ints, null if the
+     * annotations cannot be expressed as IDs.
+     */
+    abstract int[] getTypeAnnotationIds();
+
+    /**
+     * Write symbolId out as an IonSymbol value.  The value must
+     * be valid in the symbol table.
+     *
+     * @param symbolId symbol table id to write
+     */
+    abstract void writeSymbol(int symbolId) throws IOException;
+
+
+    //========================================================================
+
+
+    //
+    // default overload implementations.  These generally
+    // convert the users value to a value of the intrinsic
+    // underlying type and then write that type using
+    // the concrete writers method.
+    //
+    public void writeBlob(byte[] value) throws IOException
+    {
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L191">            this.writeNull(IonType.BLOB);</span>
+        }
+        else {
+<span class="fc" id="L194">            this.writeBlob(value, 0, value.length);</span>
+        }
+<span class="fc" id="L196">        return;</span>
+    }
+    public void writeClob(byte[] value) throws IOException
+    {
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L201">            this.writeNull(IonType.CLOB);</span>
+        }
+        else {
+<span class="fc" id="L204">            this.writeClob(value, 0, value.length);</span>
+        }
+<span class="fc" id="L206">        return;</span>
+    }
+
+    abstract public void writeDecimal(BigDecimal value) throws IOException;
+
+
+    public void writeFloat(float value) throws IOException
+    {
+<span class="nc" id="L214">        writeFloat((double)value);</span>
+<span class="nc" id="L215">    }</span>
+
+    public void writeNull() throws IOException
+    {
+<span class="fc" id="L219">        writeNull(IonType.NULL);</span>
+<span class="fc" id="L220">    }</span>
+
+    final void validateSymbolId(int sid) {
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        if (sid &gt; getSymbolTable().getMaxId()) {</span>
+            // There is no slot for this symbol ID in the symbol table,
+            // so an error would be raised on read. Fail early on write.
+<span class="fc" id="L226">            throw new UnknownSymbolException(sid);</span>
+        }
+<span class="fc" id="L228">    }</span>
+
+    public final void writeSymbolToken(SymbolToken tok)
+        throws IOException
+    {
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">        if (tok == null) {</span>
+<span class="nc" id="L234">            writeNull(IonType.SYMBOL);</span>
+<span class="nc" id="L235">            return;</span>
+        }
+
+<span class="fc" id="L238">        String text = tok.getText();</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        if (text != null)</span>
+        {
+<span class="fc" id="L241">            writeSymbol(text);</span>
+        }
+        else
+        {
+<span class="fc" id="L245">            int sid = tok.getSid();</span>
+<span class="fc" id="L246">            validateSymbolId(sid);</span>
+<span class="fc" id="L247">            writeSymbol(sid);</span>
+        }
+<span class="fc" id="L249">    }</span>
+
+
+    public void writeTimestampUTC(Date value) throws IOException
+    {
+<span class="nc" id="L254">        Timestamp time = Timestamp.forDateZ(value);</span>
+<span class="nc" id="L255">        writeTimestamp(time);</span>
+<span class="nc" id="L256">    }</span>
+
+
+
+    //
+    //  default value and reader implementations.
+    //  note that these could be optimized, especially
+    //  the reader versions, when the reader is of the
+    //  same format as the writer.
+    //
+    @Deprecated
+    public void writeValue(IonValue value) throws IOException
+    {
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        if (value != null)</span>
+        {
+<span class="fc" id="L271">            value.writeTo(this);</span>
+        }
+<span class="fc" id="L273">    }</span>
+
+    public void writeValues(IonReader reader) throws IOException
+    {
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">        if (reader.getDepth() == 0) {</span>
+<span class="fc" id="L278">            clear_system_value_stack();</span>
+        }
+
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        if (reader.getType() == null) reader.next();</span>
+
+<span class="fc bfc" id="L283" title="All 4 branches covered.">        if (getDepth() == 0 &amp;&amp; reader instanceof _Private_ReaderWriter) {</span>
+            // Optimize symbol table copying
+<span class="fc" id="L285">            _Private_ReaderWriter private_reader =</span>
+                (_Private_ReaderWriter)reader;
+<span class="fc bfc" id="L287" title="All 2 branches covered.">            while (reader.getType() != null) {</span>
+<span class="fc" id="L288">                transfer_symbol_tables(private_reader);</span>
+<span class="fc" id="L289">                writeValue(reader);</span>
+<span class="fc" id="L290">                reader.next();</span>
+            }
+<span class="fc" id="L292">        }</span>
+        else {
+<span class="fc bfc" id="L294" title="All 2 branches covered.">            while (reader.getType() != null) {</span>
+<span class="fc" id="L295">                writeValue(reader);</span>
+<span class="fc" id="L296">                reader.next();</span>
+            }
+        }
+<span class="fc" id="L299">    }</span>
+
+    private final void transfer_symbol_tables(_Private_ReaderWriter reader)
+        throws IOException
+    {
+<span class="fc" id="L304">        SymbolTable reader_symbols = reader.pop_passed_symbol_table();</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        if (reader_symbols != null) {</span>
+<span class="fc" id="L306">            clear_system_value_stack();</span>
+<span class="fc" id="L307">            setSymbolTable(reader_symbols);</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">            while (reader_symbols != null) {</span>
+                // TODO these symtabs are never popped!
+                // Why bother pushing them?
+<span class="fc" id="L311">                push_symbol_table(reader_symbols);</span>
+<span class="fc" id="L312">                reader_symbols = reader.pop_passed_symbol_table();</span>
+            }
+        }
+<span class="fc" id="L315">    }</span>
+
+    /**
+     * @throws UnknownSymbolException if the text of the field name is
+     *  unknown.
+     */
+    private final void write_value_field_name_helper(IonReader reader)
+    {
+<span class="fc bfc" id="L323" title="All 4 branches covered.">        if (this.isInStruct() &amp;&amp; !isFieldNameSet())</span>
+        {
+<span class="fc" id="L325">            SymbolToken tok = reader.getFieldNameSymbol();</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">            if (tok == null)</span>
+            {
+<span class="fc" id="L328">                throw new IllegalStateException(&quot;Field name not set&quot;);</span>
+            }
+
+<span class="fc" id="L331">            setFieldNameSymbol(tok);</span>
+            if (_debug_on) System.out.print(&quot;:&quot;);
+        }
+<span class="fc" id="L334">    }</span>
+
+    private final void write_value_annotations_helper(IonReader reader)
+    {
+<span class="fc" id="L338">        SymbolToken[] a = reader.getTypeAnnotationSymbols();</span>
+        // At present, we must always call this, even when the list is empty,
+        // because local symtab diversion leaves the $ion_symbol_table
+        // dangling on the system writer!  TODO fix that, it's broken.
+<span class="fc" id="L342">        setTypeAnnotationSymbols(a);</span>
+        if (_debug_on) System.out.print(&quot;;&quot;);
+<span class="fc" id="L344">    }</span>
+
+
+    public boolean isStreamCopyOptimized()
+    {
+<span class="nc" id="L349">        return false;</span>
+    }
+
+    /**
+     * Overrides can optimize special cases.
+     */
+    public void writeValue(IonReader reader) throws IOException
+    {
+        // TODO this should do symtab optimization as per writeValues()
+<span class="fc" id="L358">        IonType type = reader.getType();</span>
+<span class="fc" id="L359">        writeValueRecursively(type, reader);</span>
+<span class="fc" id="L360">    }</span>
+
+    /**
+     * Unoptimized copy. This must not recurse back to the public
+     * {@link #writeValue(IonReader)} method since that will cause the
+     * optimization test to happen repeatedly.
+     */
+    final void writeValueRecursively(IonType type, IonReader reader)
+        throws IOException
+    {
+<span class="fc" id="L370">        write_value_field_name_helper(reader);</span>
+<span class="fc" id="L371">        write_value_annotations_helper(reader);</span>
+
+<span class="fc bfc" id="L373" title="All 2 branches covered.">        if (reader.isNullValue()) {</span>
+<span class="fc" id="L374">            this.writeNull(type);</span>
+        }
+        else {
+<span class="pc bpc" id="L377" title="2 of 14 branches missed.">            switch (type) {</span>
+            case NULL:
+<span class="nc" id="L379">                writeNull();</span>
+                if (_debug_on) System.out.print(&quot;-&quot;);
+<span class="nc" id="L381">                break;</span>
+            case BOOL:
+<span class="fc" id="L383">                writeBool(reader.booleanValue());</span>
+                if (_debug_on) System.out.print(&quot;b&quot;);
+<span class="fc" id="L385">                break;</span>
+            case INT:
+<span class="fc" id="L387">                writeInt(reader.bigIntegerValue());</span>
+                if (_debug_on) System.out.print(&quot;i&quot;);
+<span class="fc" id="L389">                break;</span>
+            case FLOAT:
+<span class="fc" id="L391">                writeFloat(reader.doubleValue());</span>
+                if (_debug_on) System.out.print(&quot;f&quot;);
+<span class="fc" id="L393">                break;</span>
+            case DECIMAL:
+<span class="fc" id="L395">                writeDecimal(reader.decimalValue());</span>
+                if (_debug_on) System.out.print(&quot;d&quot;);
+<span class="fc" id="L397">                break;</span>
+            case TIMESTAMP:
+<span class="fc" id="L399">                writeTimestamp(reader.timestampValue());</span>
+                if (_debug_on) System.out.print(&quot;t&quot;);
+<span class="fc" id="L401">                break;</span>
+            case STRING:
+<span class="fc" id="L403">                writeString(reader.stringValue());</span>
+                if (_debug_on) System.out.print(&quot;$&quot;);
+<span class="fc" id="L405">                break;</span>
+            case SYMBOL:
+<span class="fc" id="L407">                writeSymbolToken(reader.symbolValue());</span>
+                if (_debug_on) System.out.print(&quot;y&quot;);
+<span class="fc" id="L409">                break;</span>
+            case BLOB:
+<span class="fc" id="L411">                writeBlob(reader.newBytes());</span>
+                if (_debug_on) System.out.print(&quot;B&quot;);
+<span class="fc" id="L413">                break;</span>
+            case CLOB:
+<span class="fc" id="L415">                writeClob(reader.newBytes());</span>
+                if (_debug_on) System.out.print(&quot;L&quot;);
+<span class="fc" id="L417">                break;</span>
+            case STRUCT:
+                if (_debug_on) System.out.print(&quot;{&quot;);
+<span class="fc" id="L420">                writeContainerRecursively(IonType.STRUCT, reader);</span>
+                if (_debug_on) System.out.print(&quot;}&quot;);
+<span class="fc" id="L422">                break;</span>
+            case LIST:
+                if (_debug_on) System.out.print(&quot;[&quot;);
+<span class="fc" id="L425">                writeContainerRecursively(IonType.LIST, reader);</span>
+                if (_debug_on) System.out.print(&quot;]&quot;);
+<span class="fc" id="L427">                break;</span>
+            case SEXP:
+                if (_debug_on) System.out.print(&quot;(&quot;);
+<span class="fc" id="L430">                writeContainerRecursively(IonType.SEXP, reader);</span>
+                if (_debug_on) System.out.print(&quot;)&quot;);
+<span class="fc" id="L432">                break;</span>
+            default:
+<span class="nc" id="L434">                throw new IllegalStateException();</span>
+            }
+        }
+<span class="fc" id="L437">    }</span>
+
+    private void writeContainerRecursively(IonType type, IonReader reader)
+        throws IOException
+    {
+<span class="fc" id="L442">        stepIn(type);</span>
+<span class="fc" id="L443">        reader.stepIn();</span>
+<span class="fc bfc" id="L444" title="All 2 branches covered.">        while ((type = reader.next()) != null)</span>
+        {
+<span class="fc" id="L446">            writeValueRecursively(type, reader);</span>
+        }
+<span class="fc" id="L448">        reader.stepOut();</span>
+<span class="fc" id="L449">        stepOut();</span>
+<span class="fc" id="L450">    }</span>
+
+
+    //
+    //  This code handles the skipped symbol table
+    //  support - it is cloned in IonReaderTextUserX,
+    //  IonReaderBinaryUserX and _Private_IonWriterBase
+    //
+    //  SO ANY FIXES HERE WILL BE NEEDED IN THOSE
+    //  THREE LOCATIONS AS WELL.
+    //
+<span class="fc" id="L461">    private int _symbol_table_top = 0;</span>
+<span class="fc" id="L462">    private SymbolTable[] _symbol_table_stack = new SymbolTable[3]; // 3 is rare, IVM followed by a local sym tab with open content</span>
+    private void clear_system_value_stack()
+    {
+<span class="fc bfc" id="L465" title="All 2 branches covered.">        while (_symbol_table_top &gt; 0) {</span>
+<span class="fc" id="L466">            _symbol_table_top--;</span>
+<span class="fc" id="L467">            _symbol_table_stack[_symbol_table_top] = null;</span>
+        }
+<span class="fc" id="L469">    }</span>
+    private void push_symbol_table(SymbolTable symbols)
+    {
+<span class="pc bpc" id="L472" title="2 of 4 branches missed.">        assert(symbols != null);</span>
+<span class="pc bpc" id="L473" title="1 of 2 branches missed.">        if (_symbol_table_top &gt;= _symbol_table_stack.length) {</span>
+<span class="nc" id="L474">            int new_len = _symbol_table_stack.length * 2;</span>
+<span class="nc" id="L475">            SymbolTable[] temp = new SymbolTable[new_len];</span>
+<span class="nc" id="L476">            System.arraycopy(_symbol_table_stack, 0, temp, 0, _symbol_table_stack.length);</span>
+<span class="nc" id="L477">            _symbol_table_stack = temp;</span>
+        }
+<span class="fc" id="L479">        _symbol_table_stack[_symbol_table_top++] = symbols;</span>
+<span class="fc" id="L480">    }</span>
+    public final SymbolTable pop_passed_symbol_table()
+    {
+<span class="nc bnc" id="L483" title="All 2 branches missed.">        if (_symbol_table_top &lt;= 0) {</span>
+<span class="nc" id="L484">            return null;</span>
+        }
+<span class="nc" id="L486">        _symbol_table_top--;</span>
+<span class="nc" id="L487">        SymbolTable symbols = _symbol_table_stack[_symbol_table_top];</span>
+<span class="nc" id="L488">        _symbol_table_stack[_symbol_table_top] = null;</span>
+<span class="nc" id="L489">        return symbols;</span>
+    }
+
+    public &lt;T&gt; T asFacet(Class&lt;T&gt; facetType)
+    {
+        // This implementation has no facets.
+<span class="nc" id="L495">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

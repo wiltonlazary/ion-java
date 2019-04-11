@@ -1,0 +1,820 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonStructLite.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl.lite</a> &gt; <span class="el_source">IonStructLite.java</span></div><h1>IonStructLite.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl.lite;
+
+import com.amazon.ion.ContainedValueException;
+import com.amazon.ion.IonStruct;
+import com.amazon.ion.IonType;
+import com.amazon.ion.IonValue;
+import com.amazon.ion.IonWriter;
+import com.amazon.ion.SymbolToken;
+import com.amazon.ion.ValueFactory;
+import com.amazon.ion.ValueVisitor;
+import com.amazon.ion.impl._Private_CurriedValueFactory;
+import com.amazon.ion.util.Equivalence;
+import com.amazon.ion.UnknownSymbolException;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.ListIterator;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+
+
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">final class IonStructLite</span>
+    extends IonContainerLite
+    implements IonStruct
+{
+<span class="fc" id="L45">    private static final int HASH_SIGNATURE =</span>
+<span class="fc" id="L46">        IonType.STRUCT.toString().hashCode();</span>
+    // TODO amzn/ion-java/issues/41: add support for _isOrdered
+
+    IonStructLite(ContainerlessContext context, boolean isNull)
+    {
+<span class="fc" id="L51">        super(context, isNull);</span>
+<span class="fc" id="L52">    }</span>
+
+    private IonStructLite(IonStructLite existing, IonContext context)
+    {
+<span class="fc" id="L56">        super(existing, context, true);</span>
+        // field map can be shallow cloned due to it dealing with String and Integer
+        // values - both of which are immutable constructs and so safe to retain as references
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        this._field_map = null == existing._field_map ? null : new HashMap&lt;String, Integer&gt;(existing._field_map);</span>
+<span class="fc" id="L60">        this._field_map_duplicate_count = existing._field_map_duplicate_count;</span>
+<span class="fc" id="L61">        this.hasNullFieldName = existing.hasNullFieldName;</span>
+<span class="fc" id="L62">    }</span>
+
+    private Map&lt;String, Integer&gt; _field_map;
+<span class="fc" id="L65">    private boolean hasNullFieldName = false;</span>
+
+    public int                      _field_map_duplicate_count;
+
+    @Override
+    IonStructLite clone(IonContext parentContext)
+    {
+<span class="fc" id="L72">        return new IonStructLite(this, parentContext);</span>
+    }
+
+    @Override
+    public IonStructLite clone()
+    {
+<span class="fc" id="L78">        return clone(ContainerlessContext.wrap(getSystem()));</span>
+    }
+
+    @Override
+    protected void transitionToLargeSize(int size)
+    {
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (_field_map != null) return;</span>
+
+<span class="fc" id="L86">        build_field_map();</span>
+<span class="fc" id="L87">        return;</span>
+    }
+    protected void build_field_map()
+    {
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        int size = (_children == null) ? 0 : _children.length;</span>
+
+<span class="fc" id="L93">        _field_map = new HashMap&lt;String, Integer&gt;(size);</span>
+<span class="fc" id="L94">        _field_map_duplicate_count = 0;</span>
+
+<span class="fc" id="L96">        int count = get_child_count();</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        for (int ii=0; ii&lt;count; ii++) {</span>
+<span class="fc" id="L98">            IonValueLite v = get_child(ii);</span>
+<span class="fc" id="L99">            SymbolToken fieldNameSymbol = v.getFieldNameSymbol();</span>
+<span class="fc" id="L100">            String name = fieldNameSymbol.getText();</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            if (_field_map.get(name) != null) {</span>
+<span class="fc" id="L102">                _field_map_duplicate_count++;</span>
+            }
+<span class="fc" id="L104">            _field_map.put(name, ii); // this causes the map to have the largest index value stored</span>
+        }
+<span class="fc" id="L106">        return;</span>
+    }
+    private void add_field(String fieldName, int newFieldIdx)
+    {
+<span class="fc" id="L110">        Integer idx = _field_map.get(fieldName);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (idx != null) {</span>
+<span class="fc" id="L112">            _field_map_duplicate_count++;</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (idx.intValue() &gt; newFieldIdx) {</span>
+<span class="nc" id="L114">                newFieldIdx = idx.intValue();</span>
+            }
+        }
+<span class="fc" id="L117">        _field_map.put(fieldName, newFieldIdx);</span>
+<span class="fc" id="L118">    }</span>
+    private void remove_field(String fieldName, int lowest_idx, int copies)
+    {
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (_field_map == null) {</span>
+<span class="fc" id="L122">            return;</span>
+        }
+
+<span class="fc" id="L125">        Integer field_idx = _field_map.get(fieldName);</span>
+<span class="pc bpc" id="L126" title="2 of 4 branches missed.">        assert(field_idx != null);</span>
+<span class="fc" id="L127">        _field_map.remove(fieldName);</span>
+<span class="fc" id="L128">        _field_map_duplicate_count -= (copies - 1);</span>
+<span class="fc" id="L129">    }</span>
+
+    private void remove_field_from_field_map(String fieldName, int idx)
+    {
+<span class="fc" id="L133">        Integer field_idx = _field_map.get(fieldName);</span>
+<span class="pc bpc" id="L134" title="2 of 4 branches missed.">        assert(field_idx != null);</span>
+
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (field_idx.intValue() != idx) {</span>
+            // if the map has a different index, this must
+            // be a duplicate, and this copy isn't in the map
+<span class="pc bpc" id="L139" title="2 of 4 branches missed.">            assert(_field_map_duplicate_count &gt; 0);</span>
+<span class="fc" id="L140">            _field_map_duplicate_count--;</span>
+        }
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        else if (_field_map_duplicate_count &gt; 0) {</span>
+            // if we have any duplicates we have to check
+            // every time since we don't track which field
+            // is duplicated - so any dup can be expensive
+<span class="fc" id="L146">            int ii = find_last_duplicate(fieldName, idx);</span>
+
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            if (ii == -1) {</span>
+                // this is the last copy of this key
+<span class="fc" id="L150">                _field_map.remove(fieldName);</span>
+            }
+            else {
+                // replaces this fields (the one being
+                // removed) array idx in the map with
+                // the preceding duplicates index
+<span class="fc" id="L156">                _field_map.put(fieldName, ii);</span>
+<span class="fc" id="L157">                _field_map_duplicate_count--;</span>
+            }
+<span class="fc" id="L159">        }</span>
+        else {
+            // since there are not dup's we can just update
+            // the map by removing this fieldname
+<span class="fc" id="L163">            _field_map.remove(fieldName);</span>
+        }
+<span class="fc" id="L165">    }</span>
+
+    private void patch_map_elements_helper(int removed_idx)
+    {
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (_field_map == null) {</span>
+<span class="fc" id="L170">            return;</span>
+        }
+
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (removed_idx &gt;= get_child_count()) {</span>
+            // if this was the at the end of the list
+            // there's nothing to change
+<span class="fc" id="L176">            return;</span>
+        }
+
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        for (int ii=removed_idx; ii&lt;get_child_count(); ii++) {</span>
+<span class="fc" id="L180">            IonValueLite value = get_child(ii);</span>
+<span class="fc" id="L181">            String  field_name = value.getFieldName();</span>
+<span class="fc" id="L182">            Integer map_idx = _field_map.get(field_name);</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">            if (map_idx.intValue() != ii) {</span>
+                // if this is a field that to the right of
+                // the removed (in process of removing) value
+                // we need to patch the index value
+<span class="fc" id="L187">                _field_map.put(field_name, ii);</span>
+            }
+        }
+<span class="fc" id="L190">    }</span>
+
+    @Override
+    public void dump(PrintWriter out)
+    {
+<span class="nc" id="L195">        super.dump(out);</span>
+
+<span class="nc bnc" id="L197" title="All 2 branches missed.">        if (_field_map == null) {</span>
+<span class="nc" id="L198">            return;</span>
+        }
+
+<span class="nc" id="L201">        out.println(&quot;   dups: &quot;+_field_map_duplicate_count);</span>
+<span class="nc" id="L202">        Iterator&lt;Entry&lt;String, Integer&gt;&gt; it = _field_map.entrySet().iterator();</span>
+<span class="nc" id="L203">        out.print(&quot;   map: [&quot;);</span>
+<span class="nc" id="L204">        boolean first = true;</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">        while (it.hasNext()) {</span>
+<span class="nc" id="L206">            Entry&lt;String, Integer&gt; e = it.next();</span>
+<span class="nc bnc" id="L207" title="All 2 branches missed.">            if (!first) {</span>
+<span class="nc" id="L208">                out.print(&quot;,&quot;);</span>
+            }
+<span class="nc" id="L210">            out.print(e.getKey()+&quot;:&quot;+e.getValue());</span>
+<span class="nc" id="L211">            first = false;</span>
+<span class="nc" id="L212">        }</span>
+<span class="nc" id="L213">        out.println(&quot;]&quot;);</span>
+<span class="nc" id="L214">    }</span>
+
+    @Override
+    public String validate()
+    {
+<span class="nc bnc" id="L219" title="All 2 branches missed.">        if (_field_map == null) {</span>
+<span class="nc" id="L220">            return null;</span>
+        }
+<span class="nc" id="L222">        String error = &quot;&quot;;</span>
+<span class="nc" id="L223">        Iterator&lt;Entry&lt;String, Integer&gt;&gt; it = _field_map.entrySet().iterator();</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        while (it.hasNext()) {</span>
+<span class="nc" id="L225">            Entry&lt;String, Integer&gt; e = it.next();</span>
+<span class="nc" id="L226">            int idx = e.getValue().intValue();</span>
+<span class="nc bnc" id="L227" title="All 4 branches missed.">            IonValueLite v = (idx &gt;= 0 &amp;&amp; idx &lt; get_child_count()) ? get_child(idx) : null;</span>
+<span class="nc bnc" id="L228" title="All 6 branches missed.">            if (v == null || idx != v._elementid() || (e.getKey().equals(v.getFieldName()) == false)) {</span>
+<span class="nc" id="L229">                error += &quot;map entry [&quot;+e+&quot;] doesn't match list value [&quot;+v+&quot;]\n&quot;;</span>
+            }
+<span class="nc" id="L231">        }</span>
+
+<span class="nc bnc" id="L233" title="All 2 branches missed.">        return (error == &quot;&quot;) ? null : error;</span>
+    }
+
+    private int find_last_duplicate(String fieldName, int existing_idx)
+    {
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        for (int ii=existing_idx; ii&gt;0; ) {</span>
+<span class="fc" id="L239">            ii--;</span>
+<span class="fc" id="L240">            IonValueLite field = get_child(ii);</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">            if (fieldName.equals(field.getFieldName())) {</span>
+<span class="fc" id="L242">                return ii;</span>
+            }
+<span class="fc" id="L244">        }</span>
+<span class="pc bpc" id="L245" title="2 of 4 branches missed.">        assert(there_is_only_one(fieldName, existing_idx));</span>
+<span class="fc" id="L246">        return -1;</span>
+    }
+    private boolean there_is_only_one(String fieldName, int existing_idx)
+    {
+<span class="fc" id="L250">        int count = 0;</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        for (int ii=0; ii&lt;get_child_count(); ii++) {</span>
+<span class="fc" id="L252">            IonValueLite v = get_child(ii);</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">            if (v.getFieldName().equals(fieldName)) {</span>
+<span class="fc" id="L254">                count++;</span>
+            }
+        }
+<span class="pc bpc" id="L257" title="3 of 4 branches missed.">        if (count == 1 || count == 0) {</span>
+<span class="fc" id="L258">            return true;</span>
+        }
+<span class="nc" id="L260">        return false;</span>
+    }
+//
+//    updateFieldName is unnecessary since field names are immutable
+//    (except when the value is unattached to any struct)
+//
+//    protected void updateFieldName(String oldname, String name, IonValue field)
+//    {
+//        assert(name != null &amp;&amp; name.equals(field.getFieldName()));
+//
+//        if (oldname == null) return;
+//        if (_field_map == null) return;
+//
+//        Integer idx = _field_map.get(oldname);
+//        if (idx == null) return;
+//
+//        IonValue oldfield = get_child(idx);
+//
+//        // yes, we want object identity in this test
+//        if (oldfield == field) {
+//            remove_field(oldname, idx);
+//            add_field(name, idx);
+//        }
+//    }
+
+    /**
+     * Implements {@link Object#hashCode()} consistent with equals.
+     * This is insensitive to order of fields.
+     * &lt;p&gt;
+     * This method must follow the contract of {@link Object#equals(Object)},
+     * which is located at {@link Equivalence#ionEquals(IonValue, IonValue)}.
+     *
+     * @return  An int, consistent with the contracts for
+     *          {@link Object#hashCode()} and {@link Object#equals(Object)}.
+     */
+    @Override
+    int hashCode(SymbolTableProvider symbolTableProvider)
+    {
+<span class="fc" id="L298">        final int nameHashSalt  = 16777619; // prime to salt name of each Field</span>
+<span class="fc" id="L299">        final int valueHashSalt = 8191;     // prime to salt value of each Field</span>
+<span class="fc" id="L300">        final int sidHashSalt   = 127;      // prime to salt sid of fieldname</span>
+<span class="fc" id="L301">        final int textHashSalt  = 31;       // prime to salt text of fieldname</span>
+
+<span class="fc" id="L303">        int result = HASH_SIGNATURE;</span>
+
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">        if (!isNullValue())  {</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">            for (IonValue v : this)  {</span>
+<span class="fc" id="L307">                IonValueLite vlite = (IonValueLite) v;</span>
+                // If fieldname's text is unknown, use its sid instead
+<span class="fc" id="L309">                SymbolToken token = vlite.getFieldNameSymbol(symbolTableProvider);</span>
+<span class="fc" id="L310">                String text = token.getText();</span>
+
+<span class="fc bfc" id="L312" title="All 2 branches covered.">                int nameHashCode = text == null</span>
+<span class="fc" id="L313">                    ? token.getSid()  * sidHashSalt</span>
+<span class="fc" id="L314">                    : text.hashCode() * textHashSalt;</span>
+
+                // mixing to account for small text and sid deltas
+<span class="fc" id="L317">                nameHashCode ^= (nameHashCode &lt;&lt; 17) ^ (nameHashCode &gt;&gt; 15);</span>
+
+<span class="fc" id="L319">                int fieldHashCode = HASH_SIGNATURE;</span>
+<span class="fc" id="L320">                fieldHashCode = valueHashSalt * fieldHashCode + vlite.hashCode(symbolTableProvider);</span>
+<span class="fc" id="L321">                fieldHashCode = nameHashSalt  * fieldHashCode + nameHashCode;</span>
+
+                // another mix step for each Field of the struct
+<span class="fc" id="L324">                fieldHashCode ^= (fieldHashCode &lt;&lt; 19) ^ (fieldHashCode &gt;&gt; 13);</span>
+
+                // Additive hash is used to ensure insensitivity to order of
+                // fields, and will not lose data on value hash codes
+<span class="fc" id="L328">                result += fieldHashCode;</span>
+<span class="fc" id="L329">            }</span>
+        }
+
+<span class="fc" id="L332">        return hashTypeAnnotations(result, symbolTableProvider);</span>
+    }
+
+    public IonStruct cloneAndRemove(String... fieldNames)
+    {
+<span class="fc" id="L337">        return doClone(false, fieldNames);</span>
+    }
+
+    public IonStruct cloneAndRetain(String... fieldNames)
+    {
+<span class="fc" id="L342">        return doClone(true, fieldNames);</span>
+    }
+
+    private IonStruct doClone(boolean keep, String... fieldNames)
+    {
+        IonStruct clone;
+<span class="fc bfc" id="L348" title="All 2 branches covered.">        if (isNullValue())</span>
+        {
+<span class="fc" id="L350">            clone = getSystem().newNullStruct();</span>
+        }
+        else
+        {
+<span class="fc" id="L354">            Set&lt;String&gt; fields =</span>
+<span class="fc" id="L355">                new HashSet&lt;String&gt;(Arrays.asList(fieldNames));</span>
+<span class="fc bfc" id="L356" title="All 4 branches covered.">            if (keep &amp;&amp; fields.contains(null))</span>
+            {
+<span class="fc" id="L358">                throw new NullPointerException(&quot;Can't retain an unknown field name&quot;);</span>
+            }
+
+<span class="fc" id="L361">            clone = getSystem().newEmptyStruct();</span>
+<span class="fc bfc" id="L362" title="All 2 branches covered.">            for (IonValue value : this)</span>
+            {
+<span class="fc" id="L364">                SymbolToken fieldNameSymbol = value.getFieldNameSymbol();</span>
+<span class="fc" id="L365">                String fieldName = fieldNameSymbol.getText();</span>
+<span class="fc bfc" id="L366" title="All 2 branches covered.">                if (fields.contains(fieldName) == keep)</span>
+                {
+                    // This ensures that we don't copy an unknown field name.
+<span class="fc" id="L369">                    fieldName = value.getFieldName();</span>
+<span class="fc" id="L370">                    clone.add(fieldName, value.clone());</span>
+                }
+<span class="fc" id="L372">            }</span>
+        }
+
+<span class="fc" id="L375">        clone.setTypeAnnotationSymbols(getTypeAnnotationSymbols());</span>
+
+<span class="fc" id="L377">        return clone;</span>
+    }
+
+
+    @Override
+    public IonType getType()
+    {
+<span class="fc" id="L384">        return IonType.STRUCT;</span>
+    }
+
+
+    public boolean containsKey(Object fieldName)
+    {
+<span class="fc" id="L390">        String name = (String) fieldName;</span>
+<span class="fc bfc" id="L391" title="All 2 branches covered.">        return (null != get(name));</span>
+    }
+
+    public boolean containsValue(Object value)
+    {
+<span class="fc" id="L396">        IonValue v = (IonValue) value;</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">        return (v.getContainer() == this);</span>
+    }
+
+    public IonValue get(String fieldName)
+    {
+<span class="fc" id="L402">        int field_idx = find_field_helper(fieldName);</span>
+        IonValue field;
+
+<span class="fc bfc" id="L405" title="All 2 branches covered.">        if (field_idx &lt; 0) {</span>
+<span class="pc bpc" id="L406" title="1 of 2 branches missed.">            if(hasNullFieldName) throw new UnknownSymbolException(&quot;Unable to determine whether the field exists because the struct contains field names with unknown text.&quot;);</span>
+<span class="fc" id="L407">            field = null;</span>
+        } else {
+<span class="fc" id="L409">            field = get_child(field_idx);</span>
+        }
+
+<span class="fc" id="L412">        return field;</span>
+    }
+    private int find_field_helper(String fieldName)
+    {
+<span class="fc" id="L416">        validateFieldName(fieldName);</span>
+
+<span class="fc bfc" id="L418" title="All 2 branches covered.">        if (isNullValue()) {</span>
+            // nothing to see here, move along
+        }
+<span class="fc bfc" id="L421" title="All 2 branches covered.">        else if (_field_map != null) {</span>
+<span class="fc" id="L422">            Integer idx = _field_map.get(fieldName);</span>
+<span class="fc bfc" id="L423" title="All 2 branches covered.">            if (idx != null) {</span>
+<span class="fc" id="L424">                return idx.intValue();</span>
+            }
+<span class="fc" id="L426">        }</span>
+        else {
+<span class="fc" id="L428">            int ii, size = get_child_count();</span>
+<span class="fc bfc" id="L429" title="All 2 branches covered.">            for (ii=0; ii&lt;size; ii++) {</span>
+<span class="fc" id="L430">                IonValue field = get_child(ii);</span>
+<span class="fc bfc" id="L431" title="All 2 branches covered.">                if (fieldName.equals(field.getFieldName())) {</span>
+<span class="fc" id="L432">                    return ii;</span>
+                }
+            }
+        }
+<span class="fc" id="L436">        return -1;</span>
+    }
+
+    @Override
+    public void clear()
+    {
+<span class="fc" id="L442">        super.clear();</span>
+<span class="fc" id="L443">        _field_map = null;</span>
+<span class="fc" id="L444">        _field_map_duplicate_count = 0;</span>
+<span class="fc" id="L445">    }</span>
+
+    @Override
+    public boolean add(IonValue child)
+        throws NullPointerException, IllegalArgumentException,
+        ContainedValueException
+    {
+        // TODO validate in struct.setFieldName
+<span class="fc" id="L453">        String text = child.getFieldNameSymbol().getText();</span>
+<span class="fc" id="L454">        IonValueLite concrete = (IonValueLite) child;</span>
+<span class="fc" id="L455">        _add(text, concrete);</span>
+
+<span class="fc" id="L457">        return true;</span>
+    }
+
+
+    public ValueFactory add(final String fieldName)
+    {
+<span class="fc" id="L463">        return new _Private_CurriedValueFactory(_context.getSystem())</span>
+<span class="fc" id="L464">        {</span>
+            @Override
+            protected void handle(IonValue newValue)
+            {
+<span class="fc" id="L468">                add(fieldName, newValue);</span>
+<span class="fc" id="L469">            }</span>
+        };
+    }
+
+
+    /**
+     * Validates the child and checks locks.
+     *
+     * @param fieldName may be null
+     * @param child must be validated and have field name or id set
+     */
+    private void _add(String fieldName, IonValueLite child)
+    {
+<span class="fc bfc" id="L482" title="All 2 branches covered.">        hasNullFieldName |= fieldName == null;</span>
+<span class="fc" id="L483">        int size = get_child_count();</span>
+
+        // add this to the Container child collection
+<span class="fc" id="L486">        add(size, child);</span>
+
+        // if we have a hash map we need to update it now
+<span class="fc bfc" id="L489" title="All 2 branches covered.">        if (_field_map != null) {</span>
+<span class="fc" id="L490">            add_field(fieldName, child._elementid());</span>
+        }
+<span class="fc" id="L492">    }</span>
+
+    public void add(String fieldName, IonValue value)
+    {
+        // Validate everything before altering the child
+<span class="fc" id="L497">        checkForLock();</span>
+<span class="fc" id="L498">        validateNewChild(value);</span>
+<span class="fc" id="L499">        validateFieldName(fieldName);</span>
+
+<span class="fc" id="L501">        IonValueLite concrete = (IonValueLite) value;</span>
+
+<span class="fc" id="L503">        _add(fieldName, concrete);</span>
+<span class="fc" id="L504">        concrete.setFieldName(fieldName);</span>
+<span class="fc" id="L505">    }</span>
+
+    public void add(SymbolToken fieldName, IonValue child)
+    {
+<span class="fc" id="L509">        String text = fieldName.getText();</span>
+<span class="fc bfc" id="L510" title="All 2 branches covered.">        if (text != null)</span>
+        {
+            // Ignoring the sid is safe, but perhaps not the most efficient.
+<span class="fc" id="L513">            add(text, child);</span>
+<span class="fc" id="L514">            return;</span>
+        }
+
+<span class="fc bfc" id="L517" title="All 2 branches covered.">        if (fieldName.getSid() &lt; 0)</span>
+        {
+<span class="fc" id="L519">            throw new IllegalArgumentException(&quot;fieldName has no text or ID&quot;);</span>
+        }
+
+        // Validate everything before altering the child
+<span class="fc" id="L523">        checkForLock();</span>
+<span class="fc" id="L524">        validateNewChild(child);</span>
+
+<span class="fc" id="L526">        IonValueLite concrete = (IonValueLite) child;</span>
+<span class="fc" id="L527">        concrete.setFieldNameSymbol(fieldName);</span>
+<span class="fc" id="L528">        _add(text, concrete);</span>
+<span class="fc" id="L529">    }</span>
+
+
+    public ValueFactory put(final String fieldName)
+    {
+<span class="fc" id="L534">        return new _Private_CurriedValueFactory(_context.getSystem())</span>
+<span class="fc" id="L535">        {</span>
+            @Override
+            protected void handle(IonValue newValue)
+            {
+<span class="fc" id="L539">                put(fieldName, newValue);</span>
+<span class="fc" id="L540">            }</span>
+        };
+    }
+
+    public void putAll(Map&lt;? extends String, ? extends IonValue&gt; m)
+    {
+        // TODO this is very inefficient
+<span class="fc bfc" id="L547" title="All 2 branches covered.">        for (Entry&lt;? extends String, ? extends IonValue&gt; entry : m.entrySet())</span>
+        {
+<span class="fc" id="L549">            put(entry.getKey(), entry.getValue());</span>
+<span class="fc" id="L550">        }</span>
+<span class="fc" id="L551">    }</span>
+
+    /**
+     * put is &quot;make this value the one and only value
+     * associated with this fieldName&quot;.  The side effect
+     * is that if there were multiple fields with this
+     * name when put is complete there will only be the
+     * one value in the collection.
+     */
+    public void put(String fieldName, IonValue value)
+    {
+<span class="fc" id="L562">        checkForLock();</span>
+
+<span class="fc" id="L564">        validateFieldName(fieldName);</span>
+<span class="fc bfc" id="L565" title="All 2 branches covered.">        if (value != null) validateNewChild(value);</span>
+
+<span class="fc" id="L567">        int lowestRemovedIndex = get_child_count();</span>
+<span class="fc" id="L568">        boolean any_removed = false;</span>
+
+        // first we remove the any existing fields
+        // associated with fieldName (which may be none)
+<span class="fc bfc" id="L572" title="All 4 branches covered.">        if (_field_map != null &amp;&amp; _field_map_duplicate_count == 0)</span>
+        {
+            // we have a map and no duplicates so the index
+            // (aka map) is all we need to find the only
+            // value associated with fieldName, if there is one
+<span class="fc" id="L577">            Integer idx = _field_map.get(fieldName);</span>
+<span class="fc bfc" id="L578" title="All 2 branches covered.">            if (idx != null) {</span>
+<span class="fc" id="L579">                lowestRemovedIndex = idx.intValue();</span>
+<span class="fc" id="L580">                remove_field_from_field_map(fieldName, lowestRemovedIndex);</span>
+<span class="fc" id="L581">                remove_child(lowestRemovedIndex);</span>
+<span class="fc" id="L582">                any_removed = true;</span>
+            }
+<span class="fc" id="L584">        }</span>
+        else {
+            // either we don't have a map (index) or there
+            // are duplicates in both cases we have to
+            // scan the child list directly.
+            // Walk backwards to minimize array movement
+            // as we remove fields as we encounter them.
+<span class="fc" id="L591">            int copies_removed = 0;</span>
+<span class="fc bfc" id="L592" title="All 2 branches covered.">            for (int ii = get_child_count(); ii &gt; 0; )</span>
+            {
+<span class="fc" id="L594">                ii--;</span>
+<span class="fc" id="L595">                IonValueLite child = get_child(ii);</span>
+<span class="fc bfc" id="L596" title="All 2 branches covered.">                if (fieldName.equals(child.getFieldNameSymbol().getText()))</span>
+                {
+                    // done by remove_child: child.detachFromContainer();
+<span class="fc" id="L599">                    remove_child(ii);</span>
+<span class="fc" id="L600">                    lowestRemovedIndex = ii;</span>
+<span class="fc" id="L601">                    copies_removed++;</span>
+<span class="fc" id="L602">                    any_removed = true;</span>
+                }
+<span class="fc" id="L604">            }</span>
+<span class="fc bfc" id="L605" title="All 2 branches covered.">            if (any_removed) {</span>
+<span class="fc" id="L606">                remove_field(fieldName, lowestRemovedIndex, copies_removed);</span>
+            }
+        }
+<span class="fc bfc" id="L609" title="All 2 branches covered.">        if (any_removed) {</span>
+<span class="fc" id="L610">            patch_map_elements_helper(lowestRemovedIndex);</span>
+<span class="fc" id="L611">            patch_elements_helper(lowestRemovedIndex);</span>
+        }
+
+        // once we've removed any existing copy we now add,
+        // this (delete + add == put) turns out be be the
+        // right choice since:
+        //   1 - because of possible duplicates we can't
+        //       guarantee the idx is stable
+        //   2 - we have to maintain the hash and that
+        //       really means we end up with the delete
+        //       anyway
+        // strictly speaking this approach, while simpler,
+        // is more expensive when we don't have a has and
+        // the value already exists, and it's not at the
+        // end of the field list anyway.
+<span class="fc bfc" id="L626" title="All 2 branches covered.">        if (value != null) {</span>
+<span class="fc" id="L627">            add(fieldName, value);</span>
+        }
+<span class="fc" id="L629">    }</span>
+
+    @Override
+    public ListIterator&lt;IonValue&gt; listIterator(int index) {
+<span class="pc bpc" id="L633" title="1 of 2 branches missed.">        return new SequenceContentIterator(index, isReadOnly()) {</span>
+            @Override
+            public void remove() {
+<span class="pc bpc" id="L636" title="1 of 2 branches missed.">                if (__readOnly) {</span>
+<span class="nc" id="L637">                    throw new UnsupportedOperationException();</span>
+                }
+<span class="fc" id="L639">                force_position_sync();</span>
+
+<span class="fc" id="L641">                int idx = __pos;</span>
+<span class="pc bpc" id="L642" title="1 of 2 branches missed.">                if (!__lastMoveWasPrevious) {</span>
+                    // position is 1 ahead of the array index
+<span class="fc" id="L644">                    idx--;</span>
+                }
+<span class="pc bpc" id="L646" title="1 of 2 branches missed.">                if (idx &lt; 0) {</span>
+<span class="nc" id="L647">                    throw new ArrayIndexOutOfBoundsException();</span>
+                }
+
+<span class="fc" id="L650">                IonValueLite concrete = __current;</span>
+<span class="fc" id="L651">                int concrete_idx = concrete._elementid();</span>
+<span class="pc bpc" id="L652" title="2 of 4 branches missed.">                assert(concrete_idx == idx);</span>
+
+<span class="fc bfc" id="L654" title="All 2 branches covered.">                if (_field_map != null) {</span>
+<span class="fc" id="L655">                    remove_field_from_field_map(concrete.getFieldName(), idx);</span>
+                }
+<span class="fc" id="L657">                super.remove();</span>
+
+<span class="fc bfc" id="L659" title="All 2 branches covered.">                if (_field_map != null) {</span>
+<span class="fc" id="L660">                    patch_map_elements_helper(idx);</span>
+                }
+<span class="fc" id="L662">            }</span>
+        };
+    }
+
+    public IonValue remove(String fieldName)
+    {
+<span class="fc" id="L668">        checkForLock();</span>
+
+<span class="fc" id="L670">        IonValue field = get(fieldName);</span>
+<span class="fc bfc" id="L671" title="All 2 branches covered.">        if (field == null) {</span>
+<span class="fc" id="L672">            return null;</span>
+        }
+
+<span class="fc" id="L675">        int idx = ((IonValueLite)field)._elementid();</span>
+
+        // update the hash map first we don't want
+        // the child list changed until we've done
+        // this since the map update expects the
+        // index value of the remove field to be
+        // correct and unchanged.
+<span class="fc bfc" id="L682" title="All 2 branches covered.">        if (_field_map != null) {</span>
+<span class="fc" id="L683">            remove_field_from_field_map(fieldName, idx);</span>
+        }
+
+<span class="fc" id="L686">        super.remove(field);</span>
+
+<span class="fc bfc" id="L688" title="All 2 branches covered.">        if (_field_map != null) {</span>
+<span class="fc" id="L689">            patch_map_elements_helper(idx);</span>
+        }
+
+<span class="fc" id="L692">        return field;</span>
+    }
+
+    @Override
+    public boolean remove(IonValue element)
+    {
+<span class="fc bfc" id="L698" title="All 2 branches covered.">        if (element == null) {</span>
+<span class="fc" id="L699">            throw new NullPointerException();</span>
+        }
+
+<span class="fc" id="L702">        checkForLock();</span>
+
+<span class="fc bfc" id="L704" title="All 2 branches covered.">        if (element.getContainer() != this) {</span>
+<span class="fc" id="L705">            return false;</span>
+        }
+
+<span class="fc" id="L708">        IonValueLite concrete = (IonValueLite) element;</span>
+<span class="fc" id="L709">        int idx = concrete._elementid();</span>
+
+        // update the hash map first we don't want
+        // the child list changed until we've done
+        // this since the map update expects the
+        // index value of the remove field to be
+        // correct and unchanged.
+<span class="fc bfc" id="L716" title="All 2 branches covered.">        if (_field_map != null) {</span>
+<span class="fc" id="L717">            remove_field_from_field_map(concrete.getFieldName(), idx);</span>
+        }
+
+<span class="fc" id="L720">        super.remove(concrete);</span>
+
+<span class="fc bfc" id="L722" title="All 2 branches covered.">        if (_field_map != null) {</span>
+<span class="fc" id="L723">            patch_map_elements_helper(idx);</span>
+        }
+
+<span class="fc" id="L726">        return true;</span>
+    }
+
+    public boolean removeAll(String... fieldNames)
+    {
+<span class="fc" id="L731">        boolean removedAny = false;</span>
+
+<span class="fc" id="L733">        checkForLock();</span>
+
+<span class="fc" id="L735">        int size = get_child_count();</span>
+<span class="fc bfc" id="L736" title="All 2 branches covered.">        for (int ii=size; ii&gt;0; ) {</span>
+<span class="fc" id="L737">            ii--;</span>
+<span class="fc" id="L738">            IonValue field = get_child(ii);</span>
+<span class="fc bfc" id="L739" title="All 2 branches covered.">            if (isListedField(field, fieldNames)) {</span>
+<span class="fc" id="L740">                field.removeFromContainer();</span>
+<span class="fc" id="L741">                removedAny = true;</span>
+            }
+<span class="fc" id="L743">        }</span>
+
+<span class="fc" id="L745">        return removedAny;</span>
+    }
+
+    public boolean retainAll(String... fieldNames)
+    {
+<span class="fc" id="L750">        checkForLock();</span>
+
+<span class="fc" id="L752">        boolean removedAny = false;</span>
+<span class="fc" id="L753">        int size = get_child_count();</span>
+<span class="fc bfc" id="L754" title="All 2 branches covered.">        for (int ii=size; ii&gt;0; ) {</span>
+<span class="fc" id="L755">            ii--;</span>
+<span class="fc" id="L756">            IonValue field = get_child(ii);</span>
+<span class="fc bfc" id="L757" title="All 2 branches covered.">            if (! isListedField(field, fieldNames))</span>
+            {
+<span class="fc" id="L759">                field.removeFromContainer();</span>
+<span class="fc" id="L760">                removedAny = true;</span>
+            }
+<span class="fc" id="L762">        }</span>
+<span class="fc" id="L763">        return removedAny;</span>
+    }
+
+    /**
+     *
+     * @param field must not be null.  It is not required to have a field name.
+     * @param fields must not be null, and must not contain and nulls.
+     * @return true if {@code field.getFieldName()} is in {@code fields}.
+     */
+    private static boolean isListedField(IonValue field, String[] fields)
+    {
+<span class="fc" id="L774">        String fieldName = field.getFieldName();</span>
+<span class="fc bfc" id="L775" title="All 2 branches covered.">        for (String key : fields)</span>
+        {
+<span class="fc bfc" id="L777" title="All 2 branches covered.">            if (key.equals(fieldName)) return true;</span>
+        }
+<span class="fc" id="L779">        return false;</span>
+    }
+
+
+    /**
+     * Ensures that a given field name is valid. Used as a helper for
+     * methods that have that precondition.
+     *
+     * @throws NullPointerException if the &lt;code&gt;fieldName&lt;/code&gt;
+     * is &lt;code&gt;null&lt;/code&gt;.
+     */
+    private static void validateFieldName(String fieldName)
+    {
+<span class="fc bfc" id="L792" title="All 2 branches covered.">        if (fieldName == null)</span>
+        {
+<span class="fc" id="L794">            throw new NullPointerException(&quot;fieldName is null&quot;);</span>
+        }
+<span class="fc" id="L796">    }</span>
+
+    @Override
+    final void writeBodyTo(IonWriter writer, SymbolTableProvider symbolTableProvider)
+        throws IOException
+    {
+<span class="fc bfc" id="L802" title="All 2 branches covered.">        if (isNullValue())</span>
+        {
+<span class="fc" id="L804">            writer.writeNull(IonType.STRUCT);</span>
+        }
+        else
+        {
+<span class="fc" id="L808">            writer.stepIn(IonType.STRUCT);</span>
+<span class="fc" id="L809">            writeChildren(writer, this, symbolTableProvider);</span>
+<span class="fc" id="L810">            writer.stepOut();</span>
+        }
+<span class="fc" id="L812">    }</span>
+
+    @Override
+    public void accept(ValueVisitor visitor) throws Exception
+    {
+<span class="fc" id="L817">        visitor.visit(this);</span>
+<span class="fc" id="L818">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

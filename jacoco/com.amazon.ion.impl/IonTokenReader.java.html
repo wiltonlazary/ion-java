@@ -1,0 +1,1624 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonTokenReader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl</a> &gt; <span class="el_source">IonTokenReader.java</span></div><h1>IonTokenReader.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl;
+
+import static com.amazon.ion.util.IonTextUtils.isDigit;
+import static com.amazon.ion.util.IonTextUtils.isOperatorPart;
+import static com.amazon.ion.util.IonTextUtils.isWhitespace;
+import static com.amazon.ion.util.IonTextUtils.printCodePointAsString;
+
+import com.amazon.ion.Decimal;
+import com.amazon.ion.IonException;
+import com.amazon.ion.Timestamp;
+import com.amazon.ion.UnexpectedEofException;
+import com.amazon.ion.impl._Private_IonConstants.HighNibble;
+import com.amazon.ion.util.IonTextUtils;
+import java.io.IOException;
+import java.io.PushbackReader;
+import java.io.Reader;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.Stack;
+
+/**
+ *  This class is responsible for breaking the input stream into Tokens.
+ *  It does both the token recognition (aka the scanner) and the state
+ *  management needed to use the value underlying some of these tokens.
+ */
+<span class="nc bnc" id="L41" title="All 2 branches missed.">final class IonTokenReader</span>
+{
+    // TODO clean up, many of these are unused.
+<span class="nc" id="L44">    public static int isPunctuation = 0x0001;</span>
+<span class="nc" id="L45">    public static int isKeyword     = 0x0002;</span>
+<span class="nc" id="L46">    public static int isTypeName    = 0x0004;</span>
+<span class="nc" id="L47">    public static int isConstant    = 0x0008;</span>
+<span class="nc" id="L48">    private static int isPosInt     = 0x0010;</span>
+<span class="nc" id="L49">    private static int isNegInt     = 0x0020;</span>
+<span class="nc" id="L50">    public static int isFloat       = 0x0040;</span>
+<span class="nc" id="L51">    public static int isDecimal     = 0x0080;</span>
+<span class="nc" id="L52">    public static int isTag         = 0x0100;</span>
+
+<span class="nc bnc" id="L54" title="All 2 branches missed.">    static public enum Type {</span>
+
+<span class="nc" id="L56">        eof                 (isPunctuation,         &quot;&lt;eof&gt;&quot;    ),</span>
+<span class="nc" id="L57">        tOpenParen          (isPunctuation,         &quot;(&quot;        ),</span>
+<span class="nc" id="L58">        tCloseParen         (isPunctuation,         &quot;)&quot;        ),</span>
+<span class="nc" id="L59">        tOpenSquare         (isPunctuation,         &quot;[&quot;        ),</span>
+<span class="nc" id="L60">        tCloseSquare        (isPunctuation,         &quot;[&quot;        ),</span>
+<span class="nc" id="L61">        tOpenCurly          (isPunctuation,         &quot;{&quot;        ),</span>
+<span class="nc" id="L62">        tCloseCurly         (isPunctuation,         &quot;}&quot;        ),</span>
+<span class="nc" id="L63">        tOpenDoubleCurly    (isPunctuation,         &quot;{{&quot;    ),</span>
+        //tCloseDoubleCurly (isPunctuation,         &quot;}}&quot;    ), // only valid at end of blob, not recognized in token read
+<span class="nc" id="L65">        tSingleQuote        (isPunctuation,         &quot;'&quot;        ),</span>
+<span class="nc" id="L66">        tDoubleQuote        (isPunctuation,         &quot;\&quot;&quot;    ),</span>
+        //tColon            (isPunctuation,         &quot;:&quot;        ), // filled in during identifier scan with lookahead
+        //tDoubleColon      (isPunctuation,         &quot;::&quot;    ), // ditto
+<span class="nc" id="L69">        tComma              (isPunctuation,         &quot;,&quot;        ),</span>
+
+<span class="nc" id="L71">        kwTrue            ((isConstant + isTag + isKeyword),  &quot;true&quot;,           HighNibble.hnBoolean),</span>
+<span class="nc" id="L72">        kwFalse           ((isConstant + isTag + isKeyword),  &quot;false&quot;,          HighNibble.hnBoolean),</span>
+<span class="nc" id="L73">        kwNull            ((isConstant + isTag + isKeyword),  &quot;null&quot;,           HighNibble.hnNull),</span>
+
+<span class="nc" id="L75">        kwNullNull        ((isConstant + isTag + isKeyword),  &quot;null.null&quot;,      HighNibble.hnNull),</span>
+<span class="nc" id="L76">        kwNullInt         ((isConstant + isTag + isKeyword),  &quot;null.int&quot;,       HighNibble.hnPosInt),</span>
+<span class="nc" id="L77">        kwNullList        ((isConstant + isTag + isKeyword),  &quot;null.list&quot;,      HighNibble.hnList),</span>
+<span class="nc" id="L78">        kwNullSexp        ((isConstant + isTag + isKeyword),  &quot;null.sexp&quot;,      HighNibble.hnSexp),</span>
+<span class="nc" id="L79">        kwNullFloat       ((isConstant + isTag + isKeyword),  &quot;null.float&quot;,     HighNibble.hnFloat),</span>
+<span class="nc" id="L80">        kwNullBlob        ((isConstant + isTag + isKeyword),  &quot;null.blob&quot;,      HighNibble.hnBlob),</span>
+<span class="nc" id="L81">        kwNullClob        ((isConstant + isTag + isKeyword),  &quot;null.clob&quot;,      HighNibble.hnClob),</span>
+<span class="nc" id="L82">        kwNullString      ((isConstant + isTag + isKeyword),  &quot;null.string&quot;,    HighNibble.hnString),</span>
+<span class="nc" id="L83">        kwNullStruct      ((isConstant + isTag + isKeyword),  &quot;null.struct&quot;,    HighNibble.hnStruct),  // LN</span>
+<span class="nc" id="L84">        kwNullSymbol      ((isConstant + isTag + isKeyword),  &quot;null.symbol&quot;,    HighNibble.hnSymbol),</span>
+<span class="nc" id="L85">        kwNullBoolean     ((isConstant + isTag + isKeyword),  &quot;null.bool&quot;,      HighNibble.hnBoolean),</span>
+<span class="nc" id="L86">        kwNullDecimal     ((isConstant + isTag + isKeyword),  &quot;null.decimal&quot;,   HighNibble.hnDecimal),</span>
+<span class="nc" id="L87">        kwNullTimestamp   ((isConstant + isTag + isKeyword),  &quot;null.timestamp&quot;, HighNibble.hnTimestamp),</span>
+
+<span class="nc" id="L89">        kwNan             ((isConstant + isKeyword),          &quot;nan&quot;,            HighNibble.hnFloat),</span>
+<span class="nc" id="L90">        kwPosInf          ((isConstant + isKeyword),          &quot;+inf&quot;,           HighNibble.hnFloat),</span>
+<span class="nc" id="L91">        kwNegInf          ((isConstant + isKeyword),          &quot;-inf&quot;,           HighNibble.hnFloat),</span>
+
+<span class="nc" id="L93">        constNegInt       ((isConstant + isNegInt),           &quot;cNegInt&quot;,        HighNibble.hnNegInt),</span>
+<span class="nc" id="L94">        constPosInt       ((isConstant + isPosInt),           &quot;cPosInt&quot;,        HighNibble.hnPosInt),</span>
+<span class="nc" id="L95">        constFloat        ((isConstant + isFloat),            &quot;cFloat&quot;,         HighNibble.hnFloat),</span>
+<span class="nc" id="L96">        constDecimal      ((isConstant + isDecimal),          &quot;cDec&quot;,           HighNibble.hnDecimal),</span>
+<span class="nc" id="L97">        constTime         ((isConstant),                      &quot;cTime&quot;,          HighNibble.hnTimestamp),</span>
+<span class="nc" id="L98">        constString       ((isConstant + isTag),              &quot;cString&quot;,        HighNibble.hnString),</span>
+<span class="nc" id="L99">        constSymbol       ((isConstant + isTag),              &quot;cSymbol&quot;,        HighNibble.hnSymbol),</span>
+<span class="nc" id="L100">        constMemberName   ((isConstant + isTag),              &quot;cMemberName&quot;,    HighNibble.hnSymbol),</span>
+<span class="nc" id="L101">        constUserTypeDecl ((isConstant + isTag),              &quot;cUserTypeDecl&quot;,  HighNibble.hnSymbol),</span>
+
+<span class="nc" id="L103">        none(0);</span>
+
+        private int            flags;
+        private String        image;
+        private HighNibble    highNibble;
+
+        Type() {}
+<span class="nc" id="L110">        Type(int v) {</span>
+<span class="nc" id="L111">            this.flags = v;</span>
+<span class="nc" id="L112">        }</span>
+<span class="nc" id="L113">        Type(int v, String name) {</span>
+<span class="nc" id="L114">            flags = v;</span>
+<span class="nc" id="L115">            image = name;</span>
+<span class="nc" id="L116">        }</span>
+<span class="nc" id="L117">        Type(int v, String name, HighNibble ln) {</span>
+<span class="nc" id="L118">            flags = v;</span>
+<span class="nc" id="L119">            image = name;</span>
+<span class="nc" id="L120">            highNibble = ln;</span>
+<span class="nc" id="L121">        }</span>
+
+        /**
+         * TODO why this class exists at all.  We should store
+         * this stuff directly in IonTimestampImpl as a BigDecimal (time) and
+         * int (offset, -1==unknown) and avoid constructing more objects.
+         * &lt;p&gt;
+         * Also, we probably don't need the DateFormats.  The parser already
+         * matches against a regex, so we should be able to pull the data
+         * straight from the string to compute the value.
+         */
+<span class="nc" id="L132">        public static class timeinfo {  // TODO remove vestigial class timeinfo</span>
+
+            static public Timestamp parse(String s) {
+<span class="nc" id="L135">                Timestamp t = null;</span>
+<span class="nc" id="L136">                s = s.trim(); // TODO why is this necessary?</span>
+                try {
+<span class="nc" id="L138">                    t = Timestamp.valueOf(s);  // TODO should Timestamp just throw an IonException?</span>
+                }
+<span class="nc" id="L140">                catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L141">                    throw new IonException(e);</span>
+<span class="nc" id="L142">                }</span>
+<span class="nc" id="L143">                return t;</span>
+            }
+
+        }
+
+        // TODO move out of this class into TR.
+        public Type setNumericValue(IonTokenReader tr, String s) {
+<span class="nc bnc" id="L150" title="All 8 branches missed.">            switch (this) {</span>
+            case kwNan:
+<span class="nc" id="L152">                tr.doubleValue = Double.NaN;</span>
+<span class="nc" id="L153">                return this;</span>
+            case kwPosInf:
+<span class="nc" id="L155">                tr.doubleValue = Double.POSITIVE_INFINITY;</span>
+<span class="nc" id="L156">                return this;</span>
+            case kwNegInf:
+<span class="nc" id="L158">                tr.doubleValue = Double.NEGATIVE_INFINITY;</span>
+<span class="nc" id="L159">                return this;</span>
+            case constNegInt:
+            case constPosInt:
+<span class="nc bnc" id="L162" title="All 2 branches missed.">                if (NumberType.NT_HEX.equals(tr.numberType)) {</span>
+<span class="nc" id="L163">                    tr.intValue = new BigInteger(s, 16);</span>
+                    // In hex case we've discarded the prefix [+-]?0x so
+                    // reconstruct the sign
+<span class="nc bnc" id="L166" title="All 2 branches missed.">                    if (this == constNegInt) tr.intValue = tr.intValue.negate();</span>
+                }
+                else {
+<span class="nc" id="L169">                    tr.intValue = new BigInteger(s, 10);</span>
+
+                    // Make sure that sign aligns with type.
+                    // Note that this allows negative zero.
+<span class="nc bnc" id="L173" title="All 4 branches missed.">                    assert (BigInteger.ZERO.equals(tr.intValue)</span>
+                             ? true
+<span class="nc bnc" id="L175" title="All 4 branches missed.">                             : this == (tr.intValue.signum() &lt; 0 ? constNegInt : constPosInt));</span>
+                }
+<span class="nc" id="L177">                return this;</span>
+            case constFloat:
+<span class="nc" id="L179">                tr.doubleValue = Double.parseDouble(s);</span>
+<span class="nc" id="L180">                return this;</span>
+            case constDecimal:
+                // BigDecimal parses using e instead of d or D
+<span class="nc" id="L183">                String eFormat = s.replace('d', 'e');</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">                if (eFormat == s) {</span>
+                    // No match for 'd' but look for 'D'
+<span class="nc" id="L186">                    eFormat = s.replace('D', 'e');</span>
+                }
+<span class="nc" id="L188">                tr.decimalValue = Decimal.valueOf(eFormat);</span>
+<span class="nc" id="L189">                return this;</span>
+            case constTime:
+<span class="nc" id="L191">                tr.dateValue = timeinfo.parse(s);</span>
+<span class="nc" id="L192">                return this;</span>
+            default:
+<span class="nc" id="L194">                throw new  AssertionError(&quot;Unknown op for numeric case: &quot; + this);</span>
+            }
+        }
+
+<span class="nc bnc" id="L198" title="All 2 branches missed.">        public boolean isKeyword()     { return ((flags &amp; isKeyword) != 0); }</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">        public boolean isConstant()    { return ((flags &amp; isConstant) != 0); }</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        public boolean isNumeric()     { return ((flags &amp; (isPosInt + isNegInt + isFloat + isDecimal)) != 0); }</span>
+
+<span class="nc bnc" id="L202" title="All 2 branches missed.">        public String  getImage()      { return (image == null) ? this.name() : image; }</span>
+
+<span class="nc" id="L204">        public HighNibble getHighNibble() { return highNibble; }</span>
+
+        @Override
+        public String toString() {
+<span class="nc bnc" id="L208" title="All 2 branches missed.">            if (this.getImage() != null) return this.getImage();</span>
+<span class="nc" id="L209">            return super.toString();</span>
+        }
+    }
+
+    //
+    // this is a temp reader we use when converting blob's into
+    // blob values
+    //
+    static class LocalReader extends Reader {
+
+        IonTokenReader _tr;
+        int            _sboffset;
+        int            _sbavailable;
+
+<span class="nc" id="L223">        LocalReader(IonTokenReader tr) {</span>
+<span class="nc" id="L224">            _tr = tr;</span>
+<span class="nc" id="L225">        }</span>
+
+        @Override
+        public void close() throws IOException {
+<span class="nc" id="L229">            _tr = null;</span>
+<span class="nc" id="L230">            return;</span>
+        }
+
+        @Override
+        public void reset() {
+<span class="nc" id="L235">            _sboffset = 0;</span>
+<span class="nc" id="L236">            _sbavailable = _tr.value.length();</span>
+<span class="nc" id="L237">        }</span>
+
+        @Override
+        public int read() throws IOException {
+<span class="nc" id="L241">            int c = -1;</span>
+
+<span class="nc bnc" id="L243" title="All 2 branches missed.">            if (_sbavailable &gt; 0) {</span>
+<span class="nc" id="L244">                c = _tr.value.charAt(_sboffset++);</span>
+<span class="nc" id="L245">                _sbavailable--;</span>
+            }
+            else {
+<span class="nc" id="L248">                c = _tr.read();</span>
+            }
+<span class="nc" id="L250">            return c;</span>
+        }
+
+        @Override
+        public int read(char[] dst, int dstoffset, int len) throws IOException {
+<span class="nc" id="L255">            int needed = len;</span>
+
+<span class="nc bnc" id="L257" title="All 2 branches missed.">            while (needed-- &gt; 0) {</span>
+<span class="nc" id="L258">                int c = this.read();</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">                if (c &lt; 0) break;</span>
+<span class="nc" id="L260">                dst[dstoffset++] = (char)c;</span>
+<span class="nc" id="L261">            }</span>
+<span class="nc" id="L262">            return len - needed;</span>
+        }
+    }
+
+    // easy to use number types
+<span class="nc" id="L267">    static enum NumberType {</span>
+<span class="nc" id="L268">        NT_POSINT,</span>
+<span class="nc" id="L269">        NT_NEGINT,</span>
+<span class="nc" id="L270">        NT_HEX, // pos or neg</span>
+<span class="nc" id="L271">        NT_FLOAT,</span>
+<span class="nc" id="L272">        NT_DECIMAL,</span>
+<span class="nc" id="L273">        NT_DECIMAL_NEGATIVE_ZERO</span>
+    }
+
+    /**
+     * Magic &quot;character&quot; to represent an escape sequence with an empty expansion.
+     * (or, in other words, a non-eof character that should be ignored)
+     */
+    static final int EMPTY_ESCAPE_SEQUENCE = -2;
+
+
+    //--------------------------------------------------------------------
+    //
+    // this is the parsing context to manage the in list, in struct,
+    // waiting for identifier tag (usertypedecl or member name) vs value
+    //
+    //
+<span class="nc" id="L289">    static public enum Context {</span>
+<span class="nc" id="L290">        NONE,</span>
+<span class="nc" id="L291">        STRING,</span>
+<span class="nc" id="L292">        BLOB,</span>
+<span class="nc" id="L293">        CLOB,</span>
+<span class="nc" id="L294">        EXPRESSION,</span>
+<span class="nc" id="L295">        DATALIST,</span>
+<span class="nc" id="L296">        STRUCT;</span>
+    }
+<span class="nc" id="L298">    public Stack&lt;Context&gt; contextStack = new Stack&lt;Context&gt;();</span>
+<span class="nc" id="L299">    public Context context = Context.NONE;</span>
+
+    public  void pushContext(Context newcontext) {
+<span class="nc" id="L302">        contextStack.push(newcontext);</span>
+<span class="nc" id="L303">        context = newcontext;</span>
+<span class="nc" id="L304">    }</span>
+    public Context popContext() {
+<span class="nc" id="L306">        context = contextStack.pop();</span>
+<span class="nc" id="L307">        return context;</span>
+    }
+
+    //--------------------------------------------------------------------
+    //
+    // state that keeps us on track ...
+    //
+
+    private IonCharacterReader  in;
+    private LocalReader         localReader;
+    private PushbackReader      pushbackReader;
+
+    public boolean          inQuotedContent;
+    public boolean          isIncomplete;
+    public boolean          isLongString;
+    public boolean          quotedIdentifier;
+    public int              embeddedSlash;
+    public int              endquote;
+
+
+<span class="nc" id="L327">    public Type             t        = Type.none;</span>
+<span class="nc" id="L328">    public Type             keyword  = Type.none;</span>
+<span class="nc" id="L329">    public StringBuilder    value    = new StringBuilder();</span>
+
+    public String           stringValue;
+    public Double           doubleValue;
+    public BigInteger       intValue;
+
+    public Timestamp        dateValue;
+    public BigDecimal       decimalValue;
+    public boolean          isNegative;
+    public NumberType       numberType;
+
+<span class="nc" id="L340">    public IonTokenReader(final Reader r) {</span>
+<span class="nc" id="L341">        this.in = new IonCharacterReader( r );</span>
+<span class="nc" id="L342">    }</span>
+
+    public long getConsumedAmount() {
+<span class="nc" id="L345">        return in.getConsumedAmount();</span>
+    }
+
+    public int getLineNumber() {
+<span class="nc" id="L349">        return in.getLineNumber();</span>
+    }
+
+    public int getColumn() {
+<span class="nc" id="L353">        return in.getColumn();</span>
+    }
+
+    public String position() {
+<span class="nc" id="L357">        return &quot;line &quot; + this.getLineNumber() + &quot; column &quot; + this.getColumn();</span>
+    }
+
+    public String getValueString(boolean is_in_expression) throws IOException {
+<span class="nc bnc" id="L361" title="All 2 branches missed.">        if (this.isIncomplete) {</span>
+<span class="nc" id="L362">            finishScanString(is_in_expression);</span>
+<span class="nc" id="L363">            stringValue = value.toString();  // TODO combine with below?</span>
+<span class="nc" id="L364">            this.inQuotedContent = false;</span>
+        }
+<span class="nc bnc" id="L366" title="All 2 branches missed.">        else if (stringValue == null) {</span>
+<span class="nc" id="L367">            stringValue = value.toString();</span>
+        }
+<span class="nc" id="L369">        return stringValue;</span>
+    }
+
+    void resetValue() {
+<span class="nc" id="L373">        isIncomplete = false;</span>
+<span class="nc" id="L374">        stringValue = null;</span>
+<span class="nc" id="L375">        doubleValue = null;</span>
+<span class="nc" id="L376">        intValue = null;</span>
+<span class="nc" id="L377">        dateValue = null;</span>
+<span class="nc" id="L378">        decimalValue = null;</span>
+<span class="nc" id="L379">        isNegative = false;</span>
+<span class="nc" id="L380">        numberType = null;</span>
+<span class="nc" id="L381">        t = null;</span>
+<span class="nc" id="L382">        value.setLength(0);</span>
+<span class="nc" id="L383">    }</span>
+
+    public PushbackReader getPushbackReader() {
+<span class="nc bnc" id="L386" title="All 2 branches missed.">        if (localReader == null) {</span>
+<span class="nc" id="L387">            localReader = new LocalReader(this);</span>
+<span class="nc" id="L388">            pushbackReader =</span>
+                new PushbackReader(localReader,
+                                   _Private_Utils.MAX_LOOKAHEAD_UTF16);
+        }
+<span class="nc" id="L392">        localReader.reset();</span>
+<span class="nc" id="L393">        return pushbackReader ;</span>
+    }
+
+    /**
+     * Reads the next character using the underlying stream.
+     * @return -1 on end of stream.
+     * @throws IOException
+     */
+    final int read() throws IOException {
+<span class="nc" id="L402">        final int ch = in.read();</span>
+<span class="nc bnc" id="L403" title="All 4 branches missed.">        assert ch != '\r';</span>
+<span class="nc" id="L404">        return ch;</span>
+    }
+
+
+    int readIgnoreWhitespace() throws IOException {
+<span class="nc bnc" id="L409" title="All 4 branches missed.">        assert !inQuotedContent;</span>
+
+        int c;
+
+        // read through comments - this detects and rejects double slash
+        // and slash star style comments and their contents
+        for (;;) {
+<span class="nc" id="L416">            c = read();</span>
+
+<span class="nc bnc" id="L418" title="All 2 branches missed.">            if (c == '/') { // possibly a start of a comment</span>
+<span class="nc" id="L419">                int c2 = read();</span>
+
+<span class="nc bnc" id="L421" title="All 2 branches missed.">                if (c2 == '/') {</span>
+                    // we have a // comment, scan for the terminating new line
+<span class="nc bnc" id="L423" title="All 4 branches missed.">                    while (c2 != '\n' &amp;&amp; c2 != -1) {</span>
+<span class="nc" id="L424">                        c2 = read();</span>
+                    }
+<span class="nc" id="L426">                    c = c2;</span>
+                }
+<span class="nc bnc" id="L428" title="All 2 branches missed.">                else if (c2 == '*') {</span>
+                    // we have a /* */ comment scan for closing */
+                    scancomment:
+<span class="nc bnc" id="L431" title="All 2 branches missed.">                    while (c2 != -1) {</span>
+<span class="nc" id="L432">                        c2 = read();</span>
+
+<span class="nc bnc" id="L434" title="All 2 branches missed.">                        if (c2 == '*') {</span>
+<span class="nc" id="L435">                            c2 = read();</span>
+
+<span class="nc bnc" id="L437" title="All 2 branches missed.">                            if (c2 == '/') {</span>
+<span class="nc" id="L438">                                break scancomment;</span>
+                            }
+<span class="nc" id="L440">                            unread(c2); // in case this was the '*' we're looking for</span>
+                        }
+                    }
+<span class="nc" id="L443">                    c = read();</span>
+                }
+                else {
+                    // it wasn't a comment start, throw it back
+<span class="nc" id="L447">                    unread(c2);</span>
+                }
+            }
+<span class="nc bnc" id="L450" title="All 2 branches missed.">            if (/* inContent ||*/ !isWhitespace(c)) {</span>
+<span class="nc" id="L451">                break;</span>
+            }
+        }
+<span class="nc" id="L454">        return c;</span>
+    }
+    void unread(int c) throws IOException {
+<span class="nc" id="L457">        this.in.unread(c);</span>
+<span class="nc" id="L458">    }</span>
+
+    // TODO clone the body of next(c) here, later , for perf, we
+    //      don't really want TWO methods calls per character, or
+    //      mostly we don't want an extra one. (and I doubt that
+    //      Java handles the tail optimization)
+    public Type next(boolean is_in_expression) throws IOException {
+<span class="nc" id="L465">        inQuotedContent = false;</span>
+<span class="nc" id="L466">        int c = this.readIgnoreWhitespace();</span>
+<span class="nc" id="L467">        return next(c, is_in_expression);</span>
+    }
+
+    private Type next(int c, boolean is_in_expression) throws IOException {
+        int c2;
+<span class="nc" id="L472">        t = Type.none;</span>
+
+<span class="nc" id="L474">        isIncomplete = false;</span>
+<span class="nc bnc" id="L475" title="All 14 branches missed.">        switch (c) {</span>
+        case -1:
+<span class="nc" id="L477">            return (t = Type.eof);</span>
+        case '{':
+<span class="nc" id="L479">            c2 = read();</span>
+<span class="nc bnc" id="L480" title="All 2 branches missed.">            if (c2 == '{') {</span>
+<span class="nc" id="L481">                return (t = Type.tOpenDoubleCurly);</span>
+            }
+<span class="nc" id="L483">            unread(c2);</span>
+<span class="nc" id="L484">            return (t = Type.tOpenCurly);</span>
+        case '}':
+<span class="nc" id="L486">            return (t = Type.tCloseCurly);</span>
+        case '[':
+<span class="nc" id="L488">            return (t = Type.tOpenSquare);</span>
+        case ']':
+<span class="nc" id="L490">            return (t = Type.tCloseSquare);</span>
+        case '(':
+<span class="nc" id="L492">            return (t = Type.tOpenParen);</span>
+        case ')':
+<span class="nc" id="L494">            return (t = Type.tCloseParen);</span>
+        case ',':
+<span class="nc" id="L496">            return (t = Type.tComma);</span>
+        case '0': case '1': case '2': case '3': case '4':
+        case '5': case '6': case '7': case '8': case '9':
+<span class="nc" id="L499">            return readNumber(c);</span>
+        case '\&quot;':
+<span class="nc" id="L501">            inQuotedContent = true;</span>
+<span class="nc" id="L502">            this.keyword = Type.none; // anything in quotes isn't a keyword</span>
+<span class="nc" id="L503">            return scanString(c, _Private_IonConstants.lnIsVarLen - 1);</span>
+        case '\'':
+<span class="nc" id="L505">            c2 = read();</span>
+<span class="nc bnc" id="L506" title="All 2 branches missed.">            if (c2 == '\'') {</span>
+<span class="nc" id="L507">                c2 = read();</span>
+<span class="nc bnc" id="L508" title="All 2 branches missed.">                if (c2 == '\'') {</span>
+<span class="nc" id="L509">                    return scanLongString();</span>
+                }
+<span class="nc" id="L511">                this.unread(c2);</span>
+<span class="nc" id="L512">                c2 = '\''; // restore c2 for the next unread</span>
+            }
+<span class="nc" id="L514">            this.unread(c2);</span>
+<span class="nc" id="L515">            inQuotedContent = true;</span>
+<span class="nc" id="L516">            return scanIdentifier(c);</span>
+        case '+':
+<span class="nc" id="L518">            c2 = read();</span>
+<span class="nc bnc" id="L519" title="All 2 branches missed.">            if (c2 == 'i') {</span>
+<span class="nc" id="L520">                c2 = read();</span>
+<span class="nc bnc" id="L521" title="All 2 branches missed.">                if (c2 == 'n') {</span>
+<span class="nc" id="L522">                    c2 = read();</span>
+<span class="nc bnc" id="L523" title="All 2 branches missed.">                    if (c2 == 'f') {</span>
+<span class="nc" id="L524">                        return (t = Type.kwPosInf);</span>
+                    }
+<span class="nc" id="L526">                    this.unread(c2);</span>
+<span class="nc" id="L527">                    c2 = 'n';</span>
+                }
+<span class="nc" id="L529">                this.unread(c2);</span>
+<span class="nc" id="L530">                c2 = 'i';</span>
+            }
+<span class="nc" id="L532">            this.unread(c2);</span>
+<span class="nc bnc" id="L533" title="All 2 branches missed.">            if (is_in_expression) {</span>
+<span class="nc" id="L534">                return scanOperator(c);</span>
+            }
+            break; // break to error
+        case '-':
+<span class="nc" id="L538">            c2 = read();</span>
+<span class="nc bnc" id="L539" title="All 4 branches missed.">            if (c2 &gt;= '0' &amp;&amp; c2 &lt;= '9') {</span>
+<span class="nc" id="L540">                this.unread(c2);</span>
+<span class="nc" id="L541">                return readNumber(c);</span>
+            }
+<span class="nc bnc" id="L543" title="All 2 branches missed.">            if (c2 == 'i') {</span>
+<span class="nc" id="L544">                c2 = read();</span>
+<span class="nc bnc" id="L545" title="All 2 branches missed.">                if (c2 == 'n') {</span>
+<span class="nc" id="L546">                    c2 = read();</span>
+<span class="nc bnc" id="L547" title="All 2 branches missed.">                    if (c2 == 'f') {</span>
+<span class="nc" id="L548">                        return (t = Type.kwNegInf);</span>
+                    }
+<span class="nc" id="L550">                    this.unread(c2);</span>
+<span class="nc" id="L551">                    c2 = 'n';</span>
+                }
+<span class="nc" id="L553">                this.unread(c2);</span>
+<span class="nc" id="L554">                c2 = 'i';</span>
+            }
+<span class="nc" id="L556">            this.unread(c2);</span>
+<span class="nc bnc" id="L557" title="All 2 branches missed.">            if (is_in_expression) {</span>
+<span class="nc" id="L558">                return scanOperator(c);</span>
+            }
+            break; // break to error
+        default:
+<span class="nc bnc" id="L562" title="All 2 branches missed.">            if (IonTextUtils.isIdentifierStart(c)) {</span>
+<span class="nc" id="L563">                return scanIdentifier(c);</span>
+            }
+<span class="nc bnc" id="L565" title="All 4 branches missed.">            if (is_in_expression &amp;&amp; isOperatorPart(c)) {</span>
+<span class="nc" id="L566">                return scanOperator(c);</span>
+            }
+        }
+
+<span class="nc" id="L570">        String message =</span>
+<span class="nc" id="L571">            &quot;Unexpected character &quot; + printCodePointAsString(c) +</span>
+<span class="nc" id="L572">            &quot; encountered at line &quot; + this.getLineNumber() +</span>
+<span class="nc" id="L573">            &quot; column &quot; + this.getColumn();</span>
+<span class="nc" id="L574">        throw new IonException(message);</span>
+    }
+
+
+    public Type scanIdentifier(int c) throws IOException
+    {
+        // reset our local value buffer
+<span class="nc" id="L581">        resetValue();</span>
+
+        // we don't have an identifier type any longer, just string
+<span class="nc" id="L584">        this.t = Type.constSymbol;</span>
+
+        // some strings are keywords, most are not
+        // mostly we'll guess that it's not a keyword
+<span class="nc" id="L588">        this.keyword = null;</span>
+
+        // first we read the identifier content into our value buffer
+        // if the value is quoted, use the escape char loop, otherwise
+        // look for the non-identifier character (and throw it back)
+
+<span class="nc bnc" id="L594" title="All 2 branches missed.">        if (!readIdentifierContents(c)) { // not quoted (true is quoted)</span>
+            // anything in quotes (even single quotes) is not a keyword
+            // and here we're not in quoted content (that is handled above)
+            // so see if it's also a keyword
+<span class="nc" id="L598">            this.keyword = IonTokenReader.matchKeyword(value, 0, value.length());</span>
+<span class="nc bnc" id="L599" title="All 2 branches missed.">            if (this.keyword != null) {</span>
+<span class="nc bnc" id="L600" title="All 2 branches missed.">                if (this.keyword == Type.kwNull) {</span>
+<span class="nc" id="L601">                    c = this.read();</span>
+<span class="nc bnc" id="L602" title="All 2 branches missed.">                    if (c == '.') {</span>
+<span class="nc" id="L603">                        int dot = value.length();</span>
+<span class="nc" id="L604">                        value.append((char)c);</span>
+<span class="nc" id="L605">                        c = this.read();</span>
+<span class="nc" id="L606">                        int added = readIdentifierContents(c, IonTokenConstsX.TN_MAX_NAME_LENGTH + 1); // +1 is &quot;enough roap&quot; so if there are extra letters at the end of the keyword we keep at least 1</span>
+<span class="nc" id="L607">                        int kw = IonTokenConstsX.keyword(value, dot+1, dot+added+1);</span>
+<span class="nc bnc" id="L608" title="All 2 branches missed.">                        switch (kw) {</span>
+                        case IonTokenConstsX.KEYWORD_NULL:
+                        case IonTokenConstsX.KEYWORD_BOOL:
+                        case IonTokenConstsX.KEYWORD_INT:
+                        case IonTokenConstsX.KEYWORD_FLOAT:
+                        case IonTokenConstsX.KEYWORD_DECIMAL:
+                        case IonTokenConstsX.KEYWORD_TIMESTAMP:
+                        case IonTokenConstsX.KEYWORD_SYMBOL:
+                        case IonTokenConstsX.KEYWORD_STRING:
+                        case IonTokenConstsX.KEYWORD_BLOB:
+                        case IonTokenConstsX.KEYWORD_CLOB:
+                        case IonTokenConstsX.KEYWORD_LIST:
+                        case IonTokenConstsX.KEYWORD_SEXP:
+                        case IonTokenConstsX.KEYWORD_STRUCT:
+<span class="nc" id="L622">                            this.keyword = setNullType(value, dot + 1, value.length() - dot - 1);</span>
+<span class="nc" id="L623">                            break;</span>
+                        default:
+                            // not a valid type name - so we have to unread back to the dot
+<span class="nc bnc" id="L626" title="All 2 branches missed.">                            for (int ii=value.length(); ii&gt;dot; ) {</span>
+<span class="nc" id="L627">                                ii--;</span>
+<span class="nc" id="L628">                                char uc = value.charAt(ii);</span>
+<span class="nc" id="L629">                                unread(uc);</span>
+<span class="nc" id="L630">                            }</span>
+
+<span class="nc" id="L632">                            String message =</span>
+<span class="nc" id="L633">                                position()</span>
+                                + &quot;: Expected Ion type after 'null.' but found: &quot;
+                                + value;
+<span class="nc" id="L636">                            throw new IonException(message);</span>
+                        }
+<span class="nc" id="L638">                    }</span>
+                    else {
+<span class="nc" id="L640">                        unread(c);</span>
+                    }
+                }
+<span class="nc" id="L643">                this.t = this.keyword;</span>
+<span class="nc" id="L644">                return this.t;</span>
+            }
+        }
+
+        // see if we're a user type of a member name
+<span class="nc" id="L649">        c = this.readIgnoreWhitespace();</span>
+<span class="nc bnc" id="L650" title="All 2 branches missed.">        if (c != ':') {</span>
+<span class="nc" id="L651">            unread(c);</span>
+        }
+        else {
+<span class="nc" id="L654">            c = read();</span>
+<span class="nc bnc" id="L655" title="All 2 branches missed.">            if (c != ':') {</span>
+<span class="nc" id="L656">                unread(c);</span>
+<span class="nc" id="L657">                this.t = Type.constMemberName;</span>
+            }
+            else {
+<span class="nc" id="L660">                this.t = Type.constUserTypeDecl;</span>
+            }
+        }
+<span class="nc" id="L663">        return this.t;</span>
+    }
+
+    boolean readIdentifierContents(int c) throws IOException {
+
+<span class="nc" id="L668">        int quote = c;</span>
+<span class="nc bnc" id="L669" title="All 4 branches missed.">        inQuotedContent = (quote == '\'' || quote == '\&quot;');</span>
+
+<span class="nc bnc" id="L671" title="All 2 branches missed.">        if ((quotedIdentifier = inQuotedContent) == true) {</span>
+            for (;;) {
+<span class="nc" id="L673">                c = read();</span>
+<span class="nc bnc" id="L674" title="All 4 branches missed.">                if (c &lt; 0 || c == quote) break;</span>
+<span class="nc bnc" id="L675" title="All 2 branches missed.">                if (c == '\\') {</span>
+<span class="nc" id="L676">                    c = readEscapedCharacter(this.in, false /*not clob*/);</span>
+                }
+<span class="nc bnc" id="L678" title="All 2 branches missed.">                if (c != EMPTY_ESCAPE_SEQUENCE) {</span>
+<span class="nc" id="L679">                    value.appendCodePoint(c);</span>
+                }
+            }
+<span class="nc bnc" id="L682" title="All 2 branches missed.">            if (c == -1) { // TODO throw UnexpectedEofException</span>
+<span class="nc" id="L683">                throw new IonException(&quot;end encountered before closing quote '\\&quot; + (char)endquote+ &quot;'&quot;);</span>
+            }
+            // c, at this point is a single quote, which we don't append
+<span class="nc" id="L686">            inQuotedContent = false;</span>
+        }
+        else {
+<span class="nc" id="L689">            value.append((char)c);</span>
+            for (;;) {
+<span class="nc" id="L691">                c = read();</span>
+<span class="nc bnc" id="L692" title="All 2 branches missed.">                if (!IonTextUtils.isIdentifierPart(c)) {</span>
+<span class="nc" id="L693">                    break;</span>
+                }
+<span class="nc" id="L695">                value.append((char)c);</span>
+            }
+<span class="nc" id="L697">            unread(c);  // we throw back our terminator here</span>
+        }
+<span class="nc" id="L699">        return quotedIdentifier;</span>
+    }
+    int readIdentifierContents(int c, int max_length) throws IOException {
+<span class="nc bnc" id="L702" title="All 6 branches missed.">        assert(c != '\'' &amp;&amp; c != '\&quot;');</span>
+
+<span class="nc" id="L704">        value.append((char)c);</span>
+<span class="nc" id="L705">        int count = 1;</span>
+
+<span class="nc bnc" id="L707" title="All 2 branches missed.">        while (count &lt; max_length) {</span>
+<span class="nc" id="L708">            c = read();</span>
+<span class="nc bnc" id="L709" title="All 2 branches missed.">            if (!IonTextUtils.isIdentifierPart(c)) {</span>
+<span class="nc" id="L710">                unread(c);  // we throw back our terminator here</span>
+<span class="nc" id="L711">                break;</span>
+            }
+<span class="nc" id="L713">            value.append((char)c);</span>
+<span class="nc" id="L714">            count++;</span>
+        }
+
+<span class="nc" id="L717">        return count;</span>
+    }
+
+    static Type matchKeyword(StringBuilder sb, int pos, int valuelen) throws IOException
+    {
+<span class="nc" id="L722">        Type keyword = null;</span>
+
+<span class="nc bnc" id="L724" title="All 4 branches missed.">        switch (sb.charAt(pos++)) { // there has to be at least 1 chacter or we wouldn't be here</span>
+        case 'f':
+<span class="nc bnc" id="L726" title="All 2 branches missed.">            if (valuelen == 5 //    &quot;f&quot;</span>
+<span class="nc bnc" id="L727" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'a'</span>
+<span class="nc bnc" id="L728" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'l'</span>
+<span class="nc bnc" id="L729" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 's'</span>
+<span class="nc bnc" id="L730" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'e'</span>
+            ) {
+<span class="nc" id="L732">                keyword = Type.kwFalse;</span>
+            }
+            break;
+        case 'n':
+<span class="nc bnc" id="L736" title="All 2 branches missed.">            if (valuelen == 4 //    'n'</span>
+<span class="nc bnc" id="L737" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'u'</span>
+<span class="nc bnc" id="L738" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'l'</span>
+<span class="nc bnc" id="L739" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'l'</span>
+            ) {
+<span class="nc" id="L741">                keyword = Type.kwNull;</span>
+            }
+<span class="nc bnc" id="L743" title="All 2 branches missed.">            else if (valuelen == 3 //   'n'</span>
+<span class="nc bnc" id="L744" title="All 2 branches missed.">                 &amp;&amp; sb.charAt(pos++) == 'a'</span>
+<span class="nc bnc" id="L745" title="All 2 branches missed.">                 &amp;&amp; sb.charAt(pos++) == 'n'</span>
+            ) {
+<span class="nc" id="L747">                keyword = Type.kwNan;</span>
+            }
+            break;
+        case 't':
+<span class="nc bnc" id="L751" title="All 2 branches missed.">            if (valuelen == 4 //    &quot;t&quot;</span>
+<span class="nc bnc" id="L752" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'r'</span>
+<span class="nc bnc" id="L753" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'u'</span>
+<span class="nc bnc" id="L754" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'e'</span>
+            ) {
+<span class="nc" id="L756">                keyword =  Type.kwTrue;</span>
+            }
+            break;
+        }
+
+<span class="nc" id="L761">        return keyword;</span>
+    }
+
+    public Type setNullType(StringBuilder sb, int pos, int valuelen)
+    {
+<span class="nc bnc" id="L766" title="All 7 branches missed.">        switch (valuelen) {</span>
+        case 3:
+            //int
+<span class="nc bnc" id="L769" title="All 2 branches missed.">            if (sb.charAt(pos++) == 'i'</span>
+<span class="nc bnc" id="L770" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'n'</span>
+<span class="nc bnc" id="L771" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 't'</span>
+            ) {
+<span class="nc" id="L773">                return Type.kwNullInt;</span>
+            }
+            break;
+        case 4:
+            //bool, blob, list, null, clob, sexp
+<span class="nc bnc" id="L778" title="All 6 branches missed.">            switch (sb.charAt(pos++)) {</span>
+            case 'b':
+                //bool, blob
+<span class="nc bnc" id="L781" title="All 3 branches missed.">                switch (sb.charAt(pos++)) {</span>
+                    case 'o':
+                        // bool
+<span class="nc bnc" id="L784" title="All 2 branches missed.">                        if (sb.charAt(pos++) == 'o'</span>
+<span class="nc bnc" id="L785" title="All 2 branches missed.">                         &amp;&amp; sb.charAt(pos++) == 'l'</span>
+                        ) {
+<span class="nc" id="L787">                            return Type.kwNullBoolean;</span>
+                        }
+                        break;
+                    case 'l':
+                        //blob
+<span class="nc bnc" id="L792" title="All 2 branches missed.">                        if (sb.charAt(pos++) == 'o'</span>
+<span class="nc bnc" id="L793" title="All 2 branches missed.">                         &amp;&amp; sb.charAt(pos++) == 'b'</span>
+                        ) {
+<span class="nc" id="L795">                            return Type.kwNullBlob;</span>
+                        }
+                        break;
+                }
+<span class="nc" id="L799">                break;</span>
+            case 'l':
+<span class="nc bnc" id="L801" title="All 2 branches missed.">                if (sb.charAt(pos++) == 'i'</span>
+<span class="nc bnc" id="L802" title="All 2 branches missed.">                 &amp;&amp; sb.charAt(pos++) == 's'</span>
+<span class="nc bnc" id="L803" title="All 2 branches missed.">                 &amp;&amp; sb.charAt(pos++) == 't'</span>
+                ) {
+<span class="nc" id="L805">                    return Type.kwNullList;</span>
+                }
+                break;
+            case 'n':
+<span class="nc bnc" id="L809" title="All 2 branches missed.">                if (sb.charAt(pos++) == 'u'</span>
+<span class="nc bnc" id="L810" title="All 2 branches missed.">                 &amp;&amp; sb.charAt(pos++) == 'l'</span>
+<span class="nc bnc" id="L811" title="All 2 branches missed.">                 &amp;&amp; sb.charAt(pos++) == 'l'</span>
+                ) {
+<span class="nc" id="L813">                    return Type.kwNullNull;</span>
+                }
+                break;
+            case 'c':
+                //clob
+<span class="nc bnc" id="L818" title="All 2 branches missed.">                if (sb.charAt(pos++) == 'l'</span>
+<span class="nc bnc" id="L819" title="All 2 branches missed.">                 &amp;&amp; sb.charAt(pos++) == 'o'</span>
+<span class="nc bnc" id="L820" title="All 2 branches missed.">                 &amp;&amp; sb.charAt(pos++) == 'b'</span>
+                ) {
+<span class="nc" id="L822">                    return Type.kwNullClob;</span>
+                }
+                break;
+            case 's':
+                //sexp
+<span class="nc bnc" id="L827" title="All 2 branches missed.">                if (sb.charAt(pos++) == 'e'</span>
+<span class="nc bnc" id="L828" title="All 2 branches missed.">                 &amp;&amp; sb.charAt(pos++) == 'x'</span>
+<span class="nc bnc" id="L829" title="All 2 branches missed.">                 &amp;&amp; sb.charAt(pos++) == 'p'</span>
+                ) {
+<span class="nc" id="L831">                    return Type.kwNullSexp;</span>
+                }
+                break;
+            }
+<span class="nc" id="L835">            break;</span>
+        case 5:
+            //float
+<span class="nc bnc" id="L838" title="All 2 branches missed.">            if (sb.charAt(pos++) == 'f'</span>
+<span class="nc bnc" id="L839" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'l'</span>
+<span class="nc bnc" id="L840" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'o'</span>
+<span class="nc bnc" id="L841" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'a'</span>
+<span class="nc bnc" id="L842" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 't'</span>
+            ) {
+<span class="nc" id="L844">                return Type.kwNullFloat;</span>
+            }
+            break;
+        case 6:
+<span class="nc bnc" id="L848" title="All 2 branches missed.">            switch (sb.charAt(pos++)) {</span>
+            case 's':
+                //string
+                //struct
+                //symbol
+<span class="nc bnc" id="L853" title="All 3 branches missed.">                switch(sb.charAt(pos++)) {</span>
+                case 't':
+<span class="nc bnc" id="L855" title="All 2 branches missed.">                    if (sb.charAt(pos++) == 'r') {</span>
+<span class="nc bnc" id="L856" title="All 3 branches missed.">                        switch (sb.charAt(pos++)) {</span>
+                        case 'i':
+<span class="nc bnc" id="L858" title="All 4 branches missed.">                            if (sb.charAt(pos++) == 'n' &amp;&amp; sb.charAt(pos++) == 'g') {</span>
+<span class="nc" id="L859">                                return Type.kwNullString;</span>
+                            }
+                            break;
+                        case 'u':
+<span class="nc bnc" id="L863" title="All 4 branches missed.">                            if (sb.charAt(pos++) == 'c' &amp;&amp; sb.charAt(pos++) == 't') {</span>
+<span class="nc" id="L864">                                return Type.kwNullStruct;</span>
+                            }
+<span class="nc" id="L866">                            break;</span>
+                        }
+                    }
+                    break;
+                case 'y':
+<span class="nc bnc" id="L871" title="All 2 branches missed.">                    if (sb.charAt(pos++) == 'm'</span>
+<span class="nc bnc" id="L872" title="All 2 branches missed.">                     &amp;&amp; sb.charAt(pos++) == 'b'</span>
+<span class="nc bnc" id="L873" title="All 2 branches missed.">                     &amp;&amp; sb.charAt(pos++) == 'o'</span>
+<span class="nc bnc" id="L874" title="All 2 branches missed.">                     &amp;&amp; sb.charAt(pos++) == 'l'</span>
+                    ) {
+<span class="nc" id="L876">                        return Type.kwNullSymbol;</span>
+                    }
+                    break;
+                }
+            }
+<span class="nc" id="L881">            break;</span>
+        case 7:
+            //decimal
+<span class="nc bnc" id="L884" title="All 2 branches missed.">            if (sb.charAt(pos++) == 'd'</span>
+<span class="nc bnc" id="L885" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'e'</span>
+<span class="nc bnc" id="L886" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'c'</span>
+<span class="nc bnc" id="L887" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'i'</span>
+<span class="nc bnc" id="L888" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'm'</span>
+<span class="nc bnc" id="L889" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'a'</span>
+<span class="nc bnc" id="L890" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'l'</span>
+            ) {
+<span class="nc" id="L892">                return Type.kwNullDecimal;</span>
+            }
+            break;
+        case 9:
+            //timestamp
+<span class="nc bnc" id="L897" title="All 2 branches missed.">            if (sb.charAt(pos++) == 't'</span>
+<span class="nc bnc" id="L898" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'i'</span>
+<span class="nc bnc" id="L899" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'm'</span>
+<span class="nc bnc" id="L900" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'e'</span>
+<span class="nc bnc" id="L901" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 's'</span>
+<span class="nc bnc" id="L902" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 't'</span>
+<span class="nc bnc" id="L903" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'a'</span>
+<span class="nc bnc" id="L904" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'm'</span>
+<span class="nc bnc" id="L905" title="All 2 branches missed.">             &amp;&amp; sb.charAt(pos++) == 'p'</span>
+            ) {
+<span class="nc" id="L907">                return Type.kwNullTimestamp;</span>
+            }
+            break;
+        }
+<span class="nc" id="L911">        String nullimage = sb.toString();</span>
+<span class="nc" id="L912">        throw new IonException(&quot;invalid null value '&quot;+nullimage+&quot;' at &quot; + this.position());</span>
+    }
+
+    public Type scanOperator(int c) throws IOException
+    {
+        // reset our local value buffer
+<span class="nc" id="L918">        resetValue();</span>
+
+        // we don't have an identifier type any longer, just string
+<span class="nc" id="L921">        this.t = Type.constSymbol;</span>
+
+        // some strings are keywords, most are not
+        // mostly we'll guess that it's not a keyword
+<span class="nc" id="L925">        this.keyword = null;</span>
+
+        // first we read the identifier content into our value buffer
+        // if the value is quoted, use the escape char loop, otherwise
+        // look for the non-identifier character (and throw it back)
+
+<span class="nc" id="L931">        value.append((char)c);</span>
+        for (;;) {
+<span class="nc" id="L933">            c = read();</span>
+<span class="nc bnc" id="L934" title="All 2 branches missed.">            if (!IonTextUtils.isOperatorPart(c)) {</span>
+<span class="nc" id="L935">                break;</span>
+            }
+<span class="nc" id="L937">            value.append((char)c);</span>
+        }
+<span class="nc" id="L939">        unread(c);  // we throw back our terminator here</span>
+
+<span class="nc" id="L941">        return this.t;</span>
+    }
+
+
+    public Type scanString(int c, int maxlookahead) throws IOException
+    {
+        // reset out local value buffer
+<span class="nc" id="L948">        resetValue();</span>
+
+<span class="nc bnc" id="L950" title="All 2 branches missed.">        if (c != '\&quot;') {</span>
+<span class="nc" id="L951">            throw new IonException(&quot;Programmer error! Only a quote should get you here.&quot;);</span>
+        }
+<span class="nc" id="L953">        endquote = '\&quot;';</span>
+
+        sizedloop:
+<span class="nc bnc" id="L956" title="All 2 branches missed.">        while (maxlookahead-- &gt; 0) {</span>
+<span class="nc bnc" id="L957" title="All 5 branches missed.">            switch ((c = this.read())) {</span>
+<span class="nc" id="L958">            case -1:   break sizedloop; // TODO deoptimize, throw exception</span>
+<span class="nc" id="L959">            case '\&quot;': break sizedloop;</span>
+            case '\n':
+<span class="nc" id="L961">                throw new IonException(&quot;unexpected line terminator encountered in quoted string&quot;);</span>
+            case '\\':
+<span class="nc" id="L963">                c = readEscapedCharacter(this.in, false /*not clob*/);</span>
+                //    throws UnexpectedEofException on EOF
+<span class="nc bnc" id="L965" title="All 2 branches missed.">                if (c != EMPTY_ESCAPE_SEQUENCE) {</span>
+<span class="nc" id="L966">                    value.appendCodePoint(c);</span>
+                }
+                break;
+            default:
+                // c could be part of a surrogate pair so we can't use
+                // appendCodePoint()
+<span class="nc" id="L972">                value.append((char)c);</span>
+<span class="nc" id="L973">                break;</span>
+            }
+        }
+
+<span class="nc bnc" id="L977" title="All 4 branches missed.">        if (maxlookahead != -1 &amp;&amp; c == '\&quot;') {</span>
+            // this is the normal, non-longline case so we're just done
+<span class="nc" id="L979">            closeString();</span>
+        }
+        else {
+            // we're not at the closing quote, so this is an incomplete
+            // string which will have to be read to the end ... later
+<span class="nc" id="L984">            leaveOpenString(c, false);</span>
+        }
+<span class="nc" id="L986">        return Type.constString;</span>
+    }
+    void leaveOpenString(int c, boolean longstring) {
+<span class="nc bnc" id="L989" title="All 2 branches missed.">        if (c == -1) {</span>
+<span class="nc" id="L990">            throw new UnexpectedEofException();</span>
+        }
+
+<span class="nc" id="L993">        this.isIncomplete = true;</span>
+<span class="nc" id="L994">        this.inQuotedContent = true;</span>
+<span class="nc" id="L995">        this.isLongString = longstring;</span>
+<span class="nc" id="L996">    }</span>
+
+    /**
+     * Scans the rest of the string through {@link #endquote}.
+     * &lt;p&gt;
+       XXX  WARNING  XXX
+     * Almost identical logic is found in
+     * {@link IonBinary#appendToLongValue(int, boolean, boolean, PushbackReader)}
+     *
+     * @param is_in_expression
+     * @throws UnexpectedEofException if we hit EOF before the endquote.
+     */
+    void finishScanString(boolean is_in_expression) throws IOException
+    {
+<span class="nc bnc" id="L1010" title="All 4 branches missed.">        assert isIncomplete;</span>
+<span class="nc bnc" id="L1011" title="All 4 branches missed.">        assert inQuotedContent;</span>
+
+        for (;;)
+        {
+<span class="nc" id="L1015">            int c = this.read();</span>
+<span class="nc bnc" id="L1016" title="All 2 branches missed.">            if (c == -1) {</span>
+<span class="nc" id="L1017">                throw new UnexpectedEofException();</span>
+            }
+<span class="nc bnc" id="L1019" title="All 2 branches missed.">            if (c == endquote) break;  // endquote == -1 during long strings</span>
+<span class="nc bnc" id="L1020" title="All 2 branches missed.">            if (c == '\\') {</span>
+<span class="nc" id="L1021">                c = readEscapedCharacter(this.in, false /*not clob*/);</span>
+<span class="nc bnc" id="L1022" title="All 2 branches missed.">                if (c != EMPTY_ESCAPE_SEQUENCE) {</span>
+<span class="nc" id="L1023">                    value.appendCodePoint(c);</span>
+                }
+            }
+<span class="nc bnc" id="L1026" title="All 4 branches missed.">            else if (c == '\'' &amp;&amp; isLongString) {</span>
+                // This happens while handling triple-quote field names
+<span class="nc bnc" id="L1028" title="All 2 branches missed.">                if (twoMoreSingleQuotes()) {</span>
+                    // At the end of a long string.  Look for another one.
+<span class="nc" id="L1030">                    inQuotedContent = false;</span>
+<span class="nc" id="L1031">                    c = readIgnoreWhitespace();</span>
+
+<span class="nc bnc" id="L1033" title="All 4 branches missed.">                    if (c == '\'' &amp;&amp; twoMoreSingleQuotes()) {</span>
+                        // Yep, another triple-quote.  We've consumed all three
+                        // so just keep reading.
+<span class="nc" id="L1036">                        inQuotedContent = true;</span>
+                    }
+                    else {
+                        // Something else, we are done.
+<span class="nc" id="L1040">                        unread(c);</span>
+<span class="nc" id="L1041">                        break;</span>
+                    }
+                }
+                else {
+                    // Still inside the long string
+<span class="nc" id="L1046">                    value.append((char)c);</span>
+                }
+            }
+<span class="nc bnc" id="L1049" title="All 4 branches missed.">            else if (!isLongString &amp;&amp; (c == '\n')) {</span>
+<span class="nc" id="L1050">                throw new IonException(&quot;unexpected line terminator encountered in quoted string&quot;);</span>
+            }
+            else {
+<span class="nc" id="L1053">                value.append((char)c);</span>
+            }
+<span class="nc" id="L1055">        }</span>
+<span class="nc" id="L1056">        return;</span>
+    }
+
+    /**
+     * If two single quotes are next on the input, consume them and return
+     * true.  Otherwise, leave them on the input and return false.
+     * @return true when there are two pending single quotes.
+     * @throws IOException
+     */
+    private boolean twoMoreSingleQuotes() throws IOException
+    {
+<span class="nc" id="L1067">        int c = read();</span>
+<span class="nc bnc" id="L1068" title="All 2 branches missed.">        if (c == '\'') {</span>
+<span class="nc" id="L1069">            int c2 = read();</span>
+<span class="nc bnc" id="L1070" title="All 2 branches missed.">            if (c2 == '\'') {</span>
+<span class="nc" id="L1071">                return true;</span>
+            }
+<span class="nc" id="L1073">            unread(c2);</span>
+        }
+<span class="nc" id="L1075">        unread(c);</span>
+<span class="nc" id="L1076">        return false;</span>
+    }
+
+
+    void closeString() {
+<span class="nc" id="L1081">        this.isIncomplete = false;</span>
+<span class="nc" id="L1082">        this.inQuotedContent = false;</span>
+<span class="nc" id="L1083">        this.isLongString = false;</span>
+<span class="nc" id="L1084">    }</span>
+
+    public Type scanLongString() throws IOException
+    {
+        // reset out local value buffer
+<span class="nc" id="L1089">        resetValue();</span>
+
+<span class="nc" id="L1091">        endquote = -1;</span>
+
+        // we're not at the closing quote, so this is an incomplete
+        // string which will have to be read to the end ... later
+<span class="nc" id="L1095">        leaveOpenString(EMPTY_ESCAPE_SEQUENCE, true);</span>
+
+<span class="nc" id="L1097">        return Type.constString;</span>
+    }
+    /**
+     * Closes parsing of a triple-quote string, remembering that there may be
+     * more to come.
+     */
+    void closeLongString() {
+<span class="nc" id="L1104">        this.isIncomplete = true;</span>
+<span class="nc" id="L1105">        this.inQuotedContent = false;</span>
+<span class="nc" id="L1106">        this.isLongString = true;</span>
+<span class="nc" id="L1107">    }</span>
+
+
+    /**
+     * @return the translated escape sequence.  Will not return -1 since EOF is
+     * not legal in this context. May return {@link #EMPTY_ESCAPE_SEQUENCE} to
+     * indicate a zero-length sequence such as BS-NL.
+     * @throws UnexpectedEofException if the EOF is encountered in the middle
+     * of the escape sequence.
+     * */
+    public static int readEscapedCharacter(PushbackReader r, boolean inClob)
+        throws IOException, UnexpectedEofException
+    {
+        //    \\ The backslash character
+        //    \0 The character 0 (nul terminator char, for some)
+        //    \xhh The character with hexadecimal value 0xhh
+        //    \ u hhhh The character with hexadecimal value 0xhhhh
+        //    \t The tab character ('\u0009')
+        //    \n The newline (line feed) character ('\ u 000A')
+        //    \v The vertical tab character ('\u000B')
+        //    \r The carriage-return character ('\ u 000D')
+        //    \f The form-feed character ('\ u 000C')
+        //    \a The alert (bell) character ('\ u 0007')
+        //    \&quot; The double quote character
+        //    \' The single quote character
+        //    \? The question mark character
+
+<span class="nc" id="L1134">        int c2 = 0, c = r.read();</span>
+<span class="nc bnc" id="L1135" title="All 19 branches missed.">        switch (c) {</span>
+            case -1:
+<span class="nc" id="L1137">                throw new UnexpectedEofException();</span>
+<span class="nc" id="L1138">            case 't':  return '\t';</span>
+<span class="nc" id="L1139">            case 'n':  return '\n';</span>
+<span class="nc" id="L1140">            case 'v':  return '\u000B';</span>
+<span class="nc" id="L1141">            case 'r':  return '\r';</span>
+<span class="nc" id="L1142">            case 'f':  return '\f';</span>
+<span class="nc" id="L1143">            case 'b':  return '\u0008';</span>
+<span class="nc" id="L1144">            case 'a':  return '\u0007';</span>
+<span class="nc" id="L1145">            case '\\': return '\\';</span>
+<span class="nc" id="L1146">            case '\&quot;': return '\&quot;';</span>
+<span class="nc" id="L1147">            case '\'': return '\'';</span>
+<span class="nc" id="L1148">            case '/':  return '/';</span>
+<span class="nc" id="L1149">            case '?':  return '?';</span>
+
+            case 'U':
+                // Expecting 8 hex digits
+<span class="nc bnc" id="L1153" title="All 2 branches missed.">                if (inClob) {</span>
+<span class="nc" id="L1154">                    throw new IonException(&quot;Unicode escapes \\U not allowed in clob&quot;);</span>
+                }
+<span class="nc" id="L1156">                c = readDigit(r, 16, true);</span>
+<span class="nc bnc" id="L1157" title="All 2 branches missed.">                if (c &lt; 0) break;  // TODO throw UnexpectedEofException</span>
+<span class="nc" id="L1158">                c2 = c &lt;&lt; 28;</span>
+<span class="nc" id="L1159">                c = readDigit(r, 16, true);</span>
+<span class="nc bnc" id="L1160" title="All 2 branches missed.">                if (c &lt; 0) break;</span>
+<span class="nc" id="L1161">                c2 += c &lt;&lt; 24;</span>
+<span class="nc" id="L1162">                c = readDigit(r, 16, true);</span>
+<span class="nc bnc" id="L1163" title="All 2 branches missed.">                if (c &lt; 0) break;</span>
+<span class="nc" id="L1164">                c2 += c &lt;&lt; 20;</span>
+<span class="nc" id="L1165">                c = readDigit(r, 16, true);</span>
+<span class="nc bnc" id="L1166" title="All 2 branches missed.">                if (c &lt; 0) break;</span>
+<span class="nc" id="L1167">                c2 += c &lt;&lt; 16;</span>
+                // ... fall through...
+            case 'u':
+                // Expecting 4 hex digits
+<span class="nc bnc" id="L1171" title="All 2 branches missed.">                if (inClob) {</span>
+<span class="nc" id="L1172">                    throw new IonException(&quot;Unicode escapes \\u not allowed in clob&quot;);</span>
+                }
+<span class="nc" id="L1174">                c = readDigit(r, 16, true);</span>
+<span class="nc bnc" id="L1175" title="All 2 branches missed.">                if (c &lt; 0) break;</span>
+<span class="nc" id="L1176">                c2 += c &lt;&lt; 12;</span>
+<span class="nc" id="L1177">                c = readDigit(r, 16, true);</span>
+<span class="nc bnc" id="L1178" title="All 2 branches missed.">                if (c &lt; 0) break;</span>
+<span class="nc" id="L1179">                c2 += c &lt;&lt; 8;</span>
+                // ... fall through...
+            case 'x':
+                // Expecting 2 hex digits
+<span class="nc" id="L1183">                c = readDigit(r, 16, true);</span>
+<span class="nc bnc" id="L1184" title="All 2 branches missed.">                if (c &lt; 0) break;</span>
+<span class="nc" id="L1185">                c2 += c &lt;&lt; 4;</span>
+<span class="nc" id="L1186">                c = readDigit(r, 16, true);</span>
+<span class="nc bnc" id="L1187" title="All 2 branches missed.">                if (c &lt; 0) break;</span>
+<span class="nc" id="L1188">                return c2 + c;</span>
+
+            case '0':
+<span class="nc" id="L1191">                return 0;</span>
+            case '\n':
+<span class="nc" id="L1193">                return EMPTY_ESCAPE_SEQUENCE;</span>
+            default:
+                break;
+        }
+<span class="nc" id="L1197">        throw new IonException(&quot;invalid escape sequence \&quot;\\&quot;</span>
+                               + (char) c + &quot;\&quot; [&quot; + c + &quot;]&quot;);
+    }
+
+    public static int readDigit(/*EscapedCharacterReader*/PushbackReader r, int radix, boolean isRequired) throws IOException {
+<span class="nc" id="L1202">        int c = r.read();</span>
+<span class="nc bnc" id="L1203" title="All 2 branches missed.">        if (c &lt; 0) {</span>
+<span class="nc" id="L1204">            r.unread(c);</span>
+<span class="nc" id="L1205">            return -1;</span>
+        }
+
+<span class="nc" id="L1208">        int c2 =  Character.digit(c, radix);</span>
+<span class="nc bnc" id="L1209" title="All 2 branches missed.">        if (c2 &lt; 0) {</span>
+<span class="nc bnc" id="L1210" title="All 2 branches missed.">            if (isRequired) {</span>
+<span class="nc" id="L1211">                throw new IonException(&quot;bad digit in escaped character '&quot;+((char)c)+&quot;'&quot;);</span>
+            }
+            // if it's not a required digit, we just throw it back
+<span class="nc" id="L1214">            r.unread(c);</span>
+<span class="nc" id="L1215">            return -1;</span>
+        }
+<span class="nc" id="L1217">        return c2;</span>
+    }
+
+
+    private void checkAndUnreadNumericStopper(int c) throws IOException
+    {
+        // Ignore EOF, so we don't &quot;unread&quot; it - EOF is a terminator
+<span class="nc bnc" id="L1224" title="All 2 branches missed.">        if (c != -1) {</span>
+<span class="nc bnc" id="L1225" title="All 2 branches missed.">            if ( ! this.isValueTerminatingCharacter(c) ) {</span>
+<span class="nc" id="L1226">                final String message =</span>
+<span class="nc" id="L1227">                    position() + &quot;: Numeric value followed by invalid character &quot;</span>
+<span class="nc" id="L1228">                    + printCodePointAsString(c);</span>
+<span class="nc" id="L1229">                throw new IonException(message);</span>
+            }
+<span class="nc" id="L1231">            this.unread(c);</span>
+        }
+<span class="nc" id="L1233">    }</span>
+
+    private final boolean isValueTerminatingCharacter(int c) throws IOException
+    {
+        boolean isTerminator;
+
+<span class="nc bnc" id="L1239" title="All 2 branches missed.">        if (c == '/') {</span>
+            // this is terminating only if it starts a comment of some sort
+<span class="nc" id="L1241">            c = this.read();</span>
+<span class="nc" id="L1242">            this.unread(c);  // we never &quot;keep&quot; this character</span>
+<span class="nc bnc" id="L1243" title="All 4 branches missed.">            isTerminator = (c == '/' || c == '*');</span>
+        }
+        else {
+<span class="nc" id="L1246">            isTerminator = IonTextUtils.isNumericStop(c);</span>
+        }
+
+<span class="nc" id="L1249">        return isTerminator;</span>
+    }
+
+    public Type readNumber(int c) throws IOException {
+        // clear out our string buffer
+<span class="nc" id="L1254">        resetValue();</span>
+
+        // process the initial sign character, if its there.
+<span class="nc" id="L1257">        boolean explicitPlusSign = false;</span>
+<span class="nc bnc" id="L1258" title="All 3 branches missed.">        switch (c) {</span>
+        case '-':
+<span class="nc" id="L1260">            value.append((char)c);</span>
+<span class="nc" id="L1261">            c = this.read();</span>
+<span class="nc" id="L1262">            t = Type.constNegInt;</span>
+<span class="nc" id="L1263">            this.numberType = NumberType.NT_NEGINT;</span>
+<span class="nc" id="L1264">            this.isNegative = true;</span>
+<span class="nc" id="L1265">            break;</span>
+        case '+':
+            // we eat the plus sign, but remember we saw one
+<span class="nc" id="L1268">            explicitPlusSign = true;</span>
+<span class="nc" id="L1269">            c = this.read();</span>
+<span class="nc" id="L1270">            t = Type.constPosInt;</span>
+<span class="nc" id="L1271">            this.isNegative = false;</span>
+<span class="nc" id="L1272">            this.numberType = NumberType.NT_POSINT;</span>
+<span class="nc" id="L1273">            break;</span>
+        default:
+<span class="nc" id="L1275">            t = Type.constPosInt;</span>
+<span class="nc" id="L1276">            this.numberType = NumberType.NT_POSINT;</span>
+<span class="nc" id="L1277">            this.isNegative = false;</span>
+            break;
+        }
+
+        // process the initial digit.  Caller has checked that it's a digit.
+<span class="nc bnc" id="L1282" title="All 4 branches missed.">        assert isDigit(c, 10);</span>
+<span class="nc" id="L1283">        value.append((char)c);</span>
+<span class="nc bnc" id="L1284" title="All 2 branches missed.">        boolean isZero = (c == '0');</span>
+<span class="nc" id="L1285">        boolean leadingZero = isZero;</span>
+
+        // process the next character after the initial digit.
+<span class="nc bnc" id="L1288" title="All 4 branches missed.">        switch((c = this.read())) {</span>
+        case 'x':
+        case 'X':
+<span class="nc bnc" id="L1291" title="All 2 branches missed.">            if (!isZero) {</span>
+<span class="nc" id="L1292">                throw new IonException(&quot;badly formed number encountered at &quot; + position());</span>
+            }
+<span class="nc" id="L1294">            this.numberType = NumberType.NT_HEX;</span>
+            // We don't need to append the char because we're going to wipe
+            // the value anyway to accumulate just the hex digits.
+<span class="nc" id="L1297">            return scanHexNumber();</span>
+        case '.':
+        case 'd':
+        case 'D':
+<span class="nc" id="L1301">            t = Type.constDecimal;</span>
+<span class="nc" id="L1302">            this.numberType = NumberType.NT_DECIMAL;</span>
+<span class="nc" id="L1303">            value.append((char)c);</span>
+<span class="nc" id="L1304">            break;</span>
+        case 'e':
+        case 'E':
+<span class="nc" id="L1307">            t = Type.constFloat;</span>
+<span class="nc" id="L1308">            this.numberType = NumberType.NT_FLOAT;</span>
+<span class="nc" id="L1309">            value.append((char)c);</span>
+<span class="nc" id="L1310">            break;</span>
+        default:
+<span class="nc bnc" id="L1312" title="All 2 branches missed.">            if (!isDigit(c, 10)) {</span>
+<span class="nc" id="L1313">                checkAndUnreadNumericStopper(c);</span>
+<span class="nc bnc" id="L1314" title="All 4 branches missed.">                if (isZero &amp;&amp; NumberType.NT_NEGINT.equals(this.numberType)) {</span>
+<span class="nc" id="L1315">                    t = Type.constPosInt;</span>
+<span class="nc" id="L1316">                    this.numberType = NumberType.NT_POSINT;</span>
+                }
+<span class="nc" id="L1318">                return t;</span>
+            }
+<span class="nc" id="L1320">            value.append((char)c);</span>
+<span class="nc bnc" id="L1321" title="All 2 branches missed.">            isZero &amp;= (c == '0');</span>
+            break;
+        }
+
+        // see if see can continue find leading digits
+<span class="nc bnc" id="L1326" title="All 2 branches missed.">        if (NumberType.NT_NEGINT.equals(numberType)</span>
+<span class="nc bnc" id="L1327" title="All 2 branches missed.">         || NumberType.NT_POSINT.equals(numberType)</span>
+        ) {
+            // We've now scanned at least two digits.
+            // read in the remaining whole number digits
+            for (;;) {
+<span class="nc" id="L1332">                c = this.read();</span>
+<span class="nc bnc" id="L1333" title="All 2 branches missed.">                if (!isDigit(c, 10)) break;</span>
+<span class="nc" id="L1334">                value.append((char)c);</span>
+<span class="nc bnc" id="L1335" title="All 2 branches missed.">                isZero &amp;= (c == '0');</span>
+            }
+
+            // and see what we ran aground on ..
+<span class="nc bnc" id="L1339" title="All 4 branches missed.">            switch (c) {</span>
+            case '.':
+            case 'd':
+            case 'D':
+<span class="nc bnc" id="L1343" title="All 2 branches missed.">                if (leadingZero) {</span>
+<span class="nc" id="L1344">                    throw new IonException(position() + &quot;: Invalid leading zero on numeric&quot;);</span>
+                }
+<span class="nc" id="L1346">                t = Type.constDecimal;</span>
+<span class="nc" id="L1347">                this.numberType = NumberType.NT_DECIMAL;</span>
+<span class="nc" id="L1348">                value.append((char)c);</span>
+<span class="nc" id="L1349">                break;</span>
+            case 'e':
+            case 'E':
+<span class="nc bnc" id="L1352" title="All 2 branches missed.">                if (leadingZero) {</span>
+<span class="nc" id="L1353">                    throw new IonException(position() + &quot;: Invalid leading zero on numeric&quot;);</span>
+                }
+<span class="nc" id="L1355">                t = Type.constFloat;</span>
+<span class="nc" id="L1356">                this.numberType = NumberType.NT_FLOAT;</span>
+<span class="nc" id="L1357">                value.append((char)c);</span>
+<span class="nc" id="L1358">                break;</span>
+            case 'T':  // same as '-' it's a timestamp
+            case '-':
+<span class="nc bnc" id="L1361" title="All 4 branches missed.">                if (NumberType.NT_POSINT.equals(this.numberType) &amp;&amp; !explicitPlusSign) {</span>
+<span class="nc" id="L1362">                    return scanTimestamp(c);</span>
+                }
+                // otherwise fall through to &quot;all other&quot; processing
+            default:
+                // Hit the end of our integer.  Make sure its a valid stopper.
+<span class="nc" id="L1367">                checkAndUnreadNumericStopper(c);</span>
+
+<span class="nc bnc" id="L1369" title="All 4 branches missed.">                if (leadingZero &amp;&amp; !isZero) {</span>
+<span class="nc" id="L1370">                    throw new IonException(position() + &quot;: Invalid leading zero on numeric&quot;);</span>
+                }
+<span class="nc bnc" id="L1372" title="All 4 branches missed.">                if (isZero &amp;&amp; NumberType.NT_NEGINT.equals(this.numberType)) {</span>
+<span class="nc" id="L1373">                    t = Type.constPosInt;</span>
+<span class="nc" id="L1374">                    this.numberType = NumberType.NT_POSINT;</span>
+                }
+<span class="nc" id="L1376">                return t;</span>
+            }
+        }
+
+        // now we must have just decimal or float
+        // if it's decimal we ended on a DOT, so get the trailing
+        // (fractional) digits
+<span class="nc bnc" id="L1383" title="All 2 branches missed.">        if (NumberType.NT_DECIMAL.equals(this.numberType)) {</span>
+            for (;;) {
+<span class="nc" id="L1385">                c = this.read();</span>
+<span class="nc bnc" id="L1386" title="All 2 branches missed.">                if (!isDigit(c, 10)) break;</span>
+<span class="nc" id="L1387">                value.append((char)c);</span>
+            }
+            // and see what we ran aground on this time..
+<span class="nc bnc" id="L1390" title="All 4 branches missed.">            switch (c) {</span>
+            case '-':
+            case '+':
+                // We'll handle exponent below.
+<span class="nc" id="L1394">                this.unread(c);</span>
+<span class="nc" id="L1395">                break;</span>
+            case 'e':
+            case 'E':
+                // this is the only viable option now
+<span class="nc" id="L1399">                t = Type.constFloat;</span>
+<span class="nc" id="L1400">                this.numberType = NumberType.NT_FLOAT;</span>
+<span class="nc" id="L1401">                value.append((char)c);</span>
+<span class="nc" id="L1402">                break;</span>
+            case 'd':
+            case 'D':
+                // this is the only viable option now
+<span class="nc bnc" id="L1406" title="All 4 branches missed.">                assert t == Type.constDecimal;</span>
+<span class="nc bnc" id="L1407" title="All 4 branches missed.">                assert NumberType.NT_DECIMAL.equals(this.numberType);</span>
+<span class="nc" id="L1408">                value.append((char)c);</span>
+<span class="nc" id="L1409">                break;</span>
+            default:
+<span class="nc" id="L1411">                checkAndUnreadNumericStopper(c);</span>
+<span class="nc" id="L1412">                return t;</span>
+            }
+        }
+
+        // now we have the exponent part to read
+        // reading the first character of the exponent, it can be
+        // a sign character or a digit (this is the only place
+        // the sign is valid) and we're for sure a float at this point
+<span class="nc bnc" id="L1420" title="All 3 branches missed.">        switch ((c = this.read())) {</span>
+        case '-':
+<span class="nc" id="L1422">            value.append((char)c);</span>
+<span class="nc" id="L1423">            break;</span>
+        case '+':
+            // we eat the plus sign
+<span class="nc" id="L1426">            break;</span>
+        default:
+<span class="nc bnc" id="L1428" title="All 2 branches missed.">            if (!isDigit(c, 10)) {</span>
+                // this they said 'e' then they better put something valid after it!
+<span class="nc" id="L1430">                throw new IonException(&quot;badly formed number encountered at &quot; + position());</span>
+            }
+<span class="nc" id="L1432">            this.unread(c);</span>
+            // we'll re-read this in just a bit, but we had to check
+            break;
+        }
+
+        // read in the remaining whole number digits and then quit
+        for (;;) {
+<span class="nc" id="L1439">            c = this.read();</span>
+<span class="nc bnc" id="L1440" title="All 2 branches missed.">            if (!isDigit(c, 10)) break;</span>
+<span class="nc" id="L1441">            value.append((char)c);</span>
+        }
+
+<span class="nc" id="L1444">        checkAndUnreadNumericStopper(c);</span>
+
+<span class="nc" id="L1446">        return t;</span>
+    }
+
+    Type scanHexNumber() throws IOException
+    {
+<span class="nc" id="L1451">        boolean anydigits = false;</span>
+        int c;
+
+<span class="nc" id="L1454">        boolean isZero = true;</span>
+
+        // Leave the 0x in the buffer since we'll need it to parse the content.
+        // first get clear out our string buffer, we're starting over
+<span class="nc" id="L1458">        value.setLength(0);  // resetValue() wipes out too much</span>
+
+        // read in the remaining whole number digits and then quit
+        for (;;) {
+<span class="nc" id="L1462">            c = this.read();</span>
+<span class="nc bnc" id="L1463" title="All 2 branches missed.">            if (!isDigit(c, 16)) break;</span>
+<span class="nc" id="L1464">            anydigits = true;</span>
+<span class="nc bnc" id="L1465" title="All 2 branches missed.">            isZero &amp;= (c == '0');</span>
+<span class="nc" id="L1466">            value.append((char)c);</span>
+        }
+<span class="nc bnc" id="L1468" title="All 2 branches missed.">        if (!anydigits) {</span>
+<span class="nc" id="L1469">            throw new IonException(&quot;badly formed hexadecimal number encountered at &quot; + position());</span>
+        }
+
+<span class="nc" id="L1472">        checkAndUnreadNumericStopper(c);</span>
+<span class="nc bnc" id="L1473" title="All 4 branches missed.">        if (isZero &amp;&amp; t == Type.constNegInt) {</span>
+<span class="nc" id="L1474">            t = Type.constPosInt;</span>
+        }
+
+        // as long as we saw any digit, we're good
+<span class="nc" id="L1478">        return t;</span>
+    }
+
+    /**
+     * Scans a timestamp after reading &lt;code&gt;yyyy-&lt;/code&gt;.
+     *
+     * We can be a little lenient here since the result will be reparsed and
+     * validated more thoroughly by {@link Timestamp#valueOf(CharSequence)}.
+     *
+     * @param c the last character scanned; must be &lt;code&gt;'-'&lt;/code&gt;.
+     * @return {@link Type#constTime}
+     */
+    Type scanTimestamp(int c) throws IOException {
+
+endofdate:
+        for (;;) {  // fake for loop to create a label we can jump out of,
+                    // because 4 or 5 levels of nested if's is just ugly
+
+            // at this point we will have read leading digits and exactly 1 dash
+            // in other words, we'll have read the year
+<span class="nc bnc" id="L1498" title="All 2 branches missed.">            if (c == 'T') {</span>
+                // yearT is a valid timestamp value
+<span class="nc" id="L1500">                value.append((char)c);</span>
+<span class="nc" id="L1501">                c = this.read(); // because we'll unread it before we return</span>
+<span class="nc" id="L1502">                break endofdate;</span>
+            }
+<span class="nc bnc" id="L1504" title="All 2 branches missed.">            if (c != '-') {</span>
+                // not a dash or a T after the year - so this is a bad value
+<span class="nc" id="L1506">                throw new IllegalStateException(&quot;invalid timestamp, expecting a dash here at &quot; + this.position());</span>
+            }
+
+            // append the dash and then read the month field
+<span class="nc" id="L1510">            value.append((char)c); // so append it, because we haven't already</span>
+<span class="nc" id="L1511">            c = readDigits(2, &quot;month&quot;);</span>
+<span class="nc bnc" id="L1512" title="All 2 branches missed.">            if (c == 'T') {</span>
+                // year-monthT is a valid timestamp value
+<span class="nc" id="L1514">                value.append((char)c);</span>
+<span class="nc" id="L1515">                c = this.read(); // because we'll unread it before we return</span>
+<span class="nc" id="L1516">                break endofdate;</span>
+            }
+<span class="nc bnc" id="L1518" title="All 2 branches missed.">            if (c != '-') {</span>
+                // if the month isn't followed by a dash or a T it's an invalid month
+<span class="nc" id="L1520">                throw new IonException(&quot;invalid timestamp, expecting month at &quot; + this.position());</span>
+            }
+
+            // append the dash and read the day (or day-of-month) field
+<span class="nc" id="L1524">            value.append((char)c);</span>
+<span class="nc" id="L1525">            c = readDigits(2, &quot;day of month&quot;);</span>
+<span class="nc bnc" id="L1526" title="All 2 branches missed.">            if (c == 'T') {</span>
+
+check4timezone:
+                for (;;) { // another fake label/ for=goto
+
+                    // attach the 'T' to the value we're collecting
+<span class="nc" id="L1532">                    value.append((char)c);</span>
+
+                    // we're going to &quot;watch&quot; how many digits we read in the hours
+                    // field.  It's 0 that's actually ok, since we can end at the
+                    // 'T' we just read
+<span class="nc" id="L1537">                    int length_before_reading_hours = value.length();</span>
+                    // so read the hours
+<span class="nc" id="L1539">                    c = readDigits(2, &quot;hours&quot;);</span>
+<span class="nc bnc" id="L1540" title="All 2 branches missed.">                    if (length_before_reading_hours == value.length()) {</span>
+                        // FIXME I don't think there should be a timezone here
+<span class="nc" id="L1542">                        break check4timezone;</span>
+                    }
+<span class="nc bnc" id="L1544" title="All 2 branches missed.">                    if (c != ':') {</span>
+<span class="nc" id="L1545">                        throw new IonException(&quot;invalid timestamp, expecting hours at &quot; + this.position());</span>
+                    }
+<span class="nc" id="L1547">                    value.append((char)c);</span>
+                    // so read the minutes
+<span class="nc" id="L1549">                    c = readDigits(2, &quot;minutes&quot;);</span>
+<span class="nc bnc" id="L1550" title="All 2 branches missed.">                    if (c != ':') {</span>
+<span class="nc bnc" id="L1551" title="All 6 branches missed.">                        if (c == '-' || c == '+' || c == 'Z') {</span>
+<span class="nc" id="L1552">                            break check4timezone;</span>
+                        }
+                        break endofdate;
+                    }
+<span class="nc" id="L1556">                    value.append((char)c);</span>
+                    // so read the seconds
+<span class="nc" id="L1558">                    c = readDigits(2, &quot;seconds&quot;);</span>
+<span class="nc bnc" id="L1559" title="All 2 branches missed.">                    if (c != '.') {</span>
+<span class="nc bnc" id="L1560" title="All 6 branches missed.">                        if (c == '-' || c == '+' || c == 'Z') {</span>
+<span class="nc" id="L1561">                            break check4timezone;</span>
+                        }
+                        break endofdate;
+                    }
+<span class="nc" id="L1565">                    value.append((char)c);</span>
+                    // so read the fractional seconds
+<span class="nc" id="L1567">                    c = readDigits(32, &quot;fractional seconds&quot;);</span>
+<span class="nc" id="L1568">                    break check4timezone;</span>
+                }//check4timezone
+
+                // now check to see if it's a timezone offset we're looking at
+<span class="nc bnc" id="L1572" title="All 4 branches missed.">                if (c == '-' || c == '+') {</span>
+<span class="nc" id="L1573">                    value.append((char)c);</span>
+                    // so read the timezone offset
+<span class="nc" id="L1575">                    c = readDigits(2, &quot;timezone offset&quot;);</span>
+<span class="nc bnc" id="L1576" title="All 2 branches missed.">                    if (c != ':') break endofdate;</span>
+<span class="nc" id="L1577">                    value.append((char)c);</span>
+<span class="nc" id="L1578">                    c = readDigits(2, &quot;timezone offset&quot;);</span>
+                }
+<span class="nc bnc" id="L1580" title="All 2 branches missed.">                else if (c == 'Z') {</span>
+<span class="nc" id="L1581">                    value.append((char)c);</span>
+<span class="nc" id="L1582">                    c = this.read(); // because we'll unread it before we return</span>
+                }
+            }
+            break endofdate;
+        }//endofdate
+
+<span class="nc" id="L1588">        checkAndUnreadNumericStopper(c);</span>
+
+<span class="nc" id="L1590">        return Type.constTime;</span>
+    }
+
+    int readDigits(int limit, String field) throws IOException {
+<span class="nc" id="L1594">        int c, len = 0;</span>
+        // read in the remaining whole number digits and then quit
+        for (;;) {
+<span class="nc" id="L1597">            c = this.read();</span>
+<span class="nc bnc" id="L1598" title="All 2 branches missed.">            if (!isDigit(c, 10)) break;</span>
+<span class="nc" id="L1599">            len++;</span>
+<span class="nc bnc" id="L1600" title="All 2 branches missed.">            if (len &gt; limit) {</span>
+<span class="nc" id="L1601">                throw new IonException(&quot;invalid format &quot; + field + &quot; too long at &quot; + this.position());</span>
+            }
+<span class="nc" id="L1603">            value.append((char)c);</span>
+        }
+<span class="nc" id="L1605">        return c;</span>
+    }
+
+    public boolean makeValidNumeric(Type castto) throws IOException {
+<span class="nc" id="L1609">        String  s = getValueString(false);</span>
+
+        try
+        {
+<span class="nc" id="L1613">            this.t = castto.setNumericValue(this, s);</span>
+        }
+<span class="nc" id="L1615">        catch (NumberFormatException e)</span>
+        {
+<span class="nc" id="L1617">            throw new IonException(this.position() + &quot;: invalid numeric value &quot; + s, e);</span>
+<span class="nc" id="L1618">        }</span>
+
+<span class="nc" id="L1620">        return this.t.isNumeric();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

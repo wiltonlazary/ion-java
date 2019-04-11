@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IonLobLite.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">com.amazon.ion:ion-java</a> &gt; <a href="index.source.html" class="el_package">com.amazon.ion.impl.lite</a> &gt; <span class="el_source">IonLobLite.java</span></div><h1>IonLobLite.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * or in the &quot;license&quot; file accompanying this file. This file is distributed
+ * on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+package com.amazon.ion.impl.lite;
+
+import com.amazon.ion.IonLob;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.util.zip.CRC32;
+
+
+abstract class IonLobLite
+    extends IonValueLite
+    implements IonLob
+{
+
+    private byte[] _lob_value;
+
+    protected IonLobLite(ContainerlessContext context, boolean isNull)
+    {
+<span class="fc" id="L33">        super(context, isNull);</span>
+<span class="fc" id="L34">    }</span>
+
+    IonLobLite(IonLobLite existing, IonContext context) {
+<span class="fc" id="L37">        super(existing, context);</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (null != existing._lob_value) {</span>
+<span class="fc" id="L39">            int size = existing._lob_value.length;</span>
+<span class="fc" id="L40">            this._lob_value = new byte[size];</span>
+<span class="fc" id="L41">            System.arraycopy(existing._lob_value, 0, this._lob_value, 0, size);</span>
+        }
+<span class="fc" id="L43">    }</span>
+
+    @Override
+    public abstract IonLobLite clone();
+
+
+    /**
+     * Calculate LOB hash code as XOR of seed with CRC-32 of the LOB data.
+     * This distinguishes BLOBs from CLOBs
+     * @param seed Seed value
+     * @return hash code
+     */
+    protected int lobHashCode(int seed, SymbolTableProvider symbolTableProvider)
+    {
+<span class="fc" id="L57">        int result = seed;</span>
+
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (!isNullValue())  {</span>
+<span class="fc" id="L60">            CRC32 crc = new CRC32();</span>
+<span class="fc" id="L61">            crc.update(getBytes());</span>
+<span class="fc" id="L62">            result ^= (int) crc.getValue();</span>
+        }
+
+<span class="fc" id="L65">        return hashTypeAnnotations(result, symbolTableProvider);</span>
+    }
+
+    /**
+     * @param source may be null to make this an Ion null value.
+     */
+    protected final void copyBytesFrom(byte[] source, int offset, int length)
+    {
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (source == null)</span>
+        {
+<span class="fc" id="L75">            _lob_value = null;</span>
+<span class="fc" id="L76">            _isNullValue(true);</span>
+        }
+        else
+        {
+            // Avoid allocation if we happen to have the right length.
+<span class="fc bfc" id="L81" title="All 4 branches covered.">            if (_lob_value == null || _lob_value.length != length) {</span>
+<span class="fc" id="L82">                _lob_value = new byte[length];</span>
+            }
+<span class="fc" id="L84">            System.arraycopy(source, offset, _lob_value, 0, length);</span>
+<span class="fc" id="L85">            _isNullValue(false);</span>
+        }
+<span class="fc" id="L87">    }</span>
+
+    /**
+     * Get the byte array without copying
+     */
+    protected byte[] getBytesNoCopy()
+    {
+<span class="fc" id="L94">        return _lob_value;</span>
+    }
+
+    public final InputStream newInputStream()
+    {
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (_isNullValue())</span>
+        {
+<span class="fc" id="L101">            return null;</span>
+        }
+        // TODO this is inefficient.  Should stream directly from binary.
+<span class="fc" id="L104">        return new ByteArrayInputStream(_lob_value);</span>
+    }
+
+    public final byte[] getBytes()
+    {
+        byte[] user_copy;
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (_isNullValue()) {</span>
+<span class="fc" id="L111">            user_copy = null;</span>
+        }
+        else {
+<span class="fc" id="L114">            user_copy = _lob_value.clone();</span>
+        }
+<span class="fc" id="L116">        return user_copy;</span>
+    }
+
+    public final void setBytes(byte[] bytes)
+    {
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        setBytes(bytes, 0, bytes == null ? 0 : bytes.length);</span>
+<span class="fc" id="L122">    }</span>
+
+    public final void setBytes(byte[] bytes, int offset, int length)
+    {
+<span class="fc" id="L126">        checkForLock();</span>
+<span class="fc" id="L127">        copyBytesFrom(bytes, offset, length);</span>
+<span class="fc" id="L128">    }</span>
+
+    public final int byteSize()
+    {
+<span class="fc" id="L132">        validateThisNotNull();</span>
+<span class="fc" id="L133">        return _lob_value.length;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

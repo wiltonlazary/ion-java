@@ -36,7 +36,7 @@ public class LSTWriter implements PrivateIonWriter {
         if(!currentLST.isLocalTable()) throw new Error("LSTWriter can only be instantiated with LSTs.");
         symbolTable = currentLST;
         catalog = inCatalog;
-        depth = 0;
+        depth = 1;
     }
 
     public LSTWriter(ArrayList<SymbolTable> imports, List<String> symbols, IonCatalog inCatalog) {
@@ -45,7 +45,7 @@ public class LSTWriter implements PrivateIonWriter {
             imports.add(0, PrivateUtils.systemSymtab(1));
         }
         symbolTable = new LocalSymbolTable(new LocalSymbolTableImports(imports), symbols);
-        depth = 0;
+        depth = 1;
     }
 
     public SymbolTable getSymbolTable() {
@@ -90,6 +90,7 @@ public class LSTWriter implements PrivateIonWriter {
                 SSTImport temp = decImports.getLast();
                 if(temp.maxID == 0 || temp.name == null || temp.version == 0) throw new UnsupportedOperationException("Illegal Shared Symbol Table Import declared in local symbol table." + temp.name + "." + temp.version);
                 LinkedList<SymbolTable> tempImports = new LinkedList<SymbolTable>();
+                tempImports.add(symbolTable.getSystemSymbolTable());
                 SymbolTable tempTable = null;
                 for(SSTImport desc : decImports) {
                     tempTable = catalog.getTable(desc.name, desc.version);
@@ -141,6 +142,11 @@ public class LSTWriter implements PrivateIonWriter {
         switch(state) {
             case sym:
                 symbolTable.intern(value);
+                break;
+            case impName:
+                decImports.getLast().name = value;
+                state = State.imp;
+                break;
             default:
                 throw new UnsupportedOperationException("Open content unsupported via the managed binary writer");
 
@@ -160,11 +166,13 @@ public class LSTWriter implements PrivateIonWriter {
         writeSymbol(content.getText());
     }
 
-    public void writeInt(long value){
+    public void writeInt(long value) {
         if(state == State.impVer) {
             decImports.getLast().version = (int) value;
+            state = State.imp;
         } else if(state == State.impMID) {
             decImports.getLast().maxID = (int) value;
+            state = State.imp;
         } else {
             throw new UnsupportedOperationException("Open content is unsupported via these APIs.");
         }
@@ -182,7 +190,7 @@ public class LSTWriter implements PrivateIonWriter {
 
     }
 
-    public void writeNull(IonType type){
+    public void writeNull(IonType type) {
 
     }
     //This isn't really fulfilling the contract, but we're destroying any open content anyway so screw'em.
@@ -200,6 +208,7 @@ public class LSTWriter implements PrivateIonWriter {
 
 
     public void setFieldNameSymbol(SymbolToken name) {
+
         setFieldName(name.getText());
     }
     //we aren't really a writer

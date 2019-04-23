@@ -100,7 +100,6 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
             lst = lstWriter.getSymbolTable();
             lstIndex = lst.getImportedMaxId();
         } else {
-
             lstWriter = new LSTWriter(fallbackImports, new ArrayList<String>(), catalog);
             lst = lstWriter.getSymbolTable();
             lstIndex = lst.getImportedMaxId();
@@ -139,6 +138,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
 
     private SymbolToken intern(final SymbolToken token) {
         if (token == null) return null;
+        if (token.getText() == null && token.getSid() == 0) return token;
         return intern(token.getText());
     }
 
@@ -199,8 +199,9 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
             currentWriter = lstWriter;
             user.setTypeAnnotationSymbols();
 
+        } else {
+            currentWriter.stepIn(containerType);
         }
-        currentWriter.stepIn(containerType);
     }
 
     public void stepOut() throws IOException
@@ -224,7 +225,6 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
     }
 
     // Write Value Methods
-
     public void writeNull() throws IOException {
         currentWriter.writeNull();
     }

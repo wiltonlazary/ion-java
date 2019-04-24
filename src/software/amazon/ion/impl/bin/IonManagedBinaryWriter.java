@@ -51,7 +51,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
     private IonRawBinaryWriter                  symbols;
     private PrivateIonWriter                    currentWriter;
     private SymbolTable                         lst;
-    private int                                 lstIndex;
+    private int                                 lstIndex, maxSysId;
 
 
     /*package*/ IonManagedBinaryWriter(final PrivateIonManagedBinaryWriterBuilder builder,
@@ -104,6 +104,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
             lst = lstWriter.getSymbolTable();
             lstIndex = lst.getImportedMaxId();
         }
+        maxSysId = lst.getSystemSymbolTable().getMaxId();
 
     }
 
@@ -132,14 +133,16 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
     //these should be inverted so that calling intern x text results in a new symboltoken if none currently exist, thus we can support repeated symboltokens
     private SymbolToken intern(final String text) {
         if (text == null) return null;
-        newSymbols = true;
-        return lst.intern(text);
+        SymbolToken token = lst.intern(text);
+        newSymbols |= token.getSid() > maxSysId;
+        return token;
     }
 
     private SymbolToken intern(final SymbolToken token) {
         if (token == null) return null;
-        if (token.getText() == null && token.getSid() == 0) return token;
-        return intern(token.getText());
+        String text = token.getText();
+        if (text == null && token.getSid() == 0) return token;
+        return intern(text);
     }
 
     public SymbolTable getSymbolTable() {
@@ -310,14 +313,12 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
         if (getDepth() != 0) throw new IllegalStateException("IonWriter.flush() can only be called at top-level.");
         int maxId = lst.getMaxId();
         if(newSymbols) {
+            symbols.addTypeAnnotationSymbol(systemSymbol(ION_SYMBOL_TABLE_SID));
+            symbols.stepIn(STRUCT);
             if(flushed) {//append
-                symbols.addTypeAnnotationSymbol(systemSymbol(ION_SYMBOL_TABLE_SID));
-                symbols.stepIn(STRUCT);
                 symbols.setFieldNameSymbol(systemSymbol(IMPORTS_SID));
                 symbols.writeSymbolToken(systemSymbol(ION_SYMBOL_TABLE_SID));
             } else {//fresh lst
-                symbols.addTypeAnnotationSymbol(systemSymbol(ION_SYMBOL_TABLE_SID));
-                symbols.stepIn(STRUCT);
                 SymbolTable[] tempImports = lst.getImportedTables();
                 if (tempImports.length > 0) {
                     symbols.setFieldNameSymbol(systemSymbol(IMPORTS_SID));

@@ -141,7 +141,12 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
     private SymbolToken intern(final SymbolToken token) {
         if (token == null) return null;
         String text = token.getText();
-        if (text == null && token.getSid() == 0) return token;
+        if (text == null){
+            int sid = token.getSid();
+            if(sid > lst.getMaxId()) throw new UnknownSymbolException(sid);
+            return token;
+
+        }
         return intern(text);
     }
 

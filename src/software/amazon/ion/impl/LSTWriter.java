@@ -67,7 +67,9 @@ public class LSTWriter implements PrivateIonWriter {
                 decImports.add(new SSTImport());
                 break;
             case preSym:
+                if(containerType != IonType.LIST) throw new UnsupportedOperationException("Open content unsupported via the managed binary writer");
                 decSymbols = new LinkedList<String>();
+                state = State.sym;
                 break;
             case impMID:
             case impVer:
@@ -106,6 +108,7 @@ public class LSTWriter implements PrivateIonWriter {
                         symbolTable.intern(sym);
                     }
                 }
+                break;
             case preSym:
             case impMID:
             case impVer:

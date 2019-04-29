@@ -32,20 +32,14 @@ public class LSTWriter implements PrivateIonWriter {
         int maxID;
     }
 
-    public LSTWriter(SymbolTable currentLST, IonCatalog inCatalog) {
-        if(!currentLST.isLocalTable()) throw new Error("LSTWriter can only be instantiated with LSTs.");
-        symbolTable = currentLST;
-        catalog = inCatalog;
-        depth = 1;
-    }
-
     public LSTWriter(ArrayList<SymbolTable> imports, List<String> symbols, IonCatalog inCatalog) {
         catalog = inCatalog;
+        decSymbols = new LinkedList<String>();
         if(imports.isEmpty() || !imports.get(0).isSystemTable()){
             imports.add(0, PrivateUtils.systemSymtab(1));
         }
         symbolTable = new LocalSymbolTable(new LocalSymbolTableImports(imports), symbols);
-        depth = 1;
+        depth = 0;
     }
 
     public SymbolTable getSymbolTable() {
@@ -54,6 +48,7 @@ public class LSTWriter implements PrivateIonWriter {
 
     public void stepIn(IonType containerType) throws IOException {
         depth++;
+        if(state == null) return;
         switch(state) {
             case preImp:
                 //entering the decImports list
@@ -87,8 +82,8 @@ public class LSTWriter implements PrivateIonWriter {
 
     public void stepOut() {
         depth--;
-        switch(state) {
-            case imp:
+        if(state == null) {
+            if(seenImports){
                 SSTImport temp = decImports.getLast();
                 if(temp.maxID == 0 || temp.name == null || temp.version == 0) throw new UnsupportedOperationException("Illegal Shared Symbol Table Import declared in local symbol table." + temp.name + "." + temp.version);
                 LinkedList<SymbolTable> tempImports = new LinkedList<SymbolTable>();
@@ -99,23 +94,25 @@ public class LSTWriter implements PrivateIonWriter {
                     if(tempTable == null) tempTable = new SubstituteSymbolTable(desc.name, desc.version, desc.maxID);
                     tempImports.add(tempTable);
                 }
-
                 symbolTable = new LocalSymbolTable(new LocalSymbolTableImports(tempImports), decSymbols);
-                break;
-            case sym:
-                if(seenImports) {
-                    for(String sym: decSymbols) {
-                        symbolTable.intern(sym);
-                    }
+            } else {
+                for(String sym : decSymbols) {
+                    symbolTable.intern(sym);
                 }
-                break;
-            case preSym:
-            case impMID:
-            case impVer:
-            case impName:
-                throw new UnsupportedOperationException();
+            }
+        } else {
+            switch (state) {
+                case imp:
+                case sym:
+                    state = null;
+                    break;//we need to intern decsymbols on exiting the entire lst declaration(might not have seen import context yet), so this is a no op.
+                case preSym:
+                case impMID:
+                case impVer:
+                case impName:
+                    throw new UnsupportedOperationException();
+            }
         }
-        if(depth == 1) state = null;
     }
 
     public void setFieldName(String name) {
@@ -144,7 +141,7 @@ public class LSTWriter implements PrivateIonWriter {
         if(state == null) throw new UnsupportedOperationException("Open content unsupported via the managed binary writer");
         switch(state) {
             case sym:
-                symbolTable.intern(value);
+                decSymbols.add(value);
                 break;
             case impName:
                 decImports.getLast().name = value;

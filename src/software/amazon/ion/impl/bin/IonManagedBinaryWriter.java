@@ -82,7 +82,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
         symbols.writeIonVersionMarker();
         currentWriter = user;
         catalog = builder.catalog;
-        if(builder.imports == null){
+        if(builder.imports == null) {
             fallbackImports = new ArrayList<SymbolTable>();
         } else {
             fallbackImports = new ArrayList(builder.imports);
@@ -205,16 +205,16 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
     {
         if(currentWriter.getDepth() == 0 && user.hasTopLevelSymbolTableAnnotation() && containerType == STRUCT){//only true when the user writer wrote the lst st.
             currentWriter = lstWriter;
-            user.setTypeAnnotationSymbols();
+            user.setTypeAnnotationSymbols();//empties the prepped annotations on the user writer
 
-        } else {
-            currentWriter.stepIn(containerType);
         }
+        currentWriter.stepIn(containerType);
     }
 
     public void stepOut() throws IOException
     {
-        if(currentWriter == lstWriter && currentWriter.getDepth() == 1) {//depth should be 1 because we havent stepped out yet.
+        currentWriter.stepOut();
+        if(currentWriter == lstWriter && currentWriter.getDepth() == 0) {//depth should be 1 because we havent stepped out yet.
             currentWriter = user;
             SymbolTable tempLST = lstWriter.getSymbolTable();
             if(lst != tempLST) {//we found imported tables and created a new lst object so the references dont match.
@@ -222,8 +222,6 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
                 lst = tempLST;
                 lstIndex = lst.getImportedMaxId();
             }
-        } else {
-            currentWriter.stepOut();
         }
     }
 

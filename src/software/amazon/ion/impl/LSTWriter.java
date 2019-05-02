@@ -1,5 +1,4 @@
 package software.amazon.ion.impl;
-import software.amazon.ion.IonWriter;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -24,7 +23,7 @@ public class LSTWriter implements PrivateIonWriter {
     private IonCatalog catalog;
     private boolean seenImports;
 
-    private enum State {preImp, imp, impMID, impName, impVer,  preSym, sym}
+    private enum State {preImp, impList, impDesc, impMID, impName, impVer,  preSym, sym, openContent0, openContent1, openContent2}
 
     private static class SSTImport {
         String name;
@@ -52,13 +51,14 @@ public class LSTWriter implements PrivateIonWriter {
         switch(state) {
             case preImp:
                 //entering the decImports list
-                state = State.imp;
+                state = State.impList;
                 decImports = new LinkedList<SSTImport>();
                 seenImports = true;
                 //we need to delete all context when we step out?
                 break;
-            case imp:
+            case impList:
                 //entering an import struct
+                state = State.impDesc;
                 decImports.add(new SSTImport());
                 break;
             case preSym:
@@ -83,7 +83,7 @@ public class LSTWriter implements PrivateIonWriter {
     public void stepOut() {
         depth--;
         if(state == null) {
-            if(seenImports){
+            if(seenImports) {
                 SSTImport temp = decImports.getLast();
                 if(temp.maxID == 0 || temp.name == null || temp.version == 0) throw new UnsupportedOperationException("Illegal Shared Symbol Table Import declared in local symbol table." + temp.name + "." + temp.version);
                 LinkedList<SymbolTable> tempImports = new LinkedList<SymbolTable>();
@@ -95,6 +95,7 @@ public class LSTWriter implements PrivateIonWriter {
                     tempImports.add(tempTable);
                 }
                 symbolTable = new LocalSymbolTable(new LocalSymbolTableImports(tempImports), decSymbols);
+                seenImports = false;//do we need to refresh any other processing flags?
             } else {
                 for(String sym : decSymbols) {
                     symbolTable.intern(sym);
@@ -102,7 +103,10 @@ public class LSTWriter implements PrivateIonWriter {
             }
         } else {
             switch (state) {
-                case imp:
+                case impDesc:
+                    state = State.impList;
+                    break;
+                case impList:
                 case sym:
                     state = null;
                     break;//we need to intern decsymbols on exiting the entire lst declaration(might not have seen import context yet), so this is a no op.
@@ -118,13 +122,14 @@ public class LSTWriter implements PrivateIonWriter {
     public void setFieldName(String name) {
         if(state == null) {
             if (name.equals("imports")) {
+                if(seenImports) throw new UnsupportedOperationException("Two import declarations found.");
                 state = State.preImp;
             } else if (name.equals("symbols")) {
                 state = State.preSym;
             } else {
                 throw new UnsupportedOperationException();
             }
-        } else if(state == State.imp) {
+        } else if(state == State.impDesc) {
             if(name.equals("name")) {
                 state = State.impName;
             } else if(name.equals("version")) {
@@ -145,7 +150,7 @@ public class LSTWriter implements PrivateIonWriter {
                 break;
             case impName:
                 decImports.getLast().name = value;
-                state = State.imp;
+                state = State.impDesc;
                 break;
             default:
                 throw new UnsupportedOperationException("Open content unsupported via the managed binary writer");
@@ -155,8 +160,6 @@ public class LSTWriter implements PrivateIonWriter {
 
     public void writeSymbol(String content){
         if(state == State.preImp && content.equals("$ion_symbol_table")) {
-            //we are appending to our current context
-            seenImports = true;
             state = null;
         } else {
             throw new UnsupportedOperationException("Open content unsupported via the managed binary writer");
@@ -169,10 +172,10 @@ public class LSTWriter implements PrivateIonWriter {
     public void writeInt(long value) {
         if(state == State.impVer) {
             decImports.getLast().version = (int) value;
-            state = State.imp;
+            state = State.impDesc;
         } else if(state == State.impMID) {
             decImports.getLast().maxID = (int) value;
-            state = State.imp;
+            state = State.impDesc;
         } else {
             throw new UnsupportedOperationException("Open content is unsupported via these APIs.");
         }
@@ -195,7 +198,7 @@ public class LSTWriter implements PrivateIonWriter {
     }
     //This isn't really fulfilling the contract, but we're destroying any open content anyway so screw'em.
     public boolean isInStruct() {
-        return state == null || state == State.imp;
+        return state == null || state == State.impDesc;
     }
 
     public void addTypeAnnotation(String annotation) {

@@ -79,7 +79,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
             builder.preallocationMode,
             builder.isFloatBinary32Enabled
         );
-        symbols.writeIonVersionMarker();
+
         currentWriter = user;
         catalog = builder.catalog;
         if(builder.imports == null) {
@@ -279,42 +279,37 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
         currentWriter.writeSymbolToken(token);
     }
 
-    public void writeString(final String value) throws IOException
-    {
+    public void writeString(final String value) throws IOException {
         currentWriter.writeString(value);
     }
 
-    public void writeClob(byte[] data) throws IOException
-    {
+    public void writeClob(byte[] data) throws IOException {
         currentWriter.writeClob(data);
     }
 
-    public void writeClob(final byte[] data, final int offset, final int length) throws IOException
-    {
+    public void writeClob(final byte[] data, final int offset, final int length) throws IOException {
         currentWriter.writeClob(data, offset, length);
     }
 
-    public void writeBlob(byte[] data) throws IOException
-    {
+    public void writeBlob(byte[] data) throws IOException {
         currentWriter.writeBlob(data);
     }
 
-    public void writeBlob(final byte[] data, final int offset, final int length) throws IOException
-    {
+    public void writeBlob(final byte[] data, final int offset, final int length) throws IOException {
         currentWriter.writeBlob(data, offset, length);
     }
 
-    public void writeBytes(byte[] data, int off, int len) throws IOException
-    {
+    public void writeBytes(byte[] data, int off, int len) throws IOException {
         user.writeBytes(data, off, len);
     }
 
     // Stream Terminators
 
-    public void flush() throws IOException
-    {
+    public void flush() throws IOException {
+
         if (getDepth() != 0) throw new IllegalStateException("IonWriter.flush() can only be called at top-level.");
         int maxId = lst.getMaxId();
+        if(!flushed && user.hasWrittenValuesSinceFinished()) symbols.writeIonVersionMarker();
         if(newSymbols) {
             symbols.addTypeAnnotationSymbol(systemSymbol(ION_SYMBOL_TABLE_SID));
             symbols.stepIn(STRUCT);
@@ -362,7 +357,6 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
         lstWriter = new LSTWriter(fallbackImports, new ArrayList<String>(), catalog);
         lst = lstWriter.getSymbolTable();
         lstIndex = lst.getImportedMaxId();
-        symbols.writeIonVersionMarker();
         flushed = false;
     }
 

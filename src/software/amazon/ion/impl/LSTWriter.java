@@ -211,7 +211,6 @@ public class LSTWriter implements PrivateIonWriter {
 
 
     public void setFieldNameSymbol(SymbolToken name) {
-
         setFieldName(name.getText());
     }
     //we aren't really a writer

@@ -91,7 +91,11 @@ public class LSTWriter implements PrivateIonWriter {
                 SymbolTable tempTable = null;
                 for(SSTImport desc : decImports) {
                     tempTable = catalog.getTable(desc.name, desc.version);
-                    if(tempTable == null) tempTable = new SubstituteSymbolTable(desc.name, desc.version, desc.maxID);
+                    if(tempTable == null) {
+                        tempTable = new SubstituteSymbolTable(desc.name, desc.version, desc.maxID);
+                    } else if(tempTable.getMaxId() != desc.maxID) {
+                        tempTable = new SubstituteSymbolTable(tempTable, desc.version, desc.maxID);
+                    }
                     tempImports.add(tempTable);
                 }
                 symbolTable = new LocalSymbolTable(new LocalSymbolTableImports(tempImports), decSymbols);

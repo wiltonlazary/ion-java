@@ -144,6 +144,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
         if (text == null){
             int sid = token.getSid();
             if(sid > lst.getMaxId()) throw new UnknownSymbolException(sid);
+            newSymbols = true;
             return token;
 
         }
@@ -306,7 +307,6 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
     // Stream Terminators
 
     public void flush() throws IOException {
-
         if (getDepth() != 0) throw new IllegalStateException("IonWriter.flush() can only be called at top-level.");
         int maxId = lst.getMaxId();
         if(!flushed && user.hasWrittenValuesSinceFinished()) symbols.writeIonVersionMarker();

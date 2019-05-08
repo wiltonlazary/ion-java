@@ -329,7 +329,6 @@ public abstract class SystemProcessingTestCase
         checkSymbol("foo");
         assertSame(table2, currentSymtab());
     }
-
     @Test
     public void testTrivialLocalTableReplacement()
         throws Exception
@@ -358,7 +357,6 @@ public abstract class SystemProcessingTestCase
         assertNotSame(table1, table2);
         assertEquals(systemMaxId(), table2.getMaxId());
     }
-
 
     @Test
     public void testLocalSymtabWithOpenContent()
@@ -1021,7 +1019,7 @@ public abstract class SystemProcessingTestCase
 
 
     //=========================================================================
-
+    @Ignore //TODO this is no longer valid, we need to flesh out a system writer api to exercise this assertion.
     @Test
     public void testSystemIterationShowsIvm()
         throws Exception

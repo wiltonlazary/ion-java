@@ -224,12 +224,13 @@ public class LocalSymbolTableImportAdapterTest extends BaseSymbolTableWrapperTes
         IonWriter ionWriter = system().newBinaryWriter(out);
         subject.writeTo(ionWriter);
         system().newInt(1).writeTo(ionWriter);
+        system().newSymbol("taco").writeTo(ionWriter);
         ionWriter.close();
 
         IonDatagram datagram = loader().load(out.toByteArray());
         SymbolTable symbolTable = datagram.get(0).getSymbolTable();
 
-        assertEquals(10, symbolTable.getMaxId());
+        assertEquals(11, symbolTable.getMaxId());
         assertEquals(10, symbolTable.findSymbol("mySymbol"));
     }
 

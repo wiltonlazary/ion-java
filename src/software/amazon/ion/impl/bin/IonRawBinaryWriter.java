@@ -1429,86 +1429,60 @@ import software.amazon.ion.Timestamp;
     }
 
     public void flush() throws IOException {
-        if (closed)
-        {
-            return;
-        }
-        if (!containers.isEmpty())
-        {
-            throw new IllegalStateException("Cannot flush within container: " + containers);
-        }
-        if (patchPoints.isEmpty())
-        {
-            // nothing to patch--write 'em out!
-            buffer.writeTo(out);
-        }
-        else
-        {
-            long bufferPosition = 0;
-            for (final PatchPoint patch : patchPoints)
-            {
-                // write up to the thing to be patched
-                final long bufferLength = patch.oldPosition - bufferPosition;
-                buffer.writeTo(out, bufferPosition, bufferLength);
+        if (!closed) {
+            if (!containers.isEmpty()) throw new IllegalStateException("Cannot flush within container: " + containers);
+            if (patchPoints.isEmpty()) {
+                // nothing to patch--write 'em out!
+                buffer.writeTo(out);
+            } else {
+                long bufferPosition = 0;
+                for (final PatchPoint patch : patchPoints) {
+                    // write up to the thing to be patched
+                    final long bufferLength = patch.oldPosition - bufferPosition;
+                    buffer.writeTo(out, bufferPosition, bufferLength);
 
-                // write out the patch
-                patchBuffer.writeTo(out, patch.patchPosition, patch.patchLength);
+                    // write out the patch
+                    patchBuffer.writeTo(out, patch.patchPosition, patch.patchLength);
 
-                // skip over the preallocated varuint field
-                bufferPosition = patch.oldPosition;
-                bufferPosition += patch.oldLength;
+                    // skip over the preallocated varuint field
+                    bufferPosition = patch.oldPosition;
+                    bufferPosition += patch.oldLength;
+                }
+                buffer.writeTo(out, bufferPosition, buffer.position() - bufferPosition);
             }
-            buffer.writeTo(out, bufferPosition, buffer.position() - bufferPosition);
+            patchPoints.clear();
+            patchBuffer.reset();
+            buffer.reset();
+            if (streamFlushMode == StreamFlushMode.FLUSH) out.flush();
         }
-        patchPoints.clear();
-        patchBuffer.reset();
-        buffer.reset();
     }
 
-    public void finish() throws IOException
-    {
-        if (closed)
-        {
-            return;
+    public void finish() throws IOException {
+        if (!closed) {
+            flush();
+            hasWrittenValuesSinceFinished = false;
         }
-        flush();
-        if (streamFlushMode == StreamFlushMode.FLUSH)
-        {
-            out.flush();
-        }
-
-        hasWrittenValuesSinceFinished = false;
     }
 
-    public void close() throws IOException
-    {
-        if (closed)
-        {
-            return;
-        }
-        try
-        {
-            try
-            {
-                finish();
-            }
-            catch (final IllegalStateException e)
-            {
-                // callers don't expect this...
-            }
+    public void close() throws IOException {
+        if (!closed) {
+            try {
+                try {
+                    flush();
+                } catch (final IllegalStateException e) {
+                    // callers don't expect this...
+                }
 
-            // release all of our blocks -- these should never throw
-            buffer.close();
-            patchBuffer.close();
-            allocator.close();
-        }
-        finally
-        {
-            closed = true;
-            if (streamCloseMode == StreamCloseMode.CLOSE)
-            {
-                // release the stream
-                out.close();
+                // release all of our blocks -- these should never throw
+                buffer.close();
+                patchBuffer.close();
+                allocator.close();
+            } finally {
+                closed = true;
+                if (streamCloseMode == StreamCloseMode.CLOSE) {
+                    // release the stream
+                    out.close();
+                }
             }
         }
     }

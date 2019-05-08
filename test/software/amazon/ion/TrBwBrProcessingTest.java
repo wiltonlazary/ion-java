@@ -37,6 +37,27 @@ public class TrBwBrProcessingTest
     @Override
     @Ignore
     @Test
+    public void testTrivialLocalTableReplacement() throws Exception{
+
+    }
+
+    @Override
+    @Ignore
+    @Test
+    public void testLocalSymtabWithOpenContent() throws Exception {
+
+    }
+
+    @Override
+    @Ignore
+    @Test
+    public void testLocalTableReplacement() throws Exception {
+
+    }
+
+    @Override
+    @Ignore
+    @Test
     public void testLocalSymtabWithMalformedSymbolEntries() throws Exception {
         // TODO amzn/ion-java#151 this test exercises null slots in the local symbol table. The reader should collapse
         // all local symbol table null slots to $0. Currently, since this doesn't happen, the reader passes $10 to the

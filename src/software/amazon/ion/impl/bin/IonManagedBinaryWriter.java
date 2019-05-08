@@ -144,7 +144,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
         if (text == null){
             int sid = token.getSid();
             if(sid > lst.getMaxId()) throw new UnknownSymbolException(sid);
-            newSymbols = true;
+            newSymbols |= token.getSid() > maxSysId;
             return token;
 
         }
@@ -307,48 +307,50 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
     // Stream Terminators
 
     public void flush() throws IOException {
-        if (getDepth() != 0) throw new IllegalStateException("IonWriter.flush() can only be called at top-level.");
-        int maxId = lst.getMaxId();
-        if(!flushed && user.hasWrittenValuesSinceFinished()) symbols.writeIonVersionMarker();
-        if(newSymbols) {
-            symbols.addTypeAnnotationSymbol(systemSymbol(ION_SYMBOL_TABLE_SID));
-            symbols.stepIn(STRUCT);
-            if(flushed) {//append
-                symbols.setFieldNameSymbol(systemSymbol(IMPORTS_SID));
-                symbols.writeSymbolToken(systemSymbol(ION_SYMBOL_TABLE_SID));
-            } else {//fresh lst
-                SymbolTable[] tempImports = lst.getImportedTables();
-                if (tempImports.length > 0) {
+        if (getDepth() == 0) {
+            int maxId = lst.getMaxId();
+            if (!flushed && (user.hasWrittenValuesSinceFinished() || isStreamCopyOptimized()))
+                symbols.writeIonVersionMarker();
+            if (newSymbols || (!flushed && isStreamCopyOptimized())) {
+                symbols.addTypeAnnotationSymbol(systemSymbol(ION_SYMBOL_TABLE_SID));
+                symbols.stepIn(STRUCT);
+                if (flushed) {//append
                     symbols.setFieldNameSymbol(systemSymbol(IMPORTS_SID));
-                    symbols.stepIn(LIST);
-                    for (final SymbolTable st : tempImports) {
-                        symbols.stepIn(STRUCT);
-                        symbols.setFieldNameSymbol(systemSymbol(NAME_SID));
-                        symbols.writeString(st.getName());
-                        symbols.setFieldNameSymbol(systemSymbol(VERSION_SID));
-                        symbols.writeInt(st.getVersion());
-                        symbols.setFieldNameSymbol(systemSymbol(MAX_ID_SID));
-                        symbols.writeInt(st.getMaxId());
+                    symbols.writeSymbolToken(systemSymbol(ION_SYMBOL_TABLE_SID));
+                } else {//fresh lst
+                    SymbolTable[] tempImports = lst.getImportedTables();
+                    if (tempImports.length > 0) {
+                        symbols.setFieldNameSymbol(systemSymbol(IMPORTS_SID));
+                        symbols.stepIn(LIST);
+                        for (final SymbolTable st : tempImports) {
+                            symbols.stepIn(STRUCT);
+                            symbols.setFieldNameSymbol(systemSymbol(NAME_SID));
+                            symbols.writeString(st.getName());
+                            symbols.setFieldNameSymbol(systemSymbol(VERSION_SID));
+                            symbols.writeInt(st.getVersion());
+                            symbols.setFieldNameSymbol(systemSymbol(MAX_ID_SID));
+                            symbols.writeInt(st.getMaxId());
+                            symbols.stepOut();
+                        }
                         symbols.stepOut();
                     }
+                }
+                if (lstIndex < maxId) {
+                    symbols.setFieldNameSymbol(systemSymbol(SYMBOLS_SID));
+                    symbols.stepIn(LIST);
+                    for (int i = this.lstIndex + 1; i <= maxId; i++) {
+                        symbols.writeString(this.lst.findKnownSymbol(i));
+                    }
+                    lstIndex = maxId;
                     symbols.stepOut();
                 }
-            }
-            if (lstIndex < maxId) {
-                symbols.setFieldNameSymbol(systemSymbol(SYMBOLS_SID));
-                symbols.stepIn(LIST);
-                for (int i = this.lstIndex + 1; i <= maxId; i++) {
-                    symbols.writeString(this.lst.findKnownSymbol(i));
-                }
-                lstIndex = maxId;
                 symbols.stepOut();
+                flushed = true;
+                newSymbols = false;
             }
-            symbols.stepOut();
-            flushed = true;
-            newSymbols = false;
+            symbols.flush();
+            user.flush();
         }
-        symbols.flush();
-        user.flush();
     }
 
     public void finish() throws IOException {
@@ -364,7 +366,7 @@ import software.amazon.ion.impl.bin.IonRawBinaryWriter.StreamFlushMode;
         if (!closed) {
             closed = true;
             try {
-                finish();
+                flush();
             } catch (IllegalStateException e) {
             } finally {
                 try {

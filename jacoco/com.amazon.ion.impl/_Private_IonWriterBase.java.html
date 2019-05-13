@@ -431,7 +431,7 @@ import java.util.Date;
                 if (_debug_on) System.out.print(&quot;)&quot;);
 <span class="fc" id="L432">                break;</span>
             default:
-<span class="nc" id="L434">                throw new IllegalStateException();</span>
+<span class="nc" id="L434">                throw new IllegalStateException(&quot;Unknown value type: &quot; + type);</span>
             }
         }
 <span class="fc" id="L437">    }</span>

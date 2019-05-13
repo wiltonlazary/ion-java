@@ -1338,7 +1338,7 @@ import java.util.Iterator;
         case SEXP:
 <span class="fc" id="L1339">            break;</span>
         default:
-<span class="nc" id="L1341">            throw new IllegalStateException();</span>
+<span class="nc" id="L1341">            throw new IllegalStateException(&quot;Unexpected value type: &quot; + _value_type);</span>
         }
 
 <span class="fc" id="L1344">        int new_state = get_state_at_container_start(_value_type);</span>
@@ -1382,7 +1382,7 @@ import java.util.Iterator;
             case DATAGRAM:
 <span class="nc" id="L1383">                break;</span>
             default:
-<span class="nc" id="L1385">                throw new IllegalStateException();</span>
+<span class="nc" id="L1385">                throw new IllegalStateException(&quot;Unexpected value type: &quot; + _value_type);</span>
             }
         }
 <span class="nc" id="L1388">        catch (IOException e) {</span>

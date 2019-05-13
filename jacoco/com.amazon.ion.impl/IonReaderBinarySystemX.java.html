@@ -15,7 +15,6 @@
 
 package com.amazon.ion.impl;
 
-import com.amazon.ion.IonSystem;
 import static com.amazon.ion.IonType.SYMBOL;
 import static com.amazon.ion.SymbolTable.UNKNOWN_SYMBOL_ID;
 
@@ -36,7 +35,7 @@ import java.util.Date;
 import java.util.Iterator;
 
 
-<span class="pc bpc" id="L39" title="1 of 2 branches missed.">class IonReaderBinarySystemX</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">class IonReaderBinarySystemX</span>
     extends IonReaderBinaryRawX
     implements _Private_ReaderWriter
 {
@@ -44,16 +43,16 @@ import java.util.Iterator;
 
     @Deprecated
     IonReaderBinarySystemX(byte[] bytes, int offset, int length) {
-<span class="nc" id="L47">        this(UnifiedInputStreamX.makeStream(bytes, offset, length));</span>
-<span class="nc" id="L48">    }</span>
+<span class="nc" id="L46">        this(UnifiedInputStreamX.makeStream(bytes, offset, length));</span>
+<span class="nc" id="L47">    }</span>
 
     IonReaderBinarySystemX(UnifiedInputStreamX in)
     {
-<span class="fc" id="L52">        super();</span>
-<span class="fc" id="L53">        init_raw(in);</span>
+<span class="fc" id="L51">        super();</span>
+<span class="fc" id="L52">        init_raw(in);</span>
         // TODO check IVM to determine version: amzn/ion-java#19, amzn/ion-java#24
-<span class="fc" id="L55">        _symbols = SharedSymbolTable.getSystemSymbolTable(1);</span>
-<span class="fc" id="L56">    }</span>
+<span class="fc" id="L54">        _symbols = SharedSymbolTable.getSystemSymbolTable(1);</span>
+<span class="fc" id="L55">    }</span>
 
 
     //
@@ -64,64 +63,64 @@ import java.util.Iterator;
 
     public final int getFieldId()
     {
-<span class="fc" id="L67">        return _value_field_id;</span>
+<span class="fc" id="L66">        return _value_field_id;</span>
     }
 
     public SymbolToken[] getTypeAnnotationSymbols()
     {
-<span class="fc" id="L72">        load_annotations();</span>
+<span class="fc" id="L71">        load_annotations();</span>
 
-<span class="fc" id="L74">        int count = _annotation_count;</span>
-<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (count == 0) return SymbolToken.EMPTY_ARRAY;</span>
+<span class="fc" id="L73">        int count = _annotation_count;</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (count == 0) return SymbolToken.EMPTY_ARRAY;</span>
 
-<span class="fc" id="L77">        SymbolTable symtab = getSymbolTable();</span>
+<span class="fc" id="L76">        SymbolTable symtab = getSymbolTable();</span>
 
-<span class="fc" id="L79">        SymbolToken[] result = new SymbolToken[count];</span>
-<span class="fc bfc" id="L80" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++)</span>
+<span class="fc" id="L78">        SymbolToken[] result = new SymbolToken[count];</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++)</span>
         {
-<span class="fc" id="L82">            int sid = _annotation_ids[i];</span>
-<span class="fc" id="L83">            String text = symtab.findKnownSymbol(sid);</span>
-<span class="fc" id="L84">            result[i] = new SymbolTokenImpl(text, sid);</span>
+<span class="fc" id="L81">            int sid = _annotation_ids[i];</span>
+<span class="fc" id="L82">            String text = symtab.findKnownSymbol(sid);</span>
+<span class="fc" id="L83">            result[i] = new SymbolTokenImpl(text, sid);</span>
         }
 
-<span class="fc" id="L87">        return result;</span>
+<span class="fc" id="L86">        return result;</span>
     }
 
     private void load_once()
     {
-<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (_v.isEmpty()) {</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (_v.isEmpty()) {</span>
             try {
-<span class="fc" id="L94">                load_scalar_value();</span>
+<span class="fc" id="L93">                load_scalar_value();</span>
             }
-<span class="nc" id="L96">            catch (IOException e) {</span>
-<span class="nc" id="L97">                error(e);</span>
-<span class="fc" id="L98">            }</span>
+<span class="nc" id="L95">            catch (IOException e) {</span>
+<span class="nc" id="L96">                error(e);</span>
+<span class="fc" id="L97">            }</span>
         }
-<span class="fc" id="L100">    }</span>
+<span class="fc" id="L99">    }</span>
 
     //
     //  basic scalar value getters (for actual content)
     //
     protected final void prepare_value(int as_type) {
-<span class="fc" id="L106">        load_once();</span>
-<span class="pc bpc" id="L107" title="1 of 4 branches missed.">        if (as_type != 0 &amp;&amp; !_v.hasValueOfType(as_type)) {</span>
+<span class="fc" id="L105">        load_once();</span>
+<span class="pc bpc" id="L106" title="1 of 4 branches missed.">        if (as_type != 0 &amp;&amp; !_v.hasValueOfType(as_type)) {</span>
             // we should never get here with a symbol asking for anything other
             // than a numeric cast (from some other numeric already loaded)
-<span class="pc bpc" id="L110" title="3 of 4 branches missed.">            if (IonType.SYMBOL.equals(_value_type) &amp;&amp; !ValueVariant.isNumericType(as_type)) {</span>
-<span class="nc bnc" id="L111" title="All 6 branches missed.">                assert(IonType.SYMBOL.equals(_value_type) &amp;&amp; !ValueVariant.isNumericType(as_type));</span>
+<span class="pc bpc" id="L109" title="3 of 4 branches missed.">            if (IonType.SYMBOL.equals(_value_type) &amp;&amp; !ValueVariant.isNumericType(as_type)) {</span>
+<span class="nc bnc" id="L110" title="All 6 branches missed.">                assert(IonType.SYMBOL.equals(_value_type) &amp;&amp; !ValueVariant.isNumericType(as_type));</span>
             }
 
-<span class="pc bpc" id="L114" title="1 of 2 branches missed.">            if (!_v.can_convert(as_type)) {</span>
-<span class="nc" id="L115">                String message = &quot;can't cast from &quot;</span>
-<span class="nc" id="L116">                    +_Private_ScalarConversions.getValueTypeName(_v.getAuthoritativeType())</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (!_v.can_convert(as_type)) {</span>
+<span class="nc" id="L114">                String message = &quot;can't cast from &quot;</span>
+<span class="nc" id="L115">                    +_Private_ScalarConversions.getValueTypeName(_v.getAuthoritativeType())</span>
                     +&quot; to &quot;
-<span class="nc" id="L118">                    +_Private_ScalarConversions.getValueTypeName(as_type);</span>
-<span class="nc" id="L119">                throw new IllegalStateException(message);</span>
+<span class="nc" id="L117">                    +_Private_ScalarConversions.getValueTypeName(as_type);</span>
+<span class="nc" id="L118">                throw new IllegalStateException(message);</span>
             }
-<span class="fc" id="L121">            int fnid = _v.get_conversion_fnid(as_type);</span>
-<span class="fc" id="L122">            _v.cast(fnid);</span>
+<span class="fc" id="L120">            int fnid = _v.get_conversion_fnid(as_type);</span>
+<span class="fc" id="L121">            _v.cast(fnid);</span>
         }
-<span class="fc" id="L124">    }</span>
+<span class="fc" id="L123">    }</span>
 
     /**
      * this checks the state of the raw reader to make sure
@@ -136,20 +135,20 @@ import java.util.Iterator;
      */
     protected final void load_cached_value(int value_type) throws IOException
     {
-<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (_v.isEmpty()) {</span>
-<span class="fc" id="L140">            load_scalar_value();</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (_v.isEmpty()) {</span>
+<span class="fc" id="L139">            load_scalar_value();</span>
         }
-<span class="fc" id="L142">    }</span>
+<span class="fc" id="L141">    }</span>
 
     static final int MAX_BINARY_LENGTH_INT = 4;
     static final int MAX_BINARY_LENGTH_LONG = 8;
-<span class="fc" id="L146">    static final BigInteger MIN_LONG_VALUE = BigInteger.valueOf(Long.MIN_VALUE);</span>
-<span class="fc" id="L147">    static final BigInteger MAX_LONG_VALUE = BigInteger.valueOf(Long.MAX_VALUE);</span>
+<span class="fc" id="L145">    static final BigInteger MIN_LONG_VALUE = BigInteger.valueOf(Long.MIN_VALUE);</span>
+<span class="fc" id="L146">    static final BigInteger MAX_LONG_VALUE = BigInteger.valueOf(Long.MAX_VALUE);</span>
 
     private final void load_scalar_value() throws IOException
     {
         // make sure we're trying to load a scalar value here
-<span class="fc bfc" id="L152" title="All 2 branches covered.">        switch(_value_type) {</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        switch(_value_type) {</span>
         case NULL:
         case BOOL:
         case INT:
@@ -158,121 +157,121 @@ import java.util.Iterator;
         case TIMESTAMP:
         case SYMBOL:
         case STRING:
-<span class="fc" id="L161">            break;</span>
+<span class="fc" id="L160">            break;</span>
         default:
-<span class="fc" id="L163">            return;</span>
+<span class="fc" id="L162">            return;</span>
         }
 
         // this will be true when the value_type is null as
         // well as when we encounter a null of any other type
-<span class="fc bfc" id="L168" title="All 2 branches covered.">        if (_value_is_null) {</span>
-<span class="fc" id="L169">            _v.setValueToNull(_value_type);</span>
-<span class="fc" id="L170">            _v.setAuthoritativeType(AS_TYPE.null_value);</span>
-<span class="fc" id="L171">            return;</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (_value_is_null) {</span>
+<span class="fc" id="L168">            _v.setValueToNull(_value_type);</span>
+<span class="fc" id="L169">            _v.setAuthoritativeType(AS_TYPE.null_value);</span>
+<span class="fc" id="L170">            return;</span>
         }
 
-<span class="pc bpc" id="L174" title="1 of 8 branches missed.">        switch (_value_type) {</span>
+<span class="pc bpc" id="L173" title="1 of 8 branches missed.">        switch (_value_type) {</span>
         default:
-<span class="nc" id="L176">            return;</span>
+<span class="nc" id="L175">            return;</span>
         case BOOL:
-<span class="fc" id="L178">            _v.setValue(_value_is_true);</span>
-<span class="fc" id="L179">            _v.setAuthoritativeType(AS_TYPE.boolean_value);</span>
-<span class="fc" id="L180">            break;</span>
+<span class="fc" id="L177">            _v.setValue(_value_is_true);</span>
+<span class="fc" id="L178">            _v.setAuthoritativeType(AS_TYPE.boolean_value);</span>
+<span class="fc" id="L179">            break;</span>
         case INT:
-<span class="fc bfc" id="L182" title="All 2 branches covered.">            boolean is_negative = _value_tid == _Private_IonConstants.tidNegInt;</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">            boolean is_negative = _value_tid == _Private_IonConstants.tidNegInt;</span>
 
-<span class="fc bfc" id="L184" title="All 2 branches covered.">            if (_value_len == 0) {</span>
-<span class="fc bfc" id="L185" title="All 2 branches covered.">                if (is_negative) {</span>
-<span class="nc" id="L186">                    throwIllegalNegativeZeroException();</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            if (_value_len == 0) {</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">                if (is_negative) {</span>
+<span class="nc" id="L185">                    throwIllegalNegativeZeroException();</span>
                 }
-<span class="fc" id="L188">                int v = 0;</span>
-<span class="fc" id="L189">                _v.setValue(v);</span>
-<span class="fc" id="L190">                _v.setAuthoritativeType(AS_TYPE.int_value);</span>
-<span class="fc" id="L191">            }</span>
-<span class="fc bfc" id="L192" title="All 2 branches covered.">            else if (_value_len &lt;= MAX_BINARY_LENGTH_LONG) {</span>
-<span class="fc" id="L193">                long v = readULong(_value_len);</span>
+<span class="fc" id="L187">                int v = 0;</span>
+<span class="fc" id="L188">                _v.setValue(v);</span>
+<span class="fc" id="L189">                _v.setAuthoritativeType(AS_TYPE.int_value);</span>
+<span class="fc" id="L190">            }</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            else if (_value_len &lt;= MAX_BINARY_LENGTH_LONG) {</span>
+<span class="fc" id="L192">                long v = readULong(_value_len);</span>
 
-<span class="fc bfc" id="L195" title="All 2 branches covered.">                if (v &lt; 0) {</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">                if (v &lt; 0) {</span>
                     // we probably can't fit this magnitude properly into a Java long
-<span class="fc bfc" id="L197" title="All 2 branches covered.">                    int signum = !is_negative ? 1 : -1;</span>
-<span class="fc" id="L198">                    BigInteger big = IonBinary.unsignedLongToBigInteger(signum, v);</span>
-<span class="fc" id="L199">                    _v.setValue(big);</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">                    int signum = !is_negative ? 1 : -1;</span>
+<span class="fc" id="L197">                    BigInteger big = IonBinary.unsignedLongToBigInteger(signum, v);</span>
+<span class="fc" id="L198">                    _v.setValue(big);</span>
                     // boundary condition
-<span class="fc bfc" id="L201" title="All 4 branches covered.">                    if (big.compareTo(MIN_LONG_VALUE) &lt; 0 || big.compareTo(MAX_LONG_VALUE) &gt; 0) {</span>
-<span class="fc" id="L202">                        _v.setAuthoritativeType(AS_TYPE.bigInteger_value);</span>
+<span class="fc bfc" id="L200" title="All 4 branches covered.">                    if (big.compareTo(MIN_LONG_VALUE) &lt; 0 || big.compareTo(MAX_LONG_VALUE) &gt; 0) {</span>
+<span class="fc" id="L201">                        _v.setAuthoritativeType(AS_TYPE.bigInteger_value);</span>
                     } else {
                         // fits in long
-<span class="fc" id="L205">                        _v.addValue(big.longValue()); // keep the BigInteger value set in case the user wants to resurrect it as such</span>
-<span class="fc" id="L206">                        _v.setAuthoritativeType(AS_TYPE.long_value);</span>
+<span class="fc" id="L204">                        _v.addValue(big.longValue()); // keep the BigInteger value set in case the user wants to resurrect it as such</span>
+<span class="fc" id="L205">                        _v.setAuthoritativeType(AS_TYPE.long_value);</span>
                     }
-<span class="fc" id="L208">                }</span>
+<span class="fc" id="L207">                }</span>
                 else {
-<span class="fc bfc" id="L210" title="All 2 branches covered.">                    if (is_negative) {</span>
-<span class="fc bfc" id="L211" title="All 2 branches covered.">                        if(v == 0) {</span>
-<span class="nc" id="L212">                            throwIllegalNegativeZeroException();</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">                    if (is_negative) {</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">                        if(v == 0) {</span>
+<span class="nc" id="L211">                            throwIllegalNegativeZeroException();</span>
                         }
-<span class="fc" id="L214">                        v = -v;</span>
+<span class="fc" id="L213">                        v = -v;</span>
                     }
-<span class="fc bfc" id="L216" title="All 4 branches covered.">                    if (v &lt; Integer.MIN_VALUE || v &gt; Integer.MAX_VALUE) {</span>
-<span class="fc" id="L217">                        _v.setValue(v);</span>
-<span class="fc" id="L218">                        _v.setAuthoritativeType(AS_TYPE.long_value);</span>
+<span class="fc bfc" id="L215" title="All 4 branches covered.">                    if (v &lt; Integer.MIN_VALUE || v &gt; Integer.MAX_VALUE) {</span>
+<span class="fc" id="L216">                        _v.setValue(v);</span>
+<span class="fc" id="L217">                        _v.setAuthoritativeType(AS_TYPE.long_value);</span>
                     } else {
-<span class="fc" id="L220">                        _v.setValue((int)v);</span>
-<span class="fc" id="L221">                        _v.setAuthoritativeType(AS_TYPE.int_value);</span>
+<span class="fc" id="L219">                        _v.setValue((int)v);</span>
+<span class="fc" id="L220">                        _v.setAuthoritativeType(AS_TYPE.int_value);</span>
                     }
                 }
-<span class="fc" id="L224">            }</span>
+<span class="fc" id="L223">            }</span>
             else {
-<span class="fc" id="L226">                BigInteger v = readBigInteger(_value_len, is_negative);</span>
-<span class="fc" id="L227">                _v.setValue(v);</span>
-<span class="fc" id="L228">                _v.setAuthoritativeType(AS_TYPE.bigInteger_value);</span>
+<span class="fc" id="L225">                BigInteger v = readBigInteger(_value_len, is_negative);</span>
+<span class="fc" id="L226">                _v.setValue(v);</span>
+<span class="fc" id="L227">                _v.setAuthoritativeType(AS_TYPE.bigInteger_value);</span>
             }
-<span class="fc" id="L230">            break;</span>
+<span class="fc" id="L229">            break;</span>
         case FLOAT:
             double d;
-<span class="fc bfc" id="L233" title="All 2 branches covered.">            if (_value_len == 0) {</span>
-<span class="fc" id="L234">                d = 0.0;</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">            if (_value_len == 0) {</span>
+<span class="fc" id="L233">                d = 0.0;</span>
             }
             else {
-<span class="fc" id="L237">                d = readFloat(_value_len);</span>
+<span class="fc" id="L236">                d = readFloat(_value_len);</span>
             }
-<span class="fc" id="L239">            _v.setValue(d);</span>
-<span class="fc" id="L240">            _v.setAuthoritativeType(AS_TYPE.double_value);</span>
-<span class="fc" id="L241">            break;</span>
+<span class="fc" id="L238">            _v.setValue(d);</span>
+<span class="fc" id="L239">            _v.setAuthoritativeType(AS_TYPE.double_value);</span>
+<span class="fc" id="L240">            break;</span>
         case DECIMAL:
-<span class="fc" id="L243">            Decimal dec = readDecimal(_value_len);</span>
-<span class="fc" id="L244">            _v.setValue(dec);</span>
-<span class="fc" id="L245">            _v.setAuthoritativeType(AS_TYPE.decimal_value);</span>
-<span class="fc" id="L246">            break;</span>
+<span class="fc" id="L242">            Decimal dec = readDecimal(_value_len);</span>
+<span class="fc" id="L243">            _v.setValue(dec);</span>
+<span class="fc" id="L244">            _v.setAuthoritativeType(AS_TYPE.decimal_value);</span>
+<span class="fc" id="L245">            break;</span>
         case TIMESTAMP:
             // TODO: it looks like a 0 length return a null timestamp - is that right?
-<span class="fc" id="L249">            Timestamp t = readTimestamp(_value_len);</span>
-<span class="fc" id="L250">            _v.setValue(t);</span>
-<span class="fc" id="L251">            _v.setAuthoritativeType(AS_TYPE.timestamp_value);</span>
-<span class="fc" id="L252">            break;</span>
+<span class="fc" id="L248">            Timestamp t = readTimestamp(_value_len);</span>
+<span class="fc" id="L249">            _v.setValue(t);</span>
+<span class="fc" id="L250">            _v.setAuthoritativeType(AS_TYPE.timestamp_value);</span>
+<span class="fc" id="L251">            break;</span>
         case SYMBOL:
-<span class="fc" id="L254">            long sid = readULong(_value_len);</span>
-<span class="pc bpc" id="L255" title="2 of 4 branches missed.">            if (sid &lt; 0 || sid &gt; Integer.MAX_VALUE) {</span>
-<span class="nc" id="L256">                String message = &quot;symbol id [&quot;</span>
+<span class="fc" id="L253">            long sid = readULong(_value_len);</span>
+<span class="pc bpc" id="L254" title="2 of 4 branches missed.">            if (sid &lt; 0 || sid &gt; Integer.MAX_VALUE) {</span>
+<span class="nc" id="L255">                String message = &quot;symbol id [&quot;</span>
                                + sid
                                + &quot;] out of range &quot;
                                + &quot;(1-&quot;
                                + Integer.MAX_VALUE
                                + &quot;)&quot;;
-<span class="nc" id="L262">                throwErrorAt(message);</span>
+<span class="nc" id="L261">                throwErrorAt(message);</span>
             }
             // TODO: is treating this as an int too misleading?
-<span class="fc" id="L265">            _v.setValue((int)sid);</span>
-<span class="fc" id="L266">            _v.setAuthoritativeType(AS_TYPE.int_value);</span>
-<span class="fc" id="L267">            break;</span>
+<span class="fc" id="L264">            _v.setValue((int)sid);</span>
+<span class="fc" id="L265">            _v.setAuthoritativeType(AS_TYPE.int_value);</span>
+<span class="fc" id="L266">            break;</span>
         case STRING:
-<span class="fc" id="L269">            String s = readString(_value_len);</span>
-<span class="fc" id="L270">            _v.setValue(s);</span>
-<span class="fc" id="L271">            _v.setAuthoritativeType(AS_TYPE.string_value);</span>
+<span class="fc" id="L268">            String s = readString(_value_len);</span>
+<span class="fc" id="L269">            _v.setValue(s);</span>
+<span class="fc" id="L270">            _v.setAuthoritativeType(AS_TYPE.string_value);</span>
             break;
         }
-<span class="fc" id="L274">        _state = State.S_AFTER_VALUE;</span>
-<span class="fc" id="L275">    }</span>
+<span class="fc" id="L273">        _state = State.S_AFTER_VALUE;</span>
+<span class="fc" id="L274">    }</span>
 
     //
     // public value routines
@@ -281,149 +280,144 @@ import java.util.Iterator;
     @Override
     public boolean isNullValue()
     {
-<span class="fc" id="L284">        return _value_is_null;</span>
+<span class="fc" id="L283">        return _value_is_null;</span>
     }
 
     public boolean booleanValue()
     {
-<span class="fc" id="L289">        prepare_value(AS_TYPE.boolean_value);</span>
-<span class="fc" id="L290">        return _v.getBoolean();</span>
+<span class="fc" id="L288">        prepare_value(AS_TYPE.boolean_value);</span>
+<span class="fc" id="L289">        return _v.getBoolean();</span>
     }
 
     public double doubleValue()
     {
-<span class="fc" id="L295">        prepare_value(AS_TYPE.double_value);</span>
-<span class="fc" id="L296">        return _v.getDouble();</span>
+<span class="fc" id="L294">        prepare_value(AS_TYPE.double_value);</span>
+<span class="fc" id="L295">        return _v.getDouble();</span>
     }
+
+    private void checkIsIntApplicableType()
+    {
+<span class="fc bfc" id="L300" title="All 6 branches covered.">        if (_value_type != IonType.INT &amp;&amp;</span>
+          _value_type != IonType.DECIMAL &amp;&amp;
+          _value_type != IonType.FLOAT)
+        {
+<span class="fc" id="L304">          throw new IllegalStateException(&quot;Unexpected value type: &quot; + _value_type);</span>
+        }
+<span class="fc" id="L306">    }</span>
 
     public int intValue()
     {
-<span class="pc bpc" id="L301" title="2 of 6 branches missed.">        if (_value_type != IonType.INT &amp;&amp;</span>
-            _value_type != IonType.DECIMAL &amp;&amp;
-            _value_type != IonType.FLOAT)
-        {
-<span class="fc" id="L305">            throw new IllegalStateException();</span>
-        }
+<span class="fc" id="L310">        checkIsIntApplicableType();</span>
 
-<span class="fc" id="L308">        prepare_value(AS_TYPE.int_value);</span>
-<span class="fc" id="L309">        return _v.getInt();</span>
+<span class="fc" id="L312">        prepare_value(AS_TYPE.int_value);</span>
+<span class="fc" id="L313">        return _v.getInt();</span>
     }
 
     public long longValue()
     {
-<span class="pc bpc" id="L314" title="1 of 6 branches missed.">        if (_value_type != IonType.INT &amp;&amp;</span>
-            _value_type != IonType.DECIMAL &amp;&amp;
-            _value_type != IonType.FLOAT)
-        {
-<span class="fc" id="L318">            throw new IllegalStateException();</span>
-        }
+<span class="fc" id="L318">        checkIsIntApplicableType();</span>
 
-<span class="fc" id="L321">        prepare_value(AS_TYPE.long_value);</span>
-<span class="fc" id="L322">        return _v.getLong();</span>
+<span class="fc" id="L320">        prepare_value(AS_TYPE.long_value);</span>
+<span class="fc" id="L321">        return _v.getLong();</span>
     }
 
     public BigInteger bigIntegerValue()
     {
-<span class="fc bfc" id="L327" title="All 6 branches covered.">        if (_value_type != IonType.INT &amp;&amp;</span>
-            _value_type != IonType.DECIMAL &amp;&amp;
-            _value_type != IonType.FLOAT)
-        {
-<span class="fc" id="L331">            throw new IllegalStateException();</span>
-        }
+<span class="fc" id="L326">        checkIsIntApplicableType();</span>
 
-<span class="fc bfc" id="L334" title="All 2 branches covered.">        if (_value_is_null) {</span>
-<span class="fc" id="L335">            return null;</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">        if (_value_is_null) {</span>
+<span class="fc" id="L329">            return null;</span>
         }
-<span class="fc" id="L337">        prepare_value(AS_TYPE.bigInteger_value);</span>
-<span class="fc" id="L338">        return _v.getBigInteger();</span>
+<span class="fc" id="L331">        prepare_value(AS_TYPE.bigInteger_value);</span>
+<span class="fc" id="L332">        return _v.getBigInteger();</span>
     }
 
     public BigDecimal bigDecimalValue()
     {
-<span class="fc bfc" id="L343" title="All 2 branches covered.">        if (_value_is_null) {</span>
-<span class="fc" id="L344">            return null;</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">        if (_value_is_null) {</span>
+<span class="fc" id="L338">            return null;</span>
         }
-<span class="fc" id="L346">        prepare_value(AS_TYPE.decimal_value);</span>
-<span class="fc" id="L347">        return _v.getBigDecimal();</span>
+<span class="fc" id="L340">        prepare_value(AS_TYPE.decimal_value);</span>
+<span class="fc" id="L341">        return _v.getBigDecimal();</span>
     }
 
     public Decimal decimalValue()
     {
-<span class="fc bfc" id="L352" title="All 2 branches covered.">        if (_value_is_null) {</span>
-<span class="fc" id="L353">            return null;</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">        if (_value_is_null) {</span>
+<span class="fc" id="L347">            return null;</span>
         }
-<span class="fc" id="L355">        prepare_value(AS_TYPE.decimal_value);</span>
-<span class="fc" id="L356">        return _v.getDecimal();</span>
+<span class="fc" id="L349">        prepare_value(AS_TYPE.decimal_value);</span>
+<span class="fc" id="L350">        return _v.getDecimal();</span>
     }
 
     public Date dateValue()
     {
-<span class="fc bfc" id="L361" title="All 2 branches covered.">        if (_value_is_null) {</span>
-<span class="fc" id="L362">            return null;</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">        if (_value_is_null) {</span>
+<span class="fc" id="L356">            return null;</span>
         }
-<span class="fc" id="L364">        prepare_value(AS_TYPE.date_value);</span>
-<span class="fc" id="L365">        return _v.getDate();</span>
+<span class="fc" id="L358">        prepare_value(AS_TYPE.date_value);</span>
+<span class="fc" id="L359">        return _v.getDate();</span>
     }
 
     public Timestamp timestampValue()
     {
-<span class="fc bfc" id="L370" title="All 2 branches covered.">        if (_value_is_null) {</span>
-<span class="fc" id="L371">            return null;</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">        if (_value_is_null) {</span>
+<span class="fc" id="L365">            return null;</span>
         }
-<span class="fc" id="L373">        prepare_value(AS_TYPE.timestamp_value);</span>
-<span class="fc" id="L374">        return _v.getTimestamp();</span>
+<span class="fc" id="L367">        prepare_value(AS_TYPE.timestamp_value);</span>
+<span class="fc" id="L368">        return _v.getTimestamp();</span>
     }
 
     public IntegerSize getIntegerSize()
     {
-<span class="fc" id="L379">        load_once();</span>
-<span class="fc bfc" id="L380" title="All 4 branches covered.">        if (_value_type != IonType.INT || _v.isNull())</span>
+<span class="fc" id="L373">        load_once();</span>
+<span class="fc bfc" id="L374" title="All 4 branches covered.">        if (_value_type != IonType.INT || _v.isNull())</span>
         {
-<span class="fc" id="L382">            return null;</span>
+<span class="fc" id="L376">            return null;</span>
         }
-<span class="fc" id="L384">        return _Private_ScalarConversions.getIntegerSize(_v.getAuthoritativeType());</span>
+<span class="fc" id="L378">        return _Private_ScalarConversions.getIntegerSize(_v.getAuthoritativeType());</span>
     }
 
     public String stringValue()
     {
-<span class="fc bfc" id="L389" title="All 2 branches covered.">        if (! IonType.isText(_value_type)) throw new IllegalStateException();</span>
-<span class="fc bfc" id="L390" title="All 2 branches covered.">        if (_value_is_null) return null;</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">        if (! IonType.isText(_value_type)) throw new IllegalStateException(&quot;Unexpected value type: &quot; + _value_type);</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">        if (_value_is_null) return null;</span>
 
-<span class="fc bfc" id="L392" title="All 2 branches covered.">        if (_value_type == SYMBOL) {</span>
-<span class="pc bpc" id="L393" title="1 of 2 branches missed.">            if (!_v.hasValueOfType(AS_TYPE.string_value)) {</span>
-<span class="fc" id="L394">                int sid = getSymbolId();</span>
-<span class="fc" id="L395">                String name = _symbols.findKnownSymbol(sid);</span>
-<span class="fc bfc" id="L396" title="All 2 branches covered.">                if (name == null) {</span>
-<span class="fc" id="L397">                    throw new UnknownSymbolException(sid);</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">        if (_value_type == SYMBOL) {</span>
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">            if (!_v.hasValueOfType(AS_TYPE.string_value)) {</span>
+<span class="fc" id="L388">                int sid = getSymbolId();</span>
+<span class="fc" id="L389">                String name = _symbols.findKnownSymbol(sid);</span>
+<span class="fc bfc" id="L390" title="All 2 branches covered.">                if (name == null) {</span>
+<span class="fc" id="L391">                    throw new UnknownSymbolException(sid);</span>
                 }
-<span class="fc" id="L399">                _v.addValue(name);</span>
-<span class="fc" id="L400">            }</span>
+<span class="fc" id="L393">                _v.addValue(name);</span>
+<span class="fc" id="L394">            }</span>
         }
         else {
-<span class="fc" id="L403">            prepare_value(AS_TYPE.string_value);</span>
+<span class="fc" id="L397">            prepare_value(AS_TYPE.string_value);</span>
         }
-<span class="fc" id="L405">        return _v.getString();</span>
+<span class="fc" id="L399">        return _v.getString();</span>
     }
 
     public SymbolToken symbolValue()
     {
-<span class="fc bfc" id="L410" title="All 2 branches covered.">        if (_value_type != SYMBOL) throw new IllegalStateException();</span>
-<span class="fc bfc" id="L411" title="All 2 branches covered.">        if (_value_is_null) return null;</span>
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        if (_value_type != SYMBOL) throw new IllegalStateException(&quot;Unexpected value type: &quot; + _value_type);</span>
+<span class="fc bfc" id="L405" title="All 2 branches covered.">        if (_value_is_null) return null;</span>
 
-<span class="fc" id="L413">        int sid = getSymbolId();</span>
-<span class="pc bpc" id="L414" title="2 of 4 branches missed.">        assert sid != UNKNOWN_SYMBOL_ID;</span>
-<span class="fc" id="L415">        String text = _symbols.findKnownSymbol(sid);</span>
+<span class="fc" id="L407">        int sid = getSymbolId();</span>
+<span class="pc bpc" id="L408" title="2 of 4 branches missed.">        assert sid != UNKNOWN_SYMBOL_ID;</span>
+<span class="fc" id="L409">        String text = _symbols.findKnownSymbol(sid);</span>
 
-<span class="fc" id="L417">        return new SymbolTokenImpl(text, sid);</span>
+<span class="fc" id="L411">        return new SymbolTokenImpl(text, sid);</span>
     }
 
     int getSymbolId()
     {
-<span class="pc bpc" id="L422" title="1 of 2 branches missed.">        if (_value_type != SYMBOL) throw new IllegalStateException();</span>
-<span class="pc bpc" id="L423" title="1 of 2 branches missed.">        if (_value_is_null) throw new NullValueException();</span>
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">        if (_value_type != SYMBOL) throw new IllegalStateException(&quot;Unexpected value type: &quot; + _value_type);</span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">        if (_value_is_null) throw new NullValueException();</span>
 
-<span class="fc" id="L425">        prepare_value(AS_TYPE.int_value);</span>
-<span class="fc" id="L426">        return _v.getInt();</span>
+<span class="fc" id="L419">        prepare_value(AS_TYPE.int_value);</span>
+<span class="fc" id="L420">        return _v.getInt();</span>
     }
 
     //
@@ -433,64 +427,64 @@ import java.util.Iterator;
     public String getFieldName()
     {
         String name;
-<span class="fc bfc" id="L436" title="All 2 branches covered.">        if (_value_field_id == SymbolTable.UNKNOWN_SYMBOL_ID) {</span>
-<span class="fc" id="L437">            name = null;</span>
+<span class="fc bfc" id="L430" title="All 2 branches covered.">        if (_value_field_id == SymbolTable.UNKNOWN_SYMBOL_ID) {</span>
+<span class="fc" id="L431">            name = null;</span>
         }
         else {
-<span class="fc" id="L440">            name = _symbols.findKnownSymbol(_value_field_id);</span>
-<span class="fc bfc" id="L441" title="All 2 branches covered.">            if (name == null) {</span>
-<span class="fc" id="L442">                throw new UnknownSymbolException(_value_field_id);</span>
+<span class="fc" id="L434">            name = _symbols.findKnownSymbol(_value_field_id);</span>
+<span class="fc bfc" id="L435" title="All 2 branches covered.">            if (name == null) {</span>
+<span class="fc" id="L436">                throw new UnknownSymbolException(_value_field_id);</span>
             }
         }
-<span class="fc" id="L445">        return name;</span>
+<span class="fc" id="L439">        return name;</span>
     }
 
     public SymbolToken getFieldNameSymbol()
     {
-<span class="fc bfc" id="L450" title="All 2 branches covered.">        if (_value_field_id == SymbolTable.UNKNOWN_SYMBOL_ID) return null;</span>
-<span class="fc" id="L451">        int sid = _value_field_id;</span>
-<span class="fc" id="L452">        String text = _symbols.findKnownSymbol(sid);</span>
-<span class="fc" id="L453">        return new SymbolTokenImpl(text, sid);</span>
+<span class="fc bfc" id="L444" title="All 2 branches covered.">        if (_value_field_id == SymbolTable.UNKNOWN_SYMBOL_ID) return null;</span>
+<span class="fc" id="L445">        int sid = _value_field_id;</span>
+<span class="fc" id="L446">        String text = _symbols.findKnownSymbol(sid);</span>
+<span class="fc" id="L447">        return new SymbolTokenImpl(text, sid);</span>
     }
 
     public final Iterator&lt;String&gt; iterateTypeAnnotations()
     {
-<span class="fc" id="L458">        String[] annotations = getTypeAnnotations();</span>
-<span class="fc" id="L459">        return _Private_Utils.stringIterator(annotations);</span>
+<span class="fc" id="L452">        String[] annotations = getTypeAnnotations();</span>
+<span class="fc" id="L453">        return _Private_Utils.stringIterator(annotations);</span>
     }
 
     public final String[] getTypeAnnotations()
     {
-<span class="fc" id="L464">        load_annotations();</span>
+<span class="fc" id="L458">        load_annotations();</span>
         String[] anns;
-<span class="fc bfc" id="L466" title="All 2 branches covered.">        if (_annotation_count &lt; 1) {</span>
-<span class="fc" id="L467">            anns = _Private_Utils.EMPTY_STRING_ARRAY;</span>
+<span class="fc bfc" id="L460" title="All 2 branches covered.">        if (_annotation_count &lt; 1) {</span>
+<span class="fc" id="L461">            anns = _Private_Utils.EMPTY_STRING_ARRAY;</span>
         }
         else {
-<span class="fc" id="L470">            anns = new String[_annotation_count];</span>
-<span class="fc bfc" id="L471" title="All 2 branches covered.">            for (int ii=0; ii&lt;_annotation_count; ii++) {</span>
-<span class="fc" id="L472">                anns[ii] = _symbols.findKnownSymbol(_annotation_ids[ii]);</span>
-<span class="fc bfc" id="L473" title="All 2 branches covered.">                if (anns[ii] == null) {</span>
-<span class="fc" id="L474">                    throw new UnknownSymbolException(_annotation_ids[ii]);</span>
+<span class="fc" id="L464">            anns = new String[_annotation_count];</span>
+<span class="fc bfc" id="L465" title="All 2 branches covered.">            for (int ii=0; ii&lt;_annotation_count; ii++) {</span>
+<span class="fc" id="L466">                anns[ii] = _symbols.findKnownSymbol(_annotation_ids[ii]);</span>
+<span class="fc bfc" id="L467" title="All 2 branches covered.">                if (anns[ii] == null) {</span>
+<span class="fc" id="L468">                    throw new UnknownSymbolException(_annotation_ids[ii]);</span>
                 }
             }
         }
-<span class="fc" id="L478">        return anns;</span>
+<span class="fc" id="L472">        return anns;</span>
     }
 
     public SymbolTable getSymbolTable()
     {
-<span class="fc" id="L483">        return _symbols;</span>
+<span class="fc" id="L477">        return _symbols;</span>
     }
 
     // system readers don't skip any symbol tables
     public SymbolTable pop_passed_symbol_table()
     {
-<span class="nc" id="L489">        return null;</span>
+<span class="nc" id="L483">        return null;</span>
     }
 
     private void throwIllegalNegativeZeroException() {
-<span class="fc" id="L493">        throw newErrorAt(&quot;negative zero is illegal in the binary format&quot;);</span>
+<span class="fc" id="L487">        throw newErrorAt(&quot;negative zero is illegal in the binary format&quot;);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

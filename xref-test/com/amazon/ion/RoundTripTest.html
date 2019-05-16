@@ -299,7 +299,7 @@
 <a class="jxr_linenumber" name="L291" href="#L291">291</a>         FileInputStream fileIn = <strong class="jxr_keyword">new</strong> FileInputStream(myTestFile);
 <a class="jxr_linenumber" name="L292" href="#L292">292</a>         <strong class="jxr_keyword">try</strong>
 <a class="jxr_linenumber" name="L293" href="#L293">293</a>         {
-<a class="jxr_linenumber" name="L294" href="#L294">294</a>             IonReader r0 = system().newSystemReader(fileIn);
+<a class="jxr_linenumber" name="L294" href="#L294">294</a>             IonReader r0 = system().newReader(fileIn);
 <a class="jxr_linenumber" name="L295" href="#L295">295</a> 
 <a class="jxr_linenumber" name="L296" href="#L296">296</a>             ByteArrayOutputStream out = <strong class="jxr_keyword">new</strong> ByteArrayOutputStream();
 <a class="jxr_linenumber" name="L297" href="#L297">297</a>             IonWriter w = builder.build(out);
@@ -316,8 +316,8 @@
 <a class="jxr_linenumber" name="L308" href="#L308">308</a>         fileIn = <strong class="jxr_keyword">new</strong> FileInputStream(myTestFile);
 <a class="jxr_linenumber" name="L309" href="#L309">309</a>         <strong class="jxr_keyword">try</strong>
 <a class="jxr_linenumber" name="L310" href="#L310">310</a>         {
-<a class="jxr_linenumber" name="L311" href="#L311">311</a>             IonReader r0 = system().newSystemReader(fileIn);
-<a class="jxr_linenumber" name="L312" href="#L312">312</a>             IonReader r1 = system().newSystemReader(outBytes);
+<a class="jxr_linenumber" name="L311" href="#L311">311</a>             IonReader r0 = system().newReader(fileIn);
+<a class="jxr_linenumber" name="L312" href="#L312">312</a>             IonReader r1 = system().newReader(outBytes);
 <a class="jxr_linenumber" name="L313" href="#L313">313</a> 
 <a class="jxr_linenumber" name="L314" href="#L314">314</a>             ReaderCompare.compare(r0, r1);
 <a class="jxr_linenumber" name="L315" href="#L315">315</a>         }

@@ -1,7 +1,7 @@
 GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
 com.amazon.ion:ion-java,com.amazon.ion.impl,UnifiedInputBufferX.Chars,11,37,0,0,3,10,2,4,2,4
 com.amazon.ion:ion-java,com.amazon.ion.impl,IonReaderTextRawTokensX,827,3234,198,560,179,951,178,363,5,107
-com.amazon.ion:ion-java,com.amazon.ion.impl,IonReaderTextSystemX,627,1059,110,179,150,263,98,105,5,32
+com.amazon.ion:ion-java,com.amazon.ion.impl,IonReaderTextSystemX,627,1076,110,179,150,268,98,107,5,34
 com.amazon.ion:ion-java,com.amazon.ion.impl,IonTokenConstsX.CharacterSequence,3,0,0,0,1,0,1,0,1,0
 com.amazon.ion:ion-java,com.amazon.ion.impl,_Private_IonTextWriterBuilder.Mutable,0,18,0,0,0,6,0,5,0,5
 com.amazon.ion:ion-java,com.amazon.ion.impl,_Private_Utils,400,683,105,105,93,178,84,77,17,37
@@ -52,7 +52,7 @@ com.amazon.ion:ion-java,com.amazon.ion.impl,_Private_IonWriterFactory,3,52,0,0,1
 com.amazon.ion:ion-java,com.amazon.ion.impl,SimpleByteBuffer.UserByteWriter,238,0,8,0,63,0,25,0,21,0
 com.amazon.ion:ion-java,com.amazon.ion.impl,SubstituteSymbolTable,24,161,6,26,6,49,10,28,4,18
 com.amazon.ion:ion-java,com.amazon.ion.impl,UnifiedDataPageX.Bytes,48,25,4,0,10,8,6,2,4,2
-com.amazon.ion:ion-java,com.amazon.ion.impl,BlockedBuffer,757,1639,161,229,105,341,153,77,7,28
+com.amazon.ion:ion-java,com.amazon.ion.impl,BlockedBuffer,754,1642,158,232,105,341,151,79,7,28
 com.amazon.ion:ion-java,com.amazon.ion.impl,_Private_SymtabExtendsCache,7,58,5,11,0,12,5,6,0,3
 com.amazon.ion:ion-java,com.amazon.ion.impl,LocalSymbolTable.Factory,0,30,0,0,0,6,0,2,0,2
 com.amazon.ion:ion-java,com.amazon.ion.impl,_Private_FastAppendableTrampoline,13,0,0,0,3,0,3,0,3,0
@@ -136,7 +136,7 @@ com.amazon.ion:ion-java,com.amazon.ion.impl,IonReaderTextRawTokensX.CommentStrat
 com.amazon.ion:ion-java,com.amazon.ion.impl,IonWriterUser,70,339,17,35,13,106,22,47,5,38
 com.amazon.ion:ion-java,com.amazon.ion.impl,IonReaderTextUserX.SeekableReaderFacet,0,13,0,0,0,3,0,2,0,2
 com.amazon.ion:ion-java,com.amazon.ion.impl,IonReaderTextRawTokensX.new Appendable() {...},4,5,0,0,2,2,2,2,2,2
-com.amazon.ion:ion-java,com.amazon.ion.impl,IonReaderTextRawX,466,2111,96,217,109,592,87,172,2,57
+com.amazon.ion:ion-java,com.amazon.ion.impl,IonReaderTextRawX,466,2105,96,217,109,591,87,171,2,56
 com.amazon.ion:ion-java,com.amazon.ion.impl,DowncastingFaceted,0,13,0,2,0,4,0,3,0,2
 com.amazon.ion:ion-java,com.amazon.ion.impl,Base64Encoder,31,639,9,13,4,23,7,9,1,4
 com.amazon.ion:ion-java,com.amazon.ion.impl,IonTextBufferedStream.OffsetBufferStream,137,0,14,0,29,0,14,0,7,0

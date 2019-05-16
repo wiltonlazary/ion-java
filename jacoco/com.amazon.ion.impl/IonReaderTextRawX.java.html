@@ -1321,93 +1321,87 @@ import java.util.Iterator;
 <span class="fc" id="L1321">        return _Private_Utils.stringIterator(getTypeAnnotations());</span>
     }
 
-    public String[] getTypeAnnotations()
-    {
-<span class="fc" id="L1326">        return _Private_Utils.toStrings(_annotations, _annotation_count);</span>
-    }
-
-
     public void stepIn()
     {
-<span class="pc bpc" id="L1332" title="2 of 4 branches missed.">        if (_value_type == null || _eof) {</span>
-<span class="nc" id="L1333">            throw new IllegalStateException();</span>
+<span class="pc bpc" id="L1326" title="2 of 4 branches missed.">        if (_value_type == null || _eof) {</span>
+<span class="nc" id="L1327">            throw new IllegalStateException();</span>
         }
-<span class="pc bpc" id="L1335" title="1 of 2 branches missed.">        switch (_value_type) {</span>
+<span class="pc bpc" id="L1329" title="1 of 2 branches missed.">        switch (_value_type) {</span>
         case STRUCT:
         case LIST:
         case SEXP:
-<span class="fc" id="L1339">            break;</span>
+<span class="fc" id="L1333">            break;</span>
         default:
-<span class="nc" id="L1341">            throw new IllegalStateException(&quot;Unexpected value type: &quot; + _value_type);</span>
+<span class="nc" id="L1335">            throw new IllegalStateException(&quot;Unexpected value type: &quot; + _value_type);</span>
         }
 
-<span class="fc" id="L1344">        int new_state = get_state_at_container_start(_value_type);</span>
-<span class="fc" id="L1345">        set_state(new_state);</span>
+<span class="fc" id="L1338">        int new_state = get_state_at_container_start(_value_type);</span>
+<span class="fc" id="L1339">        set_state(new_state);</span>
 
-<span class="fc" id="L1347">        push_container_state(_value_type);</span>
+<span class="fc" id="L1341">        push_container_state(_value_type);</span>
 
-<span class="fc" id="L1349">        _scanner.tokenIsFinished();</span>
+<span class="fc" id="L1343">        _scanner.tokenIsFinished();</span>
         try {
-<span class="fc" id="L1351">            finish_value(null);</span>
+<span class="fc" id="L1345">            finish_value(null);</span>
         }
-<span class="nc" id="L1353">        catch (IOException e) {</span>
-<span class="nc" id="L1354">            throw new IonException(e);</span>
-<span class="fc" id="L1355">        }</span>
-<span class="fc bfc" id="L1356" title="All 2 branches covered.">        if (_v.isNull()) {</span>
-<span class="fc" id="L1357">            _eof = true;</span>
-<span class="fc" id="L1358">            _has_next_called = true;  // there are no contents in a null container</span>
+<span class="nc" id="L1347">        catch (IOException e) {</span>
+<span class="nc" id="L1348">            throw new IonException(e);</span>
+<span class="fc" id="L1349">        }</span>
+<span class="fc bfc" id="L1350" title="All 2 branches covered.">        if (_v.isNull()) {</span>
+<span class="fc" id="L1351">            _eof = true;</span>
+<span class="fc" id="L1352">            _has_next_called = true;  // there are no contents in a null container</span>
         }
 
-<span class="fc" id="L1361">        _value_type = null;</span>
+<span class="fc" id="L1355">        _value_type = null;</span>
 
         if (_debug) System.out.println(&quot;stepInto() new depth: &quot;+getDepth());
-<span class="fc" id="L1364">    }</span>
+<span class="fc" id="L1358">    }</span>
     public void stepOut()
     {
-<span class="fc bfc" id="L1367" title="All 2 branches covered.">        if (getDepth() &lt; 1) {</span>
-<span class="fc" id="L1368">            throw new IllegalStateException(IonMessages.CANNOT_STEP_OUT);</span>
+<span class="fc bfc" id="L1361" title="All 2 branches covered.">        if (getDepth() &lt; 1) {</span>
+<span class="fc" id="L1362">            throw new IllegalStateException(IonMessages.CANNOT_STEP_OUT);</span>
         }
         try {
-<span class="fc" id="L1371">            finish_value(null);</span>
-<span class="pc bpc" id="L1372" title="2 of 5 branches missed.">            switch (getContainerType()) {</span>
+<span class="fc" id="L1365">            finish_value(null);</span>
+<span class="pc bpc" id="L1366" title="2 of 5 branches missed.">            switch (getContainerType()) {</span>
             case STRUCT:
-<span class="fc bfc" id="L1374" title="All 2 branches covered.">                if (!_eof) _scanner.skip_over_struct();</span>
+<span class="fc bfc" id="L1368" title="All 2 branches covered.">                if (!_eof) _scanner.skip_over_struct();</span>
                 break;
             case LIST:
-<span class="fc bfc" id="L1377" title="All 2 branches covered.">                if (!_eof) _scanner.skip_over_list();</span>
+<span class="fc bfc" id="L1371" title="All 2 branches covered.">                if (!_eof) _scanner.skip_over_list();</span>
                 break;
             case SEXP:
-<span class="fc bfc" id="L1380" title="All 2 branches covered.">                if (!_eof) _scanner.skip_over_sexp();</span>
+<span class="fc bfc" id="L1374" title="All 2 branches covered.">                if (!_eof) _scanner.skip_over_sexp();</span>
                 break;
             case DATAGRAM:
-<span class="nc" id="L1383">                break;</span>
+<span class="nc" id="L1377">                break;</span>
             default:
-<span class="nc" id="L1385">                throw new IllegalStateException(&quot;Unexpected value type: &quot; + _value_type);</span>
+<span class="nc" id="L1379">                throw new IllegalStateException(&quot;Unexpected value type: &quot; + _value_type);</span>
             }
         }
-<span class="nc" id="L1388">        catch (IOException e) {</span>
-<span class="nc" id="L1389">            throw new IonException(e);</span>
-<span class="fc" id="L1390">        }</span>
-<span class="fc" id="L1391">        pop_container_state();</span>
-<span class="fc" id="L1392">        _scanner.tokenIsFinished();</span>
+<span class="nc" id="L1382">        catch (IOException e) {</span>
+<span class="nc" id="L1383">            throw new IonException(e);</span>
+<span class="fc" id="L1384">        }</span>
+<span class="fc" id="L1385">        pop_container_state();</span>
+<span class="fc" id="L1386">        _scanner.tokenIsFinished();</span>
         try {
-<span class="fc" id="L1394">            finish_value(null);</span>
+<span class="fc" id="L1388">            finish_value(null);</span>
         }
-<span class="nc" id="L1396">        catch (IOException e) {</span>
-<span class="nc" id="L1397">            throw new IonException(e);</span>
-<span class="fc" id="L1398">        }</span>
+<span class="nc" id="L1390">        catch (IOException e) {</span>
+<span class="nc" id="L1391">            throw new IonException(e);</span>
+<span class="fc" id="L1392">        }</span>
 
-<span class="fc" id="L1400">        clear_value();</span>
+<span class="fc" id="L1394">        clear_value();</span>
 
         if (_debug) System.out.println(&quot;stepOUT() new depth: &quot;+getDepth());
-<span class="fc" id="L1403">    }</span>
+<span class="fc" id="L1397">    }</span>
 
     //
     // symbol related code that is inactive in this parser
     //
     public SymbolTable getSymbolTable()
     {
-<span class="fc" id="L1410">        return null;</span>
+<span class="fc" id="L1404">        return null;</span>
     }
 
     //
@@ -1418,31 +1412,31 @@ import java.util.Iterator;
         private static final long serialVersionUID = 1L;
 
         IonReaderTextParsingException(String msg) {
-<span class="fc" id="L1421">            super(msg);</span>
-<span class="fc" id="L1422">        }</span>
+<span class="fc" id="L1415">            super(msg);</span>
+<span class="fc" id="L1416">        }</span>
         IonReaderTextParsingException(Exception e) {
-<span class="nc" id="L1424">            super(e);</span>
-<span class="nc" id="L1425">        }</span>
+<span class="nc" id="L1418">            super(e);</span>
+<span class="nc" id="L1419">        }</span>
         IonReaderTextParsingException(String msg, Exception e) {
-<span class="fc" id="L1427">            super(msg, e);</span>
-<span class="fc" id="L1428">        }</span>
+<span class="fc" id="L1421">            super(msg, e);</span>
+<span class="fc" id="L1422">        }</span>
     }
 
     protected final void parse_error(String reason) {
-<span class="fc" id="L1432">        String message =</span>
+<span class="fc" id="L1426">        String message =</span>
                 &quot;Syntax error&quot;
-<span class="fc" id="L1434">              + _scanner.input_position()</span>
+<span class="fc" id="L1428">              + _scanner.input_position()</span>
               + &quot;: &quot;
               + reason;
-<span class="fc" id="L1437">        throw new IonReaderTextParsingException(message);</span>
+<span class="fc" id="L1431">        throw new IonReaderTextParsingException(message);</span>
     }
     protected final void parse_error(Exception e) {
-<span class="fc" id="L1440">        String message =</span>
+<span class="fc" id="L1434">        String message =</span>
                 &quot;Syntax error at &quot;
-<span class="fc" id="L1442">              + _scanner.input_position()</span>
+<span class="fc" id="L1436">              + _scanner.input_position()</span>
               + &quot;: &quot;
-<span class="fc" id="L1444">              + e.getLocalizedMessage();</span>
-<span class="fc" id="L1445">        throw new IonReaderTextParsingException(message, e);</span>
+<span class="fc" id="L1438">              + e.getLocalizedMessage();</span>
+<span class="fc" id="L1439">        throw new IonReaderTextParsingException(message, e);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

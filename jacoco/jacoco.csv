@@ -52,7 +52,7 @@ com.amazon.ion:ion-java,com.amazon.ion.impl,_Private_IonWriterFactory,3,52,0,0,1
 com.amazon.ion:ion-java,com.amazon.ion.impl,SimpleByteBuffer.UserByteWriter,238,0,8,0,63,0,25,0,21,0
 com.amazon.ion:ion-java,com.amazon.ion.impl,SubstituteSymbolTable,24,161,6,26,6,49,10,28,4,18
 com.amazon.ion:ion-java,com.amazon.ion.impl,UnifiedDataPageX.Bytes,48,25,4,0,10,8,6,2,4,2
-com.amazon.ion:ion-java,com.amazon.ion.impl,BlockedBuffer,753,1643,159,231,104,342,151,79,7,28
+com.amazon.ion:ion-java,com.amazon.ion.impl,BlockedBuffer,743,1653,157,233,101,345,150,80,7,28
 com.amazon.ion:ion-java,com.amazon.ion.impl,_Private_SymtabExtendsCache,7,58,5,11,0,12,5,6,0,3
 com.amazon.ion:ion-java,com.amazon.ion.impl,LocalSymbolTable.Factory,0,30,0,0,0,6,0,2,0,2
 com.amazon.ion:ion-java,com.amazon.ion.impl,_Private_FastAppendableTrampoline,13,0,0,0,3,0,3,0,3,0
@@ -154,7 +154,7 @@ com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonStructLite.new _Private_Curr
 com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonStructLite.new _Private_CurriedValueFactory() {...},0,17,0,0,0,3,0,2,0,2
 com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonStructLite.new IonContainerLite.SequenceContentIterator() {...},14,61,6,10,2,16,6,5,0,3
 com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonContainerLite,83,698,35,105,7,181,35,70,1,31
-com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonSystemLite,219,770,40,80,48,208,43,92,9,54
+com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonSystemLite,219,779,40,80,48,209,43,93,9,55
 com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonSystemLite.ReaderIterator,5,49,0,6,2,14,2,6,2,3
 com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonDatagramLite.new _Private_CurriedValueFactory() {...},0,13,0,0,0,3,0,2,0,2
 com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonDatagramLite.new _Private_CurriedValueFactory() {...},17,0,0,0,3,0,2,0,2,0

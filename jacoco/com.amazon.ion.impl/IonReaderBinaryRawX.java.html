@@ -1064,42 +1064,45 @@ import java.math.MathContext;
         }
         else {
             // otherwise we to it the hard way ....
-<span class="fc" id="L1067">            int  save_limit = _local_remaining - len;</span>
-<span class="fc" id="L1068">            _local_remaining = len;</span>
-<span class="fc" id="L1069">            int  exponent = readVarInt();</span>
+<span class="fc" id="L1067">            int save_limit = NO_LIMIT;</span>
+<span class="fc bfc" id="L1068" title="All 2 branches covered.">            if (_local_remaining != NO_LIMIT) {</span>
+<span class="fc" id="L1069">                save_limit = _local_remaining - len;</span>
+            }
+<span class="fc" id="L1071">            _local_remaining = len;</span>
+<span class="fc" id="L1072">            int  exponent = readVarInt();</span>
             BigInteger value;
             int signum;
-<span class="fc bfc" id="L1072" title="All 2 branches covered.">            if (_local_remaining &gt; 0)</span>
+<span class="fc bfc" id="L1075" title="All 2 branches covered.">            if (_local_remaining &gt; 0)</span>
             {
-<span class="fc" id="L1074">                byte[] bits = new byte[_local_remaining];</span>
-<span class="fc" id="L1075">                readAll(bits, 0, _local_remaining);</span>
-<span class="fc" id="L1076">                signum = 1;</span>
-<span class="fc bfc" id="L1077" title="All 2 branches covered.">                if (bits[0] &lt; 0)</span>
+<span class="fc" id="L1077">                byte[] bits = new byte[_local_remaining];</span>
+<span class="fc" id="L1078">                readAll(bits, 0, _local_remaining);</span>
+<span class="fc" id="L1079">                signum = 1;</span>
+<span class="fc bfc" id="L1080" title="All 2 branches covered.">                if (bits[0] &lt; 0)</span>
                 {
                     // value is negative, clear the sign
-<span class="fc" id="L1080">                    bits[0] &amp;= 0x7F;</span>
-<span class="fc" id="L1081">                    signum = -1;</span>
+<span class="fc" id="L1083">                    bits[0] &amp;= 0x7F;</span>
+<span class="fc" id="L1084">                    signum = -1;</span>
                 }
-<span class="fc" id="L1083">                value = new BigInteger(signum, bits);</span>
-<span class="fc" id="L1084">            }</span>
+<span class="fc" id="L1086">                value = new BigInteger(signum, bits);</span>
+<span class="fc" id="L1087">            }</span>
             else {
-<span class="fc" id="L1086">                signum = 0;</span>
-<span class="fc" id="L1087">                value = BigInteger.ZERO;</span>
+<span class="fc" id="L1089">                signum = 0;</span>
+<span class="fc" id="L1090">                value = BigInteger.ZERO;</span>
             }
             // Ion stores exponent, BigDecimal uses the negation &quot;scale&quot;
-<span class="fc" id="L1090">            int scale = -exponent;</span>
-<span class="fc bfc" id="L1091" title="All 4 branches covered.">            if (value.signum() == 0 &amp;&amp; signum == -1)</span>
+<span class="fc" id="L1093">            int scale = -exponent;</span>
+<span class="fc bfc" id="L1094" title="All 4 branches covered.">            if (value.signum() == 0 &amp;&amp; signum == -1)</span>
             {
-<span class="pc bpc" id="L1093" title="2 of 4 branches missed.">                assert value.equals(BigInteger.ZERO);</span>
-<span class="fc" id="L1094">                bd = Decimal.negativeZero(scale, mathContext);</span>
+<span class="pc bpc" id="L1096" title="2 of 4 branches missed.">                assert value.equals(BigInteger.ZERO);</span>
+<span class="fc" id="L1097">                bd = Decimal.negativeZero(scale, mathContext);</span>
             }
             else
             {
-<span class="fc" id="L1098">                bd = Decimal.valueOf(value, scale, mathContext);</span>
+<span class="fc" id="L1101">                bd = Decimal.valueOf(value, scale, mathContext);</span>
             }
-<span class="fc" id="L1100">            _local_remaining = save_limit;</span>
+<span class="fc" id="L1103">            _local_remaining = save_limit;</span>
         }
-<span class="fc" id="L1102">        return bd;</span>
+<span class="fc" id="L1105">        return bd;</span>
     }
 
     /**
@@ -1107,49 +1110,52 @@ import java.math.MathContext;
      */
     protected final Timestamp readTimestamp(int len) throws IOException
     {
-<span class="pc bpc" id="L1110" title="1 of 2 branches missed.">        if (len &lt; 1) {</span>
+<span class="pc bpc" id="L1113" title="1 of 2 branches missed.">        if (len &lt; 1) {</span>
             // nothing to do here - and the timestamp will be NULL
-<span class="nc" id="L1112">            return null;</span>
+<span class="nc" id="L1115">            return null;</span>
         }
 
-<span class="fc" id="L1115">        int         year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0;</span>
-<span class="fc" id="L1116">        BigDecimal  frac = null;</span>
-<span class="fc" id="L1117">        int         save_limit = _local_remaining - len;</span>
-<span class="fc" id="L1118">        _local_remaining = len;  // &gt; 0</span>
+<span class="fc" id="L1118">        int         year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0;</span>
+<span class="fc" id="L1119">        BigDecimal  frac = null;</span>
+<span class="fc" id="L1120">        int         save_limit = NO_LIMIT;</span>
+<span class="fc bfc" id="L1121" title="All 2 branches covered.">        if (_local_remaining != NO_LIMIT) {</span>
+<span class="fc" id="L1122">            save_limit = _local_remaining - len;</span>
+        }
+<span class="fc" id="L1124">        _local_remaining = len;  // &gt; 0</span>
 
         // first up is the offset, which requires a special int reader
         // to return the -0 as a null Integer
-<span class="fc" id="L1122">        Integer offset = readVarInteger();</span>
+<span class="fc" id="L1128">        Integer offset = readVarInteger();</span>
         // now we'll read the struct values from the input stream
 
         // year is from 0001 to 9999
         // or 0x1 to 0x270F or 14 bits - 1 or 2 bytes
-<span class="fc" id="L1127">        year  = readVarUInt();</span>
-<span class="fc" id="L1128">        Precision p = Precision.YEAR; // our lowest significant option</span>
+<span class="fc" id="L1133">        year  = readVarUInt();</span>
+<span class="fc" id="L1134">        Precision p = Precision.YEAR; // our lowest significant option</span>
 
         // now we look for months
-<span class="fc bfc" id="L1131" title="All 2 branches covered.">        if (_local_remaining &gt; 0) {</span>
-<span class="fc" id="L1132">            month = readVarUInt();</span>
-<span class="fc" id="L1133">            p = Precision.MONTH;</span>
+<span class="fc bfc" id="L1137" title="All 2 branches covered.">        if (_local_remaining &gt; 0) {</span>
+<span class="fc" id="L1138">            month = readVarUInt();</span>
+<span class="fc" id="L1139">            p = Precision.MONTH;</span>
 
             // now we look for days
-<span class="fc bfc" id="L1136" title="All 2 branches covered.">            if (_local_remaining &gt; 0) {</span>
-<span class="fc" id="L1137">                day   = readVarUInt();</span>
-<span class="fc" id="L1138">                p = Precision.DAY; // our lowest significant option</span>
+<span class="fc bfc" id="L1142" title="All 2 branches covered.">            if (_local_remaining &gt; 0) {</span>
+<span class="fc" id="L1143">                day   = readVarUInt();</span>
+<span class="fc" id="L1144">                p = Precision.DAY; // our lowest significant option</span>
 
                 // now we look for hours and minutes
-<span class="fc bfc" id="L1141" title="All 2 branches covered.">                if (_local_remaining &gt; 0) {</span>
-<span class="fc" id="L1142">                    hour   = readVarUInt();</span>
-<span class="fc" id="L1143">                    minute = readVarUInt();</span>
-<span class="fc" id="L1144">                    p = Precision.MINUTE;</span>
-<span class="fc bfc" id="L1145" title="All 2 branches covered.">                    if (_local_remaining &gt; 0) {</span>
-<span class="fc" id="L1146">                        second = readVarUInt();</span>
-<span class="fc" id="L1147">                        p = Precision.SECOND;</span>
-<span class="fc bfc" id="L1148" title="All 2 branches covered.">                        if (_local_remaining &gt; 0) {</span>
+<span class="fc bfc" id="L1147" title="All 2 branches covered.">                if (_local_remaining &gt; 0) {</span>
+<span class="fc" id="L1148">                    hour   = readVarUInt();</span>
+<span class="fc" id="L1149">                    minute = readVarUInt();</span>
+<span class="fc" id="L1150">                    p = Precision.MINUTE;</span>
+<span class="fc bfc" id="L1151" title="All 2 branches covered.">                    if (_local_remaining &gt; 0) {</span>
+<span class="fc" id="L1152">                        second = readVarUInt();</span>
+<span class="fc" id="L1153">                        p = Precision.SECOND;</span>
+<span class="fc bfc" id="L1154" title="All 2 branches covered.">                        if (_local_remaining &gt; 0) {</span>
                             // now we read in our actual &quot;milliseconds since the epoch&quot;
-<span class="fc" id="L1150">                            frac = readDecimal(_local_remaining);</span>
-<span class="fc bfc" id="L1151" title="All 4 branches covered.">                            if (frac.compareTo(BigDecimal.ZERO) &lt; 0 || frac.compareTo(BigDecimal.ONE) &gt;= 0) {</span>
-<span class="nc" id="L1152">                                throwErrorAt(</span>
+<span class="fc" id="L1156">                            frac = readDecimal(_local_remaining);</span>
+<span class="fc bfc" id="L1157" title="All 4 branches covered.">                            if (frac.compareTo(BigDecimal.ZERO) &lt; 0 || frac.compareTo(BigDecimal.ONE) &gt;= 0) {</span>
+<span class="nc" id="L1158">                                throwErrorAt(</span>
                                         &quot;The fractional seconds value in a timestamp must be greater than or &quot;
                                               + &quot;equal to zero and less than one.&quot;
                                 );
@@ -1160,18 +1166,18 @@ import java.math.MathContext;
             }
         }
         // restore out outer limit(s)
-<span class="fc" id="L1163">        _local_remaining  = save_limit;</span>
+<span class="fc" id="L1169">        _local_remaining  = save_limit;</span>
         // now we let timestamp put it all together
         try {
-<span class="fc" id="L1166">            Timestamp val =</span>
-<span class="fc" id="L1167">                Timestamp.createFromUtcFields(p, year, month, day, hour,</span>
+<span class="fc" id="L1172">            Timestamp val =</span>
+<span class="fc" id="L1173">                Timestamp.createFromUtcFields(p, year, month, day, hour,</span>
                                               minute, second, frac, offset);
-<span class="fc" id="L1169">            return val;</span>
+<span class="fc" id="L1175">            return val;</span>
         }
-<span class="fc" id="L1171">        catch (IllegalArgumentException e)</span>
+<span class="fc" id="L1177">        catch (IllegalArgumentException e)</span>
         {
             // Rewrap to the expected type.
-<span class="fc" id="L1174">            throw newErrorAt(&quot;Invalid timestamp encoding: &quot; + e.getMessage());</span>
+<span class="fc" id="L1180">            throw newErrorAt(&quot;Invalid timestamp encoding: &quot; + e.getMessage());</span>
         }
     }
 
@@ -1180,92 +1186,95 @@ import java.math.MathContext;
         // len is bytes, which is greater than or equal to java
         // chars even after utf8 to utf16 decoding nonsense
         // the char array is way faster than using string buffer
-<span class="fc" id="L1183">        char[] chars = new char[len];</span>
-<span class="fc" id="L1184">        int    c, ii = 0;</span>
-<span class="fc" id="L1185">        int    save_limit = _local_remaining - len;</span>
-<span class="fc" id="L1186">        _local_remaining = len;</span>
-<span class="fc bfc" id="L1187" title="All 2 branches covered.">        while (!isEOF()) {</span>
-<span class="fc" id="L1188">            c = readUnicodeScalar();</span>
-<span class="pc bpc" id="L1189" title="1 of 2 branches missed.">            if (c &lt; 0) throwUnexpectedEOFException();</span>
-<span class="fc bfc" id="L1190" title="All 2 branches covered.">            if (c &lt; 0x10000) {</span>
-<span class="fc" id="L1191">                chars[ii++] = (char)c;</span>
+<span class="fc" id="L1189">        char[] chars = new char[len];</span>
+<span class="fc" id="L1190">        int    c, ii = 0;</span>
+<span class="fc" id="L1191">        int    save_limit = NO_LIMIT;</span>
+<span class="fc bfc" id="L1192" title="All 2 branches covered.">        if (_local_remaining != NO_LIMIT) {</span>
+<span class="fc" id="L1193">            save_limit = _local_remaining - len;</span>
+        }
+<span class="fc" id="L1195">        _local_remaining = len;</span>
+<span class="fc bfc" id="L1196" title="All 2 branches covered.">        while (!isEOF()) {</span>
+<span class="fc" id="L1197">            c = readUnicodeScalar();</span>
+<span class="pc bpc" id="L1198" title="1 of 2 branches missed.">            if (c &lt; 0) throwUnexpectedEOFException();</span>
+<span class="fc bfc" id="L1199" title="All 2 branches covered.">            if (c &lt; 0x10000) {</span>
+<span class="fc" id="L1200">                chars[ii++] = (char)c;</span>
             }
             else { // when c is &gt;= 0x10000 we need surrogate encoding
-<span class="fc" id="L1194">                chars[ii++] = (char)_Private_IonConstants.makeHighSurrogate(c);</span>
-<span class="fc" id="L1195">                chars[ii++] = (char)_Private_IonConstants.makeLowSurrogate(c);</span>
+<span class="fc" id="L1203">                chars[ii++] = (char)_Private_IonConstants.makeHighSurrogate(c);</span>
+<span class="fc" id="L1204">                chars[ii++] = (char)_Private_IonConstants.makeLowSurrogate(c);</span>
             }
         }
-<span class="fc" id="L1198">        _local_remaining = save_limit;</span>
-<span class="fc" id="L1199">        return new String(chars, 0, ii);</span>
+<span class="fc" id="L1207">        _local_remaining = save_limit;</span>
+<span class="fc" id="L1208">        return new String(chars, 0, ii);</span>
     }
     private final int readUnicodeScalar() throws IOException
     {
-<span class="fc" id="L1203">        int c = -1, b;</span>
-<span class="fc" id="L1204">        b = read();</span>
+<span class="fc" id="L1212">        int c = -1, b;</span>
+<span class="fc" id="L1213">        b = read();</span>
         // ascii is all good, even -1 (eof)
-<span class="fc bfc" id="L1206" title="All 2 branches covered.">        if (IonUTF8.isOneByteUTF8(b)) {</span>
-<span class="fc" id="L1207">            return b;</span>
+<span class="fc bfc" id="L1215" title="All 2 branches covered.">        if (IonUTF8.isOneByteUTF8(b)) {</span>
+<span class="fc" id="L1216">            return b;</span>
         }
-<span class="pc bpc" id="L1209" title="1 of 4 branches missed.">        switch(IonUTF8.getUTF8LengthFromFirstByte(b)) {</span>
+<span class="pc bpc" id="L1218" title="1 of 4 branches missed.">        switch(IonUTF8.getUTF8LengthFromFirstByte(b)) {</span>
         case 2:
             // now we start gluing the multi-byte value together
-<span class="pc bpc" id="L1212" title="2 of 4 branches missed.">            assert((b &amp; 0xe0) == 0xc0);</span>
+<span class="pc bpc" id="L1221" title="2 of 4 branches missed.">            assert((b &amp; 0xe0) == 0xc0);</span>
             // for values from 0x80 to 0x7FF (all legal)
-<span class="fc" id="L1214">            int b2 = read();</span>
-<span class="pc bpc" id="L1215" title="1 of 2 branches missed.">            if (!IonUTF8.isContinueByteUTF8(b2)) throwUTF8Exception();</span>
-<span class="fc" id="L1216">            c = IonUTF8.twoByteScalar(b, b2);</span>
-<span class="fc" id="L1217">            break;</span>
-        case 3:
-<span class="pc bpc" id="L1219" title="2 of 4 branches missed.">            assert((b &amp; 0xf0) == 0xe0);</span>
-            // for values from 0x800 to 0xFFFFF (NOT all legal)
-<span class="fc" id="L1221">            b2 = read();</span>
-<span class="pc bpc" id="L1222" title="1 of 2 branches missed.">            if (!IonUTF8.isContinueByteUTF8(b2)) throwUTF8Exception();</span>
-<span class="fc" id="L1223">            int b3 = read();</span>
-<span class="pc bpc" id="L1224" title="1 of 2 branches missed.">            if (!IonUTF8.isContinueByteUTF8(b3)) throwUTF8Exception();</span>
-<span class="fc" id="L1225">            c = IonUTF8.threeByteScalar(b, b2, b3);</span>
+<span class="fc" id="L1223">            int b2 = read();</span>
+<span class="pc bpc" id="L1224" title="1 of 2 branches missed.">            if (!IonUTF8.isContinueByteUTF8(b2)) throwUTF8Exception();</span>
+<span class="fc" id="L1225">            c = IonUTF8.twoByteScalar(b, b2);</span>
 <span class="fc" id="L1226">            break;</span>
-        case 4:
-<span class="pc bpc" id="L1228" title="2 of 4 branches missed.">            assert((b &amp; 0xf8) == 0xf0);</span>
-            // for values from 0x010000 to 0x1FFFFF (NOT all legal)
+        case 3:
+<span class="pc bpc" id="L1228" title="2 of 4 branches missed.">            assert((b &amp; 0xf0) == 0xe0);</span>
+            // for values from 0x800 to 0xFFFFF (NOT all legal)
 <span class="fc" id="L1230">            b2 = read();</span>
 <span class="pc bpc" id="L1231" title="1 of 2 branches missed.">            if (!IonUTF8.isContinueByteUTF8(b2)) throwUTF8Exception();</span>
-<span class="fc" id="L1232">            b3 = read();</span>
+<span class="fc" id="L1232">            int b3 = read();</span>
 <span class="pc bpc" id="L1233" title="1 of 2 branches missed.">            if (!IonUTF8.isContinueByteUTF8(b3)) throwUTF8Exception();</span>
-<span class="fc" id="L1234">            int b4 = read();</span>
-<span class="pc bpc" id="L1235" title="1 of 2 branches missed.">            if (!IonUTF8.isContinueByteUTF8(b4)) throwUTF8Exception();</span>
-<span class="fc" id="L1236">            c = IonUTF8.fourByteScalar(b, b2, b3, b4);</span>
-<span class="pc bpc" id="L1237" title="1 of 2 branches missed.">            if (c &gt; 0x10FFFF) {</span>
-<span class="nc" id="L1238">                throw new IonException(&quot;illegal utf value encountered in input utf-8 stream&quot;);</span>
+<span class="fc" id="L1234">            c = IonUTF8.threeByteScalar(b, b2, b3);</span>
+<span class="fc" id="L1235">            break;</span>
+        case 4:
+<span class="pc bpc" id="L1237" title="2 of 4 branches missed.">            assert((b &amp; 0xf8) == 0xf0);</span>
+            // for values from 0x010000 to 0x1FFFFF (NOT all legal)
+<span class="fc" id="L1239">            b2 = read();</span>
+<span class="pc bpc" id="L1240" title="1 of 2 branches missed.">            if (!IonUTF8.isContinueByteUTF8(b2)) throwUTF8Exception();</span>
+<span class="fc" id="L1241">            b3 = read();</span>
+<span class="pc bpc" id="L1242" title="1 of 2 branches missed.">            if (!IonUTF8.isContinueByteUTF8(b3)) throwUTF8Exception();</span>
+<span class="fc" id="L1243">            int b4 = read();</span>
+<span class="pc bpc" id="L1244" title="1 of 2 branches missed.">            if (!IonUTF8.isContinueByteUTF8(b4)) throwUTF8Exception();</span>
+<span class="fc" id="L1245">            c = IonUTF8.fourByteScalar(b, b2, b3, b4);</span>
+<span class="pc bpc" id="L1246" title="1 of 2 branches missed.">            if (c &gt; 0x10FFFF) {</span>
+<span class="nc" id="L1247">                throw new IonException(&quot;illegal utf value encountered in input utf-8 stream&quot;);</span>
             }
             break;
         default:
-<span class="nc" id="L1242">            throwUTF8Exception();</span>
+<span class="nc" id="L1251">            throwUTF8Exception();</span>
         }
-<span class="fc" id="L1244">        return c;</span>
+<span class="fc" id="L1253">        return c;</span>
     }
     private final void throwUTF8Exception() throws IOException
     {
-<span class="nc" id="L1248">        throwErrorAt(&quot;Invalid UTF-8 character encounter in a string at position &quot;);</span>
-<span class="nc" id="L1249">    }</span>
+<span class="nc" id="L1257">        throwErrorAt(&quot;Invalid UTF-8 character encounter in a string at position &quot;);</span>
+<span class="nc" id="L1258">    }</span>
     private final void throwUnexpectedEOFException() throws IOException {
-<span class="nc" id="L1251">        throwErrorAt(&quot;unexpected EOF in value&quot;);</span>
-<span class="nc" id="L1252">    }</span>
+<span class="nc" id="L1260">        throwErrorAt(&quot;unexpected EOF in value&quot;);</span>
+<span class="nc" id="L1261">    }</span>
     private final void throwVarIntOverflowException() throws IOException {
-<span class="nc" id="L1254">        throwErrorAt(&quot;int in stream is too long for a Java int 32&quot;);</span>
-<span class="nc" id="L1255">    }</span>
+<span class="nc" id="L1263">        throwErrorAt(&quot;int in stream is too long for a Java int 32&quot;);</span>
+<span class="nc" id="L1264">    }</span>
 
     protected IonException newErrorAt(String msg) {
-<span class="fc" id="L1258">        String msg2 = msg + &quot; at position &quot; + getPosition();</span>
-<span class="fc" id="L1259">        return new IonException(msg2);</span>
+<span class="fc" id="L1267">        String msg2 = msg + &quot; at position &quot; + getPosition();</span>
+<span class="fc" id="L1268">        return new IonException(msg2);</span>
     }
     protected void throwErrorAt(String msg) {
-<span class="fc" id="L1262">        throw newErrorAt(msg);</span>
+<span class="fc" id="L1271">        throw newErrorAt(msg);</span>
     }
     protected void error(String msg) {
-<span class="nc" id="L1265">        throw new IonException(msg);</span>
+<span class="nc" id="L1274">        throw new IonException(msg);</span>
     }
     protected void error(Exception e) {
-<span class="fc" id="L1268">        throw new IonException(e);</span>
+<span class="fc" id="L1277">        throw new IonException(e);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

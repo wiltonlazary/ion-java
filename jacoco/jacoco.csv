@@ -84,7 +84,7 @@ com.amazon.ion:ion-java,com.amazon.ion.impl,IonReaderTextRawTokensX.ProhibitedCh
 com.amazon.ion:ion-java,com.amazon.ion.impl,SymbolTokenImpl,34,94,10,18,1,23,11,12,1,8
 com.amazon.ion:ion-java,com.amazon.ion.impl,IonTextBufferedStream.SimpleBufferStream,112,0,14,0,23,0,14,0,7,0
 com.amazon.ion:ion-java,com.amazon.ion.impl,_Private_FastAppendableDecorator,43,32,3,1,13,12,8,5,6,5
-com.amazon.ion:ion-java,com.amazon.ion.impl,BlockedBuffer.BlockedByteOutputStream,435,455,90,42,75,88,71,21,11,15
+com.amazon.ion:ion-java,com.amazon.ion.impl,BlockedBuffer.BlockedByteOutputStream,435,455,89,43,75,88,70,22,11,15
 com.amazon.ion:ion-java,com.amazon.ion.impl,IonBinary.Writer,1180,788,214,92,272,165,144,48,26,12
 com.amazon.ion:ion-java,com.amazon.ion.impl,LocalSymbolTableAsStruct.Factory,6,87,3,3,0,18,3,5,0,5
 com.amazon.ion:ion-java,com.amazon.ion.impl,IonReaderTextSystemX.Radix,6,173,3,17,0,25,3,10,0,3

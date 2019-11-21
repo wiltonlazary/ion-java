@@ -208,11 +208,11 @@ import java.util.List;
 <span class="fc bfc" id="L208" title="All 2 branches covered.">        while (len &gt; 0)</span>
         {
 <span class="fc" id="L210">            final char ch = chars.charAt(off);</span>
-<span class="pc bpc" id="L211" title="1 of 4 branches missed.">            if (ch &gt;= LOW_SURROGATE_FIRST &amp;&amp; ch &lt;= LOW_SURROGATE_LAST)</span>
+<span class="fc bfc" id="L211" title="All 4 branches covered.">            if (ch &gt;= LOW_SURROGATE_FIRST &amp;&amp; ch &lt;= LOW_SURROGATE_LAST)</span>
             {
 <span class="fc" id="L213">                throw new IllegalArgumentException(&quot;Unpaired low surrogate: &quot; + (int) ch);</span>
             }
-<span class="pc bpc" id="L215" title="1 of 4 branches missed.">            if ((ch &gt;= HIGH_SURROGATE_FIRST &amp;&amp; ch &lt;= HIGH_SURROGATE_LAST))</span>
+<span class="fc bfc" id="L215" title="All 4 branches covered.">            if ((ch &gt;= HIGH_SURROGATE_FIRST &amp;&amp; ch &lt;= HIGH_SURROGATE_LAST))</span>
             {
                 // we need to look ahead in this case
 <span class="fc" id="L218">                off++;</span>
@@ -311,7 +311,7 @@ import java.util.List;
 <span class="fc bfc" id="L311" title="All 2 branches covered.">        if (len &gt; 0)</span>
         {
             // just defer to 'slow' writing for non-BMP characters
-<span class="nc" id="L314">            return octets + writeUTF8Slow(chars, off, len);</span>
+<span class="fc" id="L314">            return octets + writeUTF8Slow(chars, off, len);</span>
         }
 <span class="fc" id="L316">        return octets;</span>
     }

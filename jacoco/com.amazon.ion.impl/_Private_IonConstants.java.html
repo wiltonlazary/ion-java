@@ -69,17 +69,17 @@ import com.amazon.ion.IonException;
     }
     public static final int makeHighSurrogate(int unicodeScalar) {
         int c;
-<span class="fc" id="L72">        c = unicodeScalar - surrogate_utf32_offset;</span>
-<span class="fc" id="L73">        c &gt;&gt;&gt;= surrogate_utf32_shift;</span>
-<span class="fc" id="L74">        c |= high_surrogate_value;</span>
-<span class="fc" id="L75">        return c;</span>
+<span class="nc" id="L72">        c = unicodeScalar - surrogate_utf32_offset;</span>
+<span class="nc" id="L73">        c &gt;&gt;&gt;= surrogate_utf32_shift;</span>
+<span class="nc" id="L74">        c |= high_surrogate_value;</span>
+<span class="nc" id="L75">        return c;</span>
     }
     public static final int makeLowSurrogate(int unicodeScalar) {
         int c;
-<span class="fc" id="L79">        c = unicodeScalar - surrogate_utf32_offset;</span>
-<span class="fc" id="L80">        c &amp;= surrogate_value_mask;</span>
-<span class="fc" id="L81">        c |= low_surrogate_value;</span>
-<span class="fc" id="L82">        return c;</span>
+<span class="nc" id="L79">        c = unicodeScalar - surrogate_utf32_offset;</span>
+<span class="nc" id="L80">        c &amp;= surrogate_value_mask;</span>
+<span class="nc" id="L81">        c |= low_surrogate_value;</span>
+<span class="nc" id="L82">        return c;</span>
     }
     public static final boolean isHighSurrogate(int c) {
         boolean is;

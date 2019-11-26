@@ -208,18 +208,18 @@ import java.util.List;
 <span class="fc bfc" id="L208" title="All 2 branches covered.">        while (len &gt; 0)</span>
         {
 <span class="fc" id="L210">            final char ch = chars.charAt(off);</span>
-<span class="fc bfc" id="L211" title="All 4 branches covered.">            if (ch &gt;= LOW_SURROGATE_FIRST &amp;&amp; ch &lt;= LOW_SURROGATE_LAST)</span>
+<span class="pc bpc" id="L211" title="1 of 4 branches missed.">            if (ch &gt;= LOW_SURROGATE_FIRST &amp;&amp; ch &lt;= LOW_SURROGATE_LAST)</span>
             {
 <span class="fc" id="L213">                throw new IllegalArgumentException(&quot;Unpaired low surrogate: &quot; + (int) ch);</span>
             }
-<span class="fc bfc" id="L215" title="All 4 branches covered.">            if ((ch &gt;= HIGH_SURROGATE_FIRST &amp;&amp; ch &lt;= HIGH_SURROGATE_LAST))</span>
+<span class="pc bpc" id="L215" title="1 of 4 branches missed.">            if ((ch &gt;= HIGH_SURROGATE_FIRST &amp;&amp; ch &lt;= HIGH_SURROGATE_LAST))</span>
             {
                 // we need to look ahead in this case
 <span class="fc" id="L218">                off++;</span>
 <span class="fc" id="L219">                len--;</span>
-<span class="fc bfc" id="L220" title="All 2 branches covered.">                if (len == 0)</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">                if (len == 0)</span>
                 {
-<span class="fc" id="L222">                    throw new IllegalArgumentException(&quot;Unpaired low surrogate at end of character sequence: &quot; + ch);</span>
+<span class="nc" id="L222">                    throw new IllegalArgumentException(&quot;Unpaired low surrogate at end of character sequence: &quot; + ch);</span>
                 }
 
 <span class="fc" id="L225">                final int ch2 = chars.charAt(off);</span>
@@ -275,26 +275,26 @@ import java.util.List;
 <span class="fc bfc" id="L275" title="All 2 branches covered.">        while (len &gt; 0)</span>
         {
 <span class="fc" id="L277">            final char ch = chars.charAt(off);</span>
-<span class="pc bpc" id="L278" title="1 of 4 branches missed.">            if (ch &gt;= LOW_SURROGATE_FIRST &amp;&amp; ch &lt;= LOW_SURROGATE_LAST)</span>
+<span class="pc bpc" id="L278" title="3 of 4 branches missed.">            if (ch &gt;= LOW_SURROGATE_FIRST &amp;&amp; ch &lt;= LOW_SURROGATE_LAST)</span>
             {
 <span class="nc" id="L280">                throw new IllegalArgumentException(&quot;Unpaired low surrogate: &quot; + ch);</span>
             }
-<span class="fc bfc" id="L282" title="All 4 branches covered.">            if ((ch &gt;= HIGH_SURROGATE_FIRST &amp;&amp; ch &lt;= HIGH_SURROGATE_LAST))</span>
+<span class="pc bpc" id="L282" title="1 of 4 branches missed.">            if ((ch &gt;= HIGH_SURROGATE_FIRST &amp;&amp; ch &lt;= HIGH_SURROGATE_LAST))</span>
             {
                 // we lost the 3-byte bet
 <span class="fc" id="L285">                break;</span>
             }
 
-<span class="fc bfc" id="L288" title="All 2 branches covered.">            if (ch &lt; UTF8_2_OCTET_MIN_VALUE)</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">            if (ch &lt; UTF8_2_OCTET_MIN_VALUE)</span>
             {
-<span class="fc" id="L290">                block.data[limit++] = (byte) ch;</span>
-<span class="fc" id="L291">                octets++;</span>
+<span class="nc" id="L290">                block.data[limit++] = (byte) ch;</span>
+<span class="nc" id="L291">                octets++;</span>
             }
-<span class="fc bfc" id="L293" title="All 2 branches covered.">            else if (ch &lt; UTF8_3_OCTET_MIN_VALUE)</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">            else if (ch &lt; UTF8_3_OCTET_MIN_VALUE)</span>
             {
-<span class="fc" id="L295">                block.data[limit++] = (byte) (UTF8_2_OCTET_PREFIX_MASK | (ch &gt;&gt; UTF8_2_OCTET_SHIFT)                    );</span>
-<span class="fc" id="L296">                block.data[limit++] = (byte) (UTF8_FOLLOW_PREFIX_MASK  | (ch                        &amp; UTF8_FOLLOW_MASK));</span>
-<span class="fc" id="L297">                octets += 2;</span>
+<span class="nc" id="L295">                block.data[limit++] = (byte) (UTF8_2_OCTET_PREFIX_MASK | (ch &gt;&gt; UTF8_2_OCTET_SHIFT)                    );</span>
+<span class="nc" id="L296">                block.data[limit++] = (byte) (UTF8_FOLLOW_PREFIX_MASK  | (ch                        &amp; UTF8_FOLLOW_MASK));</span>
+<span class="nc" id="L297">                octets += 2;</span>
             }
             else
             {
@@ -311,7 +311,7 @@ import java.util.List;
 <span class="fc bfc" id="L311" title="All 2 branches covered.">        if (len &gt; 0)</span>
         {
             // just defer to 'slow' writing for non-BMP characters
-<span class="fc" id="L314">            return octets + writeUTF8Slow(chars, off, len);</span>
+<span class="nc" id="L314">            return octets + writeUTF8Slow(chars, off, len);</span>
         }
 <span class="fc" id="L316">        return octets;</span>
     }
@@ -362,7 +362,7 @@ import java.util.List;
 <span class="pc bpc" id="L362" title="1 of 4 branches missed.">            if (ch &gt;= HIGH_SURROGATE_FIRST &amp;&amp; ch &lt;= HIGH_SURROGATE_LAST)</span>
             {
                 // just defer to 'slow' writing for non-BMP characters
-<span class="fc" id="L365">                return octets + writeUTF8Slow(chars, off, len);</span>
+<span class="nc" id="L365">                return octets + writeUTF8Slow(chars, off, len);</span>
             }
 
             // we must be a three byte BMP character
@@ -405,11 +405,11 @@ import java.util.List;
             {
 <span class="fc" id="L406">                return octets + writeUTF8UpTo2Byte(chars, off, len);</span>
             }
-<span class="fc bfc" id="L408" title="All 4 branches covered.">            if (ch &gt;= LOW_SURROGATE_FIRST &amp;&amp; ch &lt;= LOW_SURROGATE_LAST)</span>
+<span class="pc bpc" id="L408" title="1 of 4 branches missed.">            if (ch &gt;= LOW_SURROGATE_FIRST &amp;&amp; ch &lt;= LOW_SURROGATE_LAST)</span>
             {
 <span class="fc" id="L410">                throw new IllegalArgumentException(&quot;Unpaired low surrogate: &quot; + ch);</span>
             }
-<span class="fc bfc" id="L412" title="All 4 branches covered.">            if (ch &gt;= HIGH_SURROGATE_FIRST &amp;&amp; ch &lt;= HIGH_SURROGATE_LAST)</span>
+<span class="pc bpc" id="L412" title="1 of 4 branches missed.">            if (ch &gt;= HIGH_SURROGATE_FIRST &amp;&amp; ch &lt;= HIGH_SURROGATE_LAST)</span>
             {
                 // just defer to 'slow' writing for non-BMP characters
 <span class="fc" id="L415">                return octets + writeUTF8Slow(chars, off, len);</span>

@@ -344,7 +344,7 @@ import java.nio.charset.CoderResult;
     {
 <span class="fc bfc" id="L345" title="All 2 branches covered.">        for (int ii=1; ii&lt;_Private_IonConstants.BINARY_VERSION_MARKER_1_0.length; ii++) {</span>
 <span class="fc" id="L346">            int b = read();</span>
-<span class="pc bpc" id="L347" title="1 of 2 branches missed.">            if (b != (_Private_IonConstants.BINARY_VERSION_MARKER_1_0[ii] &amp; 0xff)) {</span>
+<span class="fc bfc" id="L347" title="All 2 branches covered.">            if (b != (_Private_IonConstants.BINARY_VERSION_MARKER_1_0[ii] &amp; 0xff)) {</span>
 <span class="nc" id="L348">                throwErrorAt(&quot;invalid binary image&quot;);</span>
             }
         }
@@ -543,7 +543,7 @@ import java.nio.charset.CoderResult;
     private final IonType get_iontype_from_tid(int tid)
     {
 <span class="fc" id="L545">        IonType t = null;</span>
-<span class="pc bpc" id="L546" title="2 of 15 branches missed.">        switch (tid) {</span>
+<span class="pc bpc" id="L546" title="1 of 15 branches missed.">        switch (tid) {</span>
         case _Private_IonConstants.tidNull:      // 0
 <span class="fc" id="L548">            t = IonType.NULL;</span>
 <span class="fc" id="L549">            break;</span>
@@ -588,7 +588,7 @@ import java.nio.charset.CoderResult;
 <span class="nc" id="L588">            t = null;  // we don't know yet</span>
 <span class="nc" id="L589">            break;</span>
         default:
-<span class="nc" id="L591">            throw newErrorAt(&quot;unrecognized value type encountered: &quot;+tid);</span>
+<span class="fc" id="L591">            throw newErrorAt(&quot;unrecognized value type encountered: &quot;+tid);</span>
         }
 <span class="fc" id="L593">        return t;</span>
     }
@@ -1063,9 +1063,9 @@ import java.nio.charset.CoderResult;
             // special case, return pos zero
 <span class="nc" id="L1064">            return 0.0d;</span>
         }
-<span class="pc bpc" id="L1066" title="1 of 4 branches missed.">        if (len != 4 &amp;&amp; len != 8)</span>
+<span class="fc bfc" id="L1066" title="All 4 branches covered.">        if (len != 4 &amp;&amp; len != 8)</span>
         {
-<span class="nc" id="L1068">            throw new IOException(&quot;Length of float read must be 0, 4, or 8&quot;);</span>
+<span class="fc" id="L1068">            throw new IOException(&quot;Length of float read must be 0, 4, or 8&quot;);</span>
         }
 
 <span class="fc" id="L1071">        long dBits = this.readULong(len);</span>

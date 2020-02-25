@@ -492,55 +492,56 @@ import java.util.Iterator;
 <span class="fc" id="L492">                int ii = _next_idx - 1;</span>
 <span class="fc" id="L493">                _next_idx = len; // if we can't find our current</span>
                                  // value we'll be at eof anyway
-<span class="pc bpc" id="L495" title="1 of 2 branches missed.">                while (ii&lt;len) {</span>
-<span class="pc bpc" id="L496" title="1 of 2 branches missed.">                    if (_curr == _parent.get_child(ii)) {</span>
+<span class="fc bfc" id="L495" title="All 2 branches covered.">                while (ii&lt;len) {</span>
+<span class="fc bfc" id="L496" title="All 2 branches covered.">                    if (_curr == _parent.get_child(ii)) {</span>
 <span class="fc" id="L497">                        _next_idx = ii+1;</span>
 <span class="fc" id="L498">                        break;</span>
                     }
+<span class="fc" id="L500">                    ii++;</span>
                 }
             }
             // if there anything left?
-<span class="fc bfc" id="L503" title="All 2 branches covered.">            if (_next_idx &gt;= _parent.get_child_count()) {</span>
-<span class="fc" id="L504">                _eof = true;</span>
+<span class="fc bfc" id="L504" title="All 2 branches covered.">            if (_next_idx &gt;= _parent.get_child_count()) {</span>
+<span class="fc" id="L505">                _eof = true;</span>
             }
-<span class="fc bfc" id="L506" title="All 2 branches covered.">            return !_eof;</span>
+<span class="fc bfc" id="L507" title="All 2 branches covered.">            return !_eof;</span>
         }
 
         public IonValue next()
         {
             // the hasNext() is needed to adjust our _next_idx
             // value if the underlying arraylist moved under us
-<span class="pc bpc" id="L513" title="1 of 2 branches missed.">            if (!hasNext()) {</span>
-<span class="nc" id="L514">                _curr = null;</span>
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">            if (!hasNext()) {</span>
+<span class="nc" id="L515">                _curr = null;</span>
             }
             else {
-<span class="fc" id="L517">                _curr = _parent.get_child(_next_idx);</span>
-<span class="fc" id="L518">                _next_idx++;</span>
+<span class="fc" id="L518">                _curr = _parent.get_child(_next_idx);</span>
+<span class="fc" id="L519">                _next_idx++;</span>
             }
-<span class="fc" id="L520">            return _curr;</span>
+<span class="fc" id="L521">            return _curr;</span>
         }
 
         public void remove()
         {
-<span class="nc" id="L525">            throw new UnsupportedOperationException();</span>
+<span class="nc" id="L526">            throw new UnsupportedOperationException();</span>
         }
     }
 
     // system readers don't skip any symbol tables
     public SymbolTable pop_passed_symbol_table()
     {
-<span class="fc" id="L532">        return null;</span>
+<span class="fc" id="L533">        return null;</span>
     }
 
 
     public IntegerSize getIntegerSize()
     {
-<span class="fc bfc" id="L538" title="All 2 branches covered.">        if(_curr instanceof IonInt)</span>
+<span class="fc bfc" id="L539" title="All 2 branches covered.">        if(_curr instanceof IonInt)</span>
         {
-<span class="fc" id="L540">            return ((IonInt)_curr).getIntegerSize();</span>
+<span class="fc" id="L541">            return ((IonInt)_curr).getIntegerSize();</span>
 
         }
-<span class="fc" id="L543">        return null;</span>
+<span class="fc" id="L544">        return null;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

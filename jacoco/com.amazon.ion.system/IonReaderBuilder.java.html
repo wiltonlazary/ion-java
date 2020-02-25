@@ -253,13 +253,17 @@ public class IonReaderBuilder
      * {@link IonReader} instance over an {@link IonValue} data model. Typically
      * this is used to iterate over a collection, such as an {@link IonStruct}.
      *
+     * The given value and its children, if any, must not be modified until after
+     * the IonReader constructed by this method is closed. Violating this
+     * constraint results in undefined behavior.
+     *
      * @param value must not be null.
      *
      * @see IonSystem#newReader(IonValue)
      */
     public IonReader build(IonValue value)
     {
-<span class="fc" id="L262">        return makeReader(validateCatalog(), value);</span>
+<span class="fc" id="L266">        return makeReader(validateCatalog(), value);</span>
     }
 
     /**
@@ -272,37 +276,37 @@ public class IonReaderBuilder
      */
     public IonTextReader build(String ionText)
     {
-<span class="fc" id="L275">        return makeReader(validateCatalog(), ionText);</span>
+<span class="fc" id="L279">        return makeReader(validateCatalog(), ionText);</span>
     }
 
     private static class Mutable extends IonReaderBuilder
     {
 
         private Mutable()
-<span class="fc" id="L282">        {</span>
-<span class="fc" id="L283">        }</span>
+<span class="fc" id="L286">        {</span>
+<span class="fc" id="L287">        }</span>
 
         private Mutable(IonReaderBuilder that)
         {
-<span class="fc" id="L287">            super(that);</span>
-<span class="fc" id="L288">        }</span>
+<span class="fc" id="L291">            super(that);</span>
+<span class="fc" id="L292">        }</span>
 
         @Override
         public IonReaderBuilder immutable()
         {
-<span class="fc" id="L293">            return new IonReaderBuilder(this);</span>
+<span class="fc" id="L297">            return new IonReaderBuilder(this);</span>
         }
 
         @Override
         public IonReaderBuilder mutable()
         {
-<span class="fc" id="L299">            return this;</span>
+<span class="fc" id="L303">            return this;</span>
         }
 
         @Override
         protected void mutationCheck()
         {
-<span class="fc" id="L305">        }</span>
+<span class="fc" id="L309">        }</span>
 
     }
 

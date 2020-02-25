@@ -77,72 +77,75 @@ public final class _Private_IonManagedBinaryWriterBuilder
     /*package*/ volatile IonCatalog             catalog;
     /*package*/ volatile WriteValueOptimization optimization;
     /*package*/ volatile SymbolTable            initialSymbolTable;
+    /*package*/ volatile boolean                isLocalSymbolTableAppendEnabled;
     /*package*/ volatile boolean                isFloatBinary32Enabled;
 
     private _Private_IonManagedBinaryWriterBuilder(final BlockAllocatorProvider provider)
-<span class="fc" id="L83">    {</span>
-<span class="fc" id="L84">        this.provider = provider;</span>
-<span class="fc" id="L85">        this.symbolsBlockSize = DEFAULT_BLOCK_SIZE;</span>
-<span class="fc" id="L86">        this.userBlockSize = DEFAULT_BLOCK_SIZE;</span>
-<span class="fc" id="L87">        this.imports = ONLY_SYSTEM_IMPORTS;</span>
-<span class="fc" id="L88">        this.preallocationMode = PreallocationMode.PREALLOCATE_2;</span>
-<span class="fc" id="L89">        this.catalog = new SimpleCatalog();</span>
-<span class="fc" id="L90">        this.optimization = WriteValueOptimization.NONE;</span>
-<span class="fc" id="L91">        this.isFloatBinary32Enabled = false;</span>
-<span class="fc" id="L92">    }</span>
+<span class="fc" id="L84">    {</span>
+<span class="fc" id="L85">        this.provider = provider;</span>
+<span class="fc" id="L86">        this.symbolsBlockSize = DEFAULT_BLOCK_SIZE;</span>
+<span class="fc" id="L87">        this.userBlockSize = DEFAULT_BLOCK_SIZE;</span>
+<span class="fc" id="L88">        this.imports = ONLY_SYSTEM_IMPORTS;</span>
+<span class="fc" id="L89">        this.preallocationMode = PreallocationMode.PREALLOCATE_2;</span>
+<span class="fc" id="L90">        this.catalog = new SimpleCatalog();</span>
+<span class="fc" id="L91">        this.optimization = WriteValueOptimization.NONE;</span>
+<span class="fc" id="L92">        this.isLocalSymbolTableAppendEnabled = false;</span>
+<span class="fc" id="L93">        this.isFloatBinary32Enabled = false;</span>
+<span class="fc" id="L94">    }</span>
 
     private _Private_IonManagedBinaryWriterBuilder(final _Private_IonManagedBinaryWriterBuilder other)
-<span class="fc" id="L95">    {</span>
-<span class="fc" id="L96">        this.provider           = other.provider;</span>
-<span class="fc" id="L97">        this.symbolsBlockSize   = other.symbolsBlockSize;</span>
-<span class="fc" id="L98">        this.userBlockSize      = other.userBlockSize;</span>
-<span class="fc" id="L99">        this.preallocationMode  = other.preallocationMode;</span>
-<span class="fc" id="L100">        this.imports            = other.imports;</span>
-<span class="fc" id="L101">        this.catalog            = other.catalog;</span>
-<span class="fc" id="L102">        this.optimization       = other.optimization;</span>
-<span class="fc" id="L103">        this.initialSymbolTable = other.initialSymbolTable;</span>
-<span class="fc" id="L104">        this.isFloatBinary32Enabled = other.isFloatBinary32Enabled;</span>
-<span class="fc" id="L105">    }</span>
+<span class="fc" id="L97">    {</span>
+<span class="fc" id="L98">        this.provider           = other.provider;</span>
+<span class="fc" id="L99">        this.symbolsBlockSize   = other.symbolsBlockSize;</span>
+<span class="fc" id="L100">        this.userBlockSize      = other.userBlockSize;</span>
+<span class="fc" id="L101">        this.preallocationMode  = other.preallocationMode;</span>
+<span class="fc" id="L102">        this.imports            = other.imports;</span>
+<span class="fc" id="L103">        this.catalog            = other.catalog;</span>
+<span class="fc" id="L104">        this.optimization       = other.optimization;</span>
+<span class="fc" id="L105">        this.initialSymbolTable = other.initialSymbolTable;</span>
+<span class="fc" id="L106">        this.isLocalSymbolTableAppendEnabled = other.isLocalSymbolTableAppendEnabled;</span>
+<span class="fc" id="L107">        this.isFloatBinary32Enabled = other.isFloatBinary32Enabled;</span>
+<span class="fc" id="L108">    }</span>
 
     public _Private_IonManagedBinaryWriterBuilder copy()
     {
-<span class="fc" id="L109">        return new _Private_IonManagedBinaryWriterBuilder(this);</span>
+<span class="fc" id="L112">        return new _Private_IonManagedBinaryWriterBuilder(this);</span>
     }
 
     // Parameter Setting Methods
 
     public _Private_IonManagedBinaryWriterBuilder withSymbolsBlockSize(final int blockSize)
     {
-<span class="nc bnc" id="L116" title="All 2 branches missed.">        if (blockSize &lt; 1)</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        if (blockSize &lt; 1)</span>
         {
-<span class="nc" id="L118">            throw new IllegalArgumentException(&quot;Block size cannot be less than 1: &quot; + blockSize);</span>
+<span class="nc" id="L121">            throw new IllegalArgumentException(&quot;Block size cannot be less than 1: &quot; + blockSize);</span>
         }
-<span class="nc" id="L120">        symbolsBlockSize = blockSize;</span>
-<span class="nc" id="L121">        return this;</span>
+<span class="nc" id="L123">        symbolsBlockSize = blockSize;</span>
+<span class="nc" id="L124">        return this;</span>
     }
 
     public _Private_IonManagedBinaryWriterBuilder withUserBlockSize(final int blockSize)
     {
-<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (blockSize &lt; 1)</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if (blockSize &lt; 1)</span>
         {
-<span class="nc" id="L128">            throw new IllegalArgumentException(&quot;Block size cannot be less than 1: &quot; + blockSize);</span>
+<span class="nc" id="L131">            throw new IllegalArgumentException(&quot;Block size cannot be less than 1: &quot; + blockSize);</span>
         }
-<span class="nc" id="L130">        userBlockSize = blockSize;</span>
-<span class="nc" id="L131">        return this;</span>
+<span class="nc" id="L133">        userBlockSize = blockSize;</span>
+<span class="nc" id="L134">        return this;</span>
     }
 
     public _Private_IonManagedBinaryWriterBuilder withImports(final SymbolTable... tables)
     {
-<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (tables != null)</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (tables != null)</span>
         {
-<span class="fc" id="L138">            return withImports(Arrays.asList(tables));</span>
+<span class="fc" id="L141">            return withImports(Arrays.asList(tables));</span>
         }
-<span class="fc" id="L140">        return this;</span>
+<span class="fc" id="L143">        return this;</span>
     }
 
     public _Private_IonManagedBinaryWriterBuilder withImports(final List&lt;SymbolTable&gt; tables)
     {
-<span class="fc" id="L145">        return withImports(ImportedSymbolResolverMode.DELEGATE, tables);</span>
+<span class="fc" id="L148">        return withImports(ImportedSymbolResolverMode.DELEGATE, tables);</span>
     }
 
     /**
@@ -151,117 +154,129 @@ public final class _Private_IonManagedBinaryWriterBuilder
      */
     public _Private_IonManagedBinaryWriterBuilder withFlatImports(final SymbolTable... tables)
     {
-<span class="nc bnc" id="L154" title="All 2 branches missed.">        if (tables != null)</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        if (tables != null)</span>
         {
-<span class="nc" id="L156">            return withFlatImports(Arrays.asList(tables));</span>
+<span class="nc" id="L159">            return withFlatImports(Arrays.asList(tables));</span>
         }
-<span class="nc" id="L158">        return this;</span>
+<span class="nc" id="L161">        return this;</span>
     }
 
     /** @see #withFlatImports(SymbolTable...) */
     public _Private_IonManagedBinaryWriterBuilder withFlatImports(final List&lt;SymbolTable&gt; tables)
     {
-<span class="nc" id="L164">        return withImports(ImportedSymbolResolverMode.FLAT, tables);</span>
+<span class="nc" id="L167">        return withImports(ImportedSymbolResolverMode.FLAT, tables);</span>
     }
 
     /*package*/ _Private_IonManagedBinaryWriterBuilder withImports(final ImportedSymbolResolverMode mode, final List&lt;SymbolTable&gt; tables) {
-<span class="fc" id="L168">        imports = new ImportedSymbolContext(mode, tables);</span>
-<span class="fc" id="L169">        return this;</span>
+<span class="fc" id="L171">        imports = new ImportedSymbolContext(mode, tables);</span>
+<span class="fc" id="L172">        return this;</span>
     }
 
     /*package*/ _Private_IonManagedBinaryWriterBuilder withPreallocationMode(final PreallocationMode preallocationMode)
     {
-<span class="fc" id="L174">        this.preallocationMode = preallocationMode;</span>
-<span class="fc" id="L175">        return this;</span>
+<span class="fc" id="L177">        this.preallocationMode = preallocationMode;</span>
+<span class="fc" id="L178">        return this;</span>
     }
 
     public _Private_IonManagedBinaryWriterBuilder withPaddedLengthPreallocation(final int pad)
     {
-<span class="fc" id="L180">        this.preallocationMode = PreallocationMode.withPadSize(pad);</span>
-<span class="fc" id="L181">        return this;</span>
+<span class="fc" id="L183">        this.preallocationMode = PreallocationMode.withPadSize(pad);</span>
+<span class="fc" id="L184">        return this;</span>
     }
 
     public _Private_IonManagedBinaryWriterBuilder withCatalog(final IonCatalog catalog)
     {
-<span class="fc" id="L186">        this.catalog = catalog;</span>
-<span class="fc" id="L187">        return this;</span>
+<span class="fc" id="L189">        this.catalog = catalog;</span>
+<span class="fc" id="L190">        return this;</span>
     }
 
     public _Private_IonManagedBinaryWriterBuilder withStreamCopyOptimization(boolean optimized)
     {
-<span class="fc bfc" id="L192" title="All 2 branches covered.">        this.optimization = optimized ? WriteValueOptimization.COPY_OPTIMIZED : WriteValueOptimization.NONE;</span>
-<span class="fc" id="L193">        return this;</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        this.optimization = optimized ? WriteValueOptimization.COPY_OPTIMIZED : WriteValueOptimization.NONE;</span>
+<span class="fc" id="L196">        return this;</span>
+    }
+
+    public _Private_IonManagedBinaryWriterBuilder withLocalSymbolTableAppendEnabled()
+    {
+<span class="fc" id="L201">        isLocalSymbolTableAppendEnabled = true;</span>
+<span class="fc" id="L202">        return this;</span>
+    }
+
+    public _Private_IonManagedBinaryWriterBuilder withLocalSymbolTableAppendDisabled()
+    {
+<span class="fc" id="L207">        isLocalSymbolTableAppendEnabled = false;</span>
+<span class="fc" id="L208">        return this;</span>
     }
 
     public _Private_IonManagedBinaryWriterBuilder withFloatBinary32Enabled() {
-<span class="fc" id="L197">        isFloatBinary32Enabled = true;</span>
-<span class="fc" id="L198">        return this;</span>
+<span class="fc" id="L212">        isFloatBinary32Enabled = true;</span>
+<span class="fc" id="L213">        return this;</span>
     }
 
     public _Private_IonManagedBinaryWriterBuilder withFloatBinary32Disabled() {
-<span class="fc" id="L202">        isFloatBinary32Enabled = false;</span>
-<span class="fc" id="L203">        return this;</span>
+<span class="fc" id="L217">        isFloatBinary32Enabled = false;</span>
+<span class="fc" id="L218">        return this;</span>
     }
 
     public _Private_IonManagedBinaryWriterBuilder withInitialSymbolTable(SymbolTable symbolTable)
     {
-<span class="fc bfc" id="L208" title="All 2 branches covered.">        if (symbolTable != null)</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        if (symbolTable != null)</span>
         {
-<span class="pc bpc" id="L210" title="1 of 4 branches missed.">            if (!symbolTable.isLocalTable() &amp;&amp; !symbolTable.isSystemTable())</span>
+<span class="pc bpc" id="L225" title="1 of 4 branches missed.">            if (!symbolTable.isLocalTable() &amp;&amp; !symbolTable.isSystemTable())</span>
             {
-<span class="nc" id="L212">                throw new IllegalArgumentException(&quot;Initial symbol table must be local or system&quot;);</span>
+<span class="nc" id="L227">                throw new IllegalArgumentException(&quot;Initial symbol table must be local or system&quot;);</span>
             }
-<span class="fc bfc" id="L214" title="All 2 branches covered.">            if (symbolTable.isSystemTable())</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">            if (symbolTable.isSystemTable())</span>
             {
-<span class="pc bpc" id="L216" title="1 of 2 branches missed.">                if (symbolTable.getMaxId() != SystemSymbols.ION_1_0_MAX_ID)</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">                if (symbolTable.getMaxId() != SystemSymbols.ION_1_0_MAX_ID)</span>
                 {
-<span class="nc" id="L218">                    throw new IllegalArgumentException(&quot;Unsupported system symbol table&quot;);</span>
+<span class="nc" id="L233">                    throw new IllegalArgumentException(&quot;Unsupported system symbol table&quot;);</span>
                 }
                 // don't need to set an explicit symbol table for system 1.0
-<span class="fc" id="L221">                symbolTable = null;</span>
+<span class="fc" id="L236">                symbolTable = null;</span>
             }
             else
             {
                 // initial symbol table is local
-<span class="fc bfc" id="L226" title="All 2 branches covered.">                for (final SymbolTable st : symbolTable.getImportedTables())</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">                for (final SymbolTable st : symbolTable.getImportedTables())</span>
                 {
-<span class="pc bpc" id="L228" title="1 of 2 branches missed.">                    if (st.isSubstitute())</span>
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">                    if (st.isSubstitute())</span>
                     {
-<span class="nc" id="L230">                        throw new SubstituteSymbolTableException(</span>
+<span class="nc" id="L245">                        throw new SubstituteSymbolTableException(</span>
                             &quot;Cannot use initial symbol table with imported substitutes&quot;);
                     }
                 }
             }
         }
 
-<span class="fc" id="L237">        this.initialSymbolTable = symbolTable;</span>
-<span class="fc" id="L238">        return this;</span>
+<span class="fc" id="L252">        this.initialSymbolTable = symbolTable;</span>
+<span class="fc" id="L253">        return this;</span>
     }
 
     // Construction
 
     public IonWriter newWriter(final OutputStream out) throws IOException
     {
-<span class="fc" id="L245">        return new IonManagedBinaryWriter(this, out);</span>
+<span class="fc" id="L260">        return new IonManagedBinaryWriter(this, out);</span>
     }
 
     public IonBinaryWriter newLegacyWriter()
     {
         try
         {
-<span class="nc" id="L252">            return new IonBinaryWriterAdapter(</span>
+<span class="nc" id="L267">            return new IonBinaryWriterAdapter(</span>
                 new Factory()
-<span class="nc" id="L254">                {</span>
+<span class="nc" id="L269">                {</span>
                     public IonWriter create(final OutputStream out) throws IOException
                     {
-<span class="nc" id="L257">                        return newWriter(out);</span>
+<span class="nc" id="L272">                        return newWriter(out);</span>
                     }
                 }
             );
         }
-<span class="nc" id="L262">        catch (final IOException e)</span>
+<span class="nc" id="L277">        catch (final IOException e)</span>
         {
-<span class="nc" id="L264">            throw new IonException(&quot;I/O error&quot;, e);</span>
+<span class="nc" id="L279">            throw new IonException(&quot;I/O error&quot;, e);</span>
         }
     }
 
@@ -275,7 +290,7 @@ public final class _Private_IonManagedBinaryWriterBuilder
      */
     public static _Private_IonManagedBinaryWriterBuilder create(final AllocatorMode allocatorMode)
     {
-<span class="fc" id="L278">        return new _Private_IonManagedBinaryWriterBuilder(allocatorMode.createAllocatorProvider());</span>
+<span class="fc" id="L293">        return new _Private_IonManagedBinaryWriterBuilder(allocatorMode.createAllocatorProvider());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

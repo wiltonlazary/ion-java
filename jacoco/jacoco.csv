@@ -34,7 +34,7 @@ com.amazon.ion:ion-java,com.amazon.ion.impl,IonWriterSystemBinary,453,984,59,116
 com.amazon.ion:ion-java,com.amazon.ion.impl,_Private_ScalarConversions.ValueVariant,732,417,103,37,193,130,125,56,45,45
 com.amazon.ion:ion-java,com.amazon.ion.impl,SubstituteSymbolTable.SymbolIterator,6,47,1,5,2,13,2,5,1,3
 com.amazon.ion:ion-java,com.amazon.ion.impl,UnifiedInputBufferX.Bytes,2,35,0,0,1,10,1,4,1,4
-com.amazon.ion:ion-java,com.amazon.ion.impl,IonReaderTreeSystem.Children,13,95,4,14,3,24,5,8,1,3
+com.amazon.ion:ion-java,com.amazon.ion.impl,IonReaderTreeSystem.Children,13,97,2,16,3,25,3,10,1,3
 com.amazon.ion:ion-java,com.amazon.ion.impl,IonReaderTextRawTokensX.NumericState,0,34,0,0,0,4,0,1,0,1
 com.amazon.ion:ion-java,com.amazon.ion.impl,_Private_ScalarConversions,181,427,41,11,40,21,35,8,4,3
 com.amazon.ion:ion-java,com.amazon.ion.impl,UnifiedSavePointManagerX,183,293,34,32,39,79,31,16,2,12
@@ -52,7 +52,7 @@ com.amazon.ion:ion-java,com.amazon.ion.impl,_Private_IonWriterFactory,3,52,0,0,1
 com.amazon.ion:ion-java,com.amazon.ion.impl,SimpleByteBuffer.UserByteWriter,238,0,8,0,63,0,25,0,21,0
 com.amazon.ion:ion-java,com.amazon.ion.impl,SubstituteSymbolTable,24,161,6,26,6,49,10,28,4,18
 com.amazon.ion:ion-java,com.amazon.ion.impl,UnifiedDataPageX.Bytes,48,25,4,0,10,8,6,2,4,2
-com.amazon.ion:ion-java,com.amazon.ion.impl,BlockedBuffer,742,1654,155,235,101,345,149,81,7,28
+com.amazon.ion:ion-java,com.amazon.ion.impl,BlockedBuffer,755,1641,160,230,105,341,152,78,7,28
 com.amazon.ion:ion-java,com.amazon.ion.impl,_Private_SymtabExtendsCache,7,58,5,11,0,12,5,6,0,3
 com.amazon.ion:ion-java,com.amazon.ion.impl,LocalSymbolTable.Factory,0,30,0,0,0,6,0,2,0,2
 com.amazon.ion:ion-java,com.amazon.ion.impl,_Private_FastAppendableTrampoline,13,0,0,0,3,0,3,0,3,0
@@ -114,7 +114,7 @@ com.amazon.ion:ion-java,com.amazon.ion.impl,_Private_IonWriterBase,87,322,10,54,
 com.amazon.ion:ion-java,com.amazon.ion.impl,IonBinary.Writer.lhNode,12,0,0,0,5,0,1,0,1,0
 com.amazon.ion:ion-java,com.amazon.ion.impl,IonReaderBinaryUserX,52,442,10,70,11,107,10,47,0,17
 com.amazon.ion:ion-java,com.amazon.ion.impl,LocalSymbolTable,151,911,45,142,19,234,44,87,3,33
-com.amazon.ion:ion-java,com.amazon.ion.impl,_Private_IonBinaryWriterBuilder,49,255,4,18,15,81,6,29,2,22
+com.amazon.ion:ion-java,com.amazon.ion.impl,_Private_IonBinaryWriterBuilder,65,269,4,20,21,86,8,31,4,23
 com.amazon.ion:ion-java,com.amazon.ion.impl,IonWriterSystemTextMarkup,19,254,0,4,8,86,2,24,2,22
 com.amazon.ion:ion-java,com.amazon.ion.impl,LocalSymbolTable.SymbolIterator,8,37,1,3,2,10,2,4,1,3
 com.amazon.ion:ion-java,com.amazon.ion.impl,IonReaderTreeSystem.new _Private_IonValue.SymbolTableProvider() {...},0,10,0,0,0,2,0,2,0,2
@@ -221,9 +221,9 @@ com.amazon.ion:ion-java,com.amazon.ion.impl.bin,IonRawBinaryWriter.Preallocation
 com.amazon.ion:ion-java,com.amazon.ion.impl.bin,IonManagedBinaryWriter.ImportDescriptor,43,30,11,3,2,9,9,4,2,4
 com.amazon.ion:ion-java,com.amazon.ion.impl.bin,AbstractIonWriter.WriteValueOptimization,0,24,0,0,0,3,0,1,0,1
 com.amazon.ion:ion-java,com.amazon.ion.impl.bin,IonManagedBinaryWriter.ImportedSymbolResolverMode.2.new IonManagedBinaryWriter.SymbolResolverBuilder() {...},0,28,0,0,0,4,0,3,0,3
-com.amazon.ion:ion-java,com.amazon.ion.impl.bin,IonManagedBinaryWriter,19,729,1,71,5,202,2,77,1,42
+com.amazon.ion:ion-java,com.amazon.ion.impl.bin,IonManagedBinaryWriter,19,742,1,77,5,203,2,80,1,42
 com.amazon.ion:ion-java,com.amazon.ion.impl.bin,IonRawBinaryWriter.PatchPoint,27,15,0,0,1,6,1,1,1,1
-com.amazon.ion:ion-java,com.amazon.ion.impl.bin,_Private_IonManagedBinaryWriterBuilder,84,186,9,15,18,51,11,21,5,15
+com.amazon.ion:ion-java,com.amazon.ion.impl.bin,_Private_IonManagedBinaryWriterBuilder,84,203,9,15,18,57,11,23,5,17
 com.amazon.ion:ion-java,com.amazon.ion.impl.bin,IonManagedBinaryWriter.ImportedSymbolResolverMode,0,24,0,0,0,3,0,1,0,1
 com.amazon.ion:ion-java,com.amazon.ion.impl.bin,IonManagedBinaryWriter.ImportedSymbolResolverMode.1.1.new IonManagedBinaryWriter.SymbolResolver() {...},0,13,0,0,0,2,0,2,0,2
 com.amazon.ion:ion-java,com.amazon.ion.impl.bin,IonRawBinaryWriter.RecyclingStack,0,90,0,6,0,21,0,8,0,5

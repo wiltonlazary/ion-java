@@ -366,164 +366,167 @@ import java.math.BigInteger;
 <span class="fc" id="L366">            SymbolToken sym = assumeFieldNameSymbol();</span>
 <span class="fc" id="L367">            writeFieldNameToken(sym);</span>
 <span class="fc" id="L368">            _output.appendAscii(':');</span>
-<span class="fc" id="L369">            clearFieldName();</span>
-<span class="fc" id="L370">            followingLongString = false;</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">            if (_options.isPrettyPrintOn()) {</span>
+<span class="fc" id="L370">                _output.appendAscii(' ');</span>
+            }
+<span class="fc" id="L372">            clearFieldName();</span>
+<span class="fc" id="L373">            followingLongString = false;</span>
         }
 
         // write annotations only if they exist and we're not currently
         // writing an IVM
-<span class="fc bfc" id="L375" title="All 4 branches covered.">        if (hasAnnotations() &amp;&amp; !_is_writing_ivm) {</span>
-<span class="fc bfc" id="L376" title="All 2 branches covered.">            if (! _options._skip_annotations) {</span>
-<span class="fc" id="L377">                SymbolToken[] annotations = getTypeAnnotationSymbols();</span>
-<span class="fc" id="L378">                writeAnnotations(annotations);</span>
-<span class="fc" id="L379">                followingLongString = false;</span>
+<span class="fc bfc" id="L378" title="All 4 branches covered.">        if (hasAnnotations() &amp;&amp; !_is_writing_ivm) {</span>
+<span class="fc bfc" id="L379" title="All 2 branches covered.">            if (! _options._skip_annotations) {</span>
+<span class="fc" id="L380">                SymbolToken[] annotations = getTypeAnnotationSymbols();</span>
+<span class="fc" id="L381">                writeAnnotations(annotations);</span>
+<span class="fc" id="L382">                followingLongString = false;</span>
             }
-<span class="fc" id="L381">            clearAnnotations();</span>
+<span class="fc" id="L384">            clearAnnotations();</span>
         }
 
-<span class="fc" id="L384">        _following_long_string = followingLongString;</span>
-<span class="fc" id="L385">    }</span>
+<span class="fc" id="L387">        _following_long_string = followingLongString;</span>
+<span class="fc" id="L388">    }</span>
 
     void closeValue()
         throws IOException
     {
-<span class="fc" id="L390">        super.endValue();</span>
-<span class="fc" id="L391">        _pending_separator = true;</span>
-<span class="fc" id="L392">        _following_long_string = false;  // Caller overwrites this as needed.</span>
+<span class="fc" id="L393">        super.endValue();</span>
+<span class="fc" id="L394">        _pending_separator = true;</span>
+<span class="fc" id="L395">        _following_long_string = false;  // Caller overwrites this as needed.</span>
 
         // Flush if a top-level-value was written
-<span class="fc bfc" id="L395" title="All 2 branches covered.">        if (getDepth() == 0)</span>
+<span class="fc bfc" id="L398" title="All 2 branches covered.">        if (getDepth() == 0)</span>
         {
             try
             {
-<span class="fc" id="L399">                flush();</span>
+<span class="fc" id="L402">                flush();</span>
             }
-<span class="nc" id="L401">            catch (IOException e)</span>
+<span class="nc" id="L404">            catch (IOException e)</span>
             {
-<span class="nc" id="L403">                throw new IonException(e);</span>
-<span class="fc" id="L404">            }</span>
+<span class="nc" id="L406">                throw new IonException(e);</span>
+<span class="fc" id="L407">            }</span>
         }
-<span class="fc" id="L406">    }</span>
+<span class="fc" id="L409">    }</span>
 
     @Override
     void writeIonVersionMarkerAsIs(SymbolTable systemSymtab)
         throws IOException
     {
-<span class="fc" id="L412">        _is_writing_ivm = true;</span>
-<span class="fc" id="L413">        writeSymbolAsIs(systemSymtab.getIonVersionId());</span>
-<span class="fc" id="L414">        _is_writing_ivm = false;</span>
-<span class="fc" id="L415">    }</span>
+<span class="fc" id="L415">        _is_writing_ivm = true;</span>
+<span class="fc" id="L416">        writeSymbolAsIs(systemSymtab.getIonVersionId());</span>
+<span class="fc" id="L417">        _is_writing_ivm = false;</span>
+<span class="fc" id="L418">    }</span>
 
     @Override
     void writeLocalSymtab(SymbolTable symtab)
         throws IOException
     {
-<span class="fc" id="L421">        SymbolTable[] imports = symtab.getImportedTables();</span>
+<span class="fc" id="L424">        SymbolTable[] imports = symtab.getImportedTables();</span>
 
-<span class="fc" id="L423">        LstMinimizing min = _options.getLstMinimizing();</span>
-<span class="fc bfc" id="L424" title="All 2 branches covered.">        if (min == null)</span>
+<span class="fc" id="L426">        LstMinimizing min = _options.getLstMinimizing();</span>
+<span class="fc bfc" id="L427" title="All 2 branches covered.">        if (min == null)</span>
         {
-<span class="fc" id="L426">            symtab.writeTo(this);</span>
+<span class="fc" id="L429">            symtab.writeTo(this);</span>
         }
-<span class="pc bpc" id="L428" title="1 of 4 branches missed.">        else if (min == LstMinimizing.LOCALS &amp;&amp; imports.length &gt; 0)</span>
+<span class="pc bpc" id="L431" title="1 of 4 branches missed.">        else if (min == LstMinimizing.LOCALS &amp;&amp; imports.length &gt; 0)</span>
         {
             // Copy the symtab, but filter out local symbols.
 
-<span class="fc" id="L432">            IonReader reader = new SymbolTableReader(symtab);</span>
+<span class="fc" id="L435">            IonReader reader = new SymbolTableReader(symtab);</span>
 
             // move onto and write the struct header
-<span class="fc" id="L435">            IonType t = reader.next();</span>
-<span class="pc bpc" id="L436" title="2 of 4 branches missed.">            assert(IonType.STRUCT.equals(t));</span>
-<span class="fc" id="L437">            SymbolToken[] a = reader.getTypeAnnotationSymbols();</span>
+<span class="fc" id="L438">            IonType t = reader.next();</span>
+<span class="pc bpc" id="L439" title="2 of 4 branches missed.">            assert(IonType.STRUCT.equals(t));</span>
+<span class="fc" id="L440">            SymbolToken[] a = reader.getTypeAnnotationSymbols();</span>
             // you (should) always have the $ion_symbol_table annotation
-<span class="pc bpc" id="L439" title="3 of 6 branches missed.">            assert(a != null &amp;&amp; a.length &gt;= 1);</span>
+<span class="pc bpc" id="L442" title="3 of 6 branches missed.">            assert(a != null &amp;&amp; a.length &gt;= 1);</span>
 
             // now we'll start a local symbol table struct
             // in the underlying system writer
-<span class="fc" id="L443">            setTypeAnnotationSymbols(a);</span>
-<span class="fc" id="L444">            stepIn(IonType.STRUCT);</span>
+<span class="fc" id="L446">            setTypeAnnotationSymbols(a);</span>
+<span class="fc" id="L447">            stepIn(IonType.STRUCT);</span>
 
             // step into the symbol table struct and
             // write the values - EXCEPT the symbols field
-<span class="fc" id="L448">            reader.stepIn();</span>
+<span class="fc" id="L451">            reader.stepIn();</span>
             for (;;) {
-<span class="fc" id="L450">                t = reader.next();</span>
-<span class="fc bfc" id="L451" title="All 2 branches covered.">                if (t == null) break;</span>
+<span class="fc" id="L453">                t = reader.next();</span>
+<span class="fc bfc" id="L454" title="All 2 branches covered.">                if (t == null) break;</span>
                 // get the field name and skip over 'symbols'
-<span class="fc" id="L453">                String name = reader.getFieldName();</span>
-<span class="fc bfc" id="L454" title="All 2 branches covered.">                if (SYMBOLS.equals(name)) {</span>
-<span class="fc" id="L455">                    continue;</span>
+<span class="fc" id="L456">                String name = reader.getFieldName();</span>
+<span class="fc bfc" id="L457" title="All 2 branches covered.">                if (SYMBOLS.equals(name)) {</span>
+<span class="fc" id="L458">                    continue;</span>
                 }
-<span class="fc" id="L457">                writeValue(reader);</span>
-<span class="fc" id="L458">            }</span>
+<span class="fc" id="L460">                writeValue(reader);</span>
+<span class="fc" id="L461">            }</span>
 
             // we're done step out and move along
-<span class="fc" id="L461">            stepOut();</span>
-<span class="fc" id="L462">        }</span>
+<span class="fc" id="L464">            stepOut();</span>
+<span class="fc" id="L465">        }</span>
         else  // Collapse to IVM
         {
-<span class="fc" id="L465">            SymbolTable systemSymtab = symtab.getSystemSymbolTable();</span>
-<span class="fc" id="L466">            writeIonVersionMarker(systemSymtab);</span>
+<span class="fc" id="L468">            SymbolTable systemSymtab = symtab.getSystemSymbolTable();</span>
+<span class="fc" id="L469">            writeIonVersionMarker(systemSymtab);</span>
         }
 
-<span class="fc" id="L469">        super.writeLocalSymtab(symtab);</span>
-<span class="fc" id="L470">    }</span>
+<span class="fc" id="L472">        super.writeLocalSymtab(symtab);</span>
+<span class="fc" id="L473">    }</span>
 
     public void stepIn(IonType containerType) throws IOException
     {
-<span class="fc" id="L474">        startValue();</span>
+<span class="fc" id="L477">        startValue();</span>
 
         int tid;
         char opener;
-<span class="pc bpc" id="L478" title="1 of 4 branches missed.">        switch (containerType)</span>
+<span class="pc bpc" id="L481" title="1 of 4 branches missed.">        switch (containerType)</span>
         {
             case SEXP:
-<span class="pc bpc" id="L481" title="1 of 2 branches missed.">                if (!_options._sexp_as_list) {</span>
-<span class="fc" id="L482">                    tid = tidSexp;</span>
-<span class="fc" id="L483">                    _in_struct = false;</span>
-<span class="fc" id="L484">                    opener = '('; break;</span>
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">                if (!_options._sexp_as_list) {</span>
+<span class="fc" id="L485">                    tid = tidSexp;</span>
+<span class="fc" id="L486">                    _in_struct = false;</span>
+<span class="fc" id="L487">                    opener = '('; break;</span>
                 }
                 // else fall through and act just like list
             case LIST:
-<span class="fc" id="L488">                tid = tidList;</span>
-<span class="fc" id="L489">                _in_struct = false;</span>
-<span class="fc" id="L490">                opener = '[';</span>
-<span class="fc" id="L491">                break;</span>
+<span class="fc" id="L491">                tid = tidList;</span>
+<span class="fc" id="L492">                _in_struct = false;</span>
+<span class="fc" id="L493">                opener = '[';</span>
+<span class="fc" id="L494">                break;</span>
             case STRUCT:
-<span class="fc" id="L493">                tid = tidStruct;</span>
-<span class="fc" id="L494">                _in_struct = true;</span>
-<span class="fc" id="L495">                opener = '{';</span>
-<span class="fc" id="L496">                break;</span>
+<span class="fc" id="L496">                tid = tidStruct;</span>
+<span class="fc" id="L497">                _in_struct = true;</span>
+<span class="fc" id="L498">                opener = '{';</span>
+<span class="fc" id="L499">                break;</span>
             default:
-<span class="nc" id="L498">                throw new IllegalArgumentException();</span>
+<span class="nc" id="L501">                throw new IllegalArgumentException();</span>
         }
 
-<span class="fc" id="L501">        push(tid);</span>
-<span class="fc" id="L502">        _output.appendAscii(opener);</span>
-<span class="fc" id="L503">        _pending_separator = false;</span>
-<span class="fc" id="L504">        _following_long_string = false;</span>
-<span class="fc" id="L505">    }</span>
+<span class="fc" id="L504">        push(tid);</span>
+<span class="fc" id="L505">        _output.appendAscii(opener);</span>
+<span class="fc" id="L506">        _pending_separator = false;</span>
+<span class="fc" id="L507">        _following_long_string = false;</span>
+<span class="fc" id="L508">    }</span>
 
     public void stepOut() throws IOException
     {
-<span class="pc bpc" id="L509" title="1 of 2 branches missed.">        if (_top &lt; 1) {</span>
-<span class="nc" id="L510">            throw new IllegalStateException(IonMessages.CANNOT_STEP_OUT);</span>
+<span class="pc bpc" id="L512" title="1 of 2 branches missed.">        if (_top &lt; 1) {</span>
+<span class="nc" id="L513">            throw new IllegalStateException(IonMessages.CANNOT_STEP_OUT);</span>
         }
-<span class="fc" id="L512">        _pending_separator = topPendingComma();</span>
-<span class="fc" id="L513">        int tid = pop();</span>
+<span class="fc" id="L515">        _pending_separator = topPendingComma();</span>
+<span class="fc" id="L516">        int tid = pop();</span>
 
         char closer;
-<span class="pc bpc" id="L516" title="1 of 4 branches missed.">        switch (tid)</span>
+<span class="pc bpc" id="L519" title="1 of 4 branches missed.">        switch (tid)</span>
         {
-<span class="fc" id="L518">            case tidList:   closer = ']'; break;</span>
-<span class="fc" id="L519">            case tidSexp:   closer = ')'; break;</span>
-<span class="fc" id="L520">            case tidStruct: closer = '}'; break;</span>
+<span class="fc" id="L521">            case tidList:   closer = ']'; break;</span>
+<span class="fc" id="L522">            case tidSexp:   closer = ')'; break;</span>
+<span class="fc" id="L523">            case tidStruct: closer = '}'; break;</span>
             default:
-<span class="nc" id="L522">                throw new IllegalStateException();</span>
+<span class="nc" id="L525">                throw new IllegalStateException();</span>
         }
-<span class="fc" id="L524">        closeCollection(closer);</span>
-<span class="fc" id="L525">        closeValue();</span>
-<span class="fc" id="L526">    }</span>
+<span class="fc" id="L527">        closeCollection(closer);</span>
+<span class="fc" id="L528">        closeValue();</span>
+<span class="fc" id="L529">    }</span>
 
 
     //========================================================================
@@ -533,218 +536,218 @@ import java.math.BigInteger;
     public void writeNull()
         throws IOException
     {
-<span class="nc" id="L536">        startValue();</span>
-<span class="nc" id="L537">        _output.appendAscii(&quot;null&quot;);</span>
-<span class="nc" id="L538">        closeValue();</span>
-<span class="nc" id="L539">    }</span>
+<span class="nc" id="L539">        startValue();</span>
+<span class="nc" id="L540">        _output.appendAscii(&quot;null&quot;);</span>
+<span class="nc" id="L541">        closeValue();</span>
+<span class="nc" id="L542">    }</span>
 
     public void writeNull(IonType type) throws IOException
     {
-<span class="fc" id="L543">        startValue();</span>
+<span class="fc" id="L546">        startValue();</span>
 
         String nullimage;
 
-<span class="pc bpc" id="L547" title="1 of 2 branches missed.">        if (_options._untyped_nulls)</span>
+<span class="pc bpc" id="L550" title="1 of 2 branches missed.">        if (_options._untyped_nulls)</span>
         {
-<span class="nc" id="L549">            nullimage = &quot;null&quot;;</span>
+<span class="nc" id="L552">            nullimage = &quot;null&quot;;</span>
         }
         else
         {
-<span class="pc bpc" id="L553" title="1 of 14 branches missed.">            switch (type) {</span>
-<span class="fc" id="L554">                case NULL:      nullimage = &quot;null&quot;;           break;</span>
-<span class="fc" id="L555">                case BOOL:      nullimage = &quot;null.bool&quot;;      break;</span>
-<span class="fc" id="L556">                case INT:       nullimage = &quot;null.int&quot;;       break;</span>
-<span class="fc" id="L557">                case FLOAT:     nullimage = &quot;null.float&quot;;     break;</span>
-<span class="fc" id="L558">                case DECIMAL:   nullimage = &quot;null.decimal&quot;;   break;</span>
-<span class="fc" id="L559">                case TIMESTAMP: nullimage = &quot;null.timestamp&quot;; break;</span>
-<span class="fc" id="L560">                case SYMBOL:    nullimage = &quot;null.symbol&quot;;    break;</span>
-<span class="fc" id="L561">                case STRING:    nullimage = &quot;null.string&quot;;    break;</span>
-<span class="fc" id="L562">                case BLOB:      nullimage = &quot;null.blob&quot;;      break;</span>
-<span class="fc" id="L563">                case CLOB:      nullimage = &quot;null.clob&quot;;      break;</span>
-<span class="fc" id="L564">                case SEXP:      nullimage = &quot;null.sexp&quot;;      break;</span>
-<span class="fc" id="L565">                case LIST:      nullimage = &quot;null.list&quot;;      break;</span>
-<span class="fc" id="L566">                case STRUCT:    nullimage = &quot;null.struct&quot;;    break;</span>
+<span class="pc bpc" id="L556" title="1 of 14 branches missed.">            switch (type) {</span>
+<span class="fc" id="L557">                case NULL:      nullimage = &quot;null&quot;;           break;</span>
+<span class="fc" id="L558">                case BOOL:      nullimage = &quot;null.bool&quot;;      break;</span>
+<span class="fc" id="L559">                case INT:       nullimage = &quot;null.int&quot;;       break;</span>
+<span class="fc" id="L560">                case FLOAT:     nullimage = &quot;null.float&quot;;     break;</span>
+<span class="fc" id="L561">                case DECIMAL:   nullimage = &quot;null.decimal&quot;;   break;</span>
+<span class="fc" id="L562">                case TIMESTAMP: nullimage = &quot;null.timestamp&quot;; break;</span>
+<span class="fc" id="L563">                case SYMBOL:    nullimage = &quot;null.symbol&quot;;    break;</span>
+<span class="fc" id="L564">                case STRING:    nullimage = &quot;null.string&quot;;    break;</span>
+<span class="fc" id="L565">                case BLOB:      nullimage = &quot;null.blob&quot;;      break;</span>
+<span class="fc" id="L566">                case CLOB:      nullimage = &quot;null.clob&quot;;      break;</span>
+<span class="fc" id="L567">                case SEXP:      nullimage = &quot;null.sexp&quot;;      break;</span>
+<span class="fc" id="L568">                case LIST:      nullimage = &quot;null.list&quot;;      break;</span>
+<span class="fc" id="L569">                case STRUCT:    nullimage = &quot;null.struct&quot;;    break;</span>
 
-<span class="nc" id="L568">                default: throw new IllegalStateException(&quot;unexpected type &quot; + type);</span>
+<span class="nc" id="L571">                default: throw new IllegalStateException(&quot;unexpected type &quot; + type);</span>
             }
         }
 
-<span class="fc" id="L572">        _output.appendAscii(nullimage);</span>
-<span class="fc" id="L573">        closeValue();</span>
-<span class="fc" id="L574">    }</span>
+<span class="fc" id="L575">        _output.appendAscii(nullimage);</span>
+<span class="fc" id="L576">        closeValue();</span>
+<span class="fc" id="L577">    }</span>
 
     public void writeBool(boolean value)
         throws IOException
     {
-<span class="fc" id="L579">        startValue();</span>
-<span class="fc bfc" id="L580" title="All 2 branches covered.">        _output.appendAscii(value ? &quot;true&quot; : &quot;false&quot;);</span>
-<span class="fc" id="L581">        closeValue();</span>
-<span class="fc" id="L582">    }</span>
+<span class="fc" id="L582">        startValue();</span>
+<span class="fc bfc" id="L583" title="All 2 branches covered.">        _output.appendAscii(value ? &quot;true&quot; : &quot;false&quot;);</span>
+<span class="fc" id="L584">        closeValue();</span>
+<span class="fc" id="L585">    }</span>
 
 
     public void writeInt(long value)
         throws IOException
     {
-<span class="fc" id="L588">        startValue();</span>
-<span class="fc" id="L589">        _output.printInt(value);</span>
-<span class="fc" id="L590">        closeValue();</span>
-<span class="fc" id="L591">    }</span>
+<span class="fc" id="L591">        startValue();</span>
+<span class="fc" id="L592">        _output.printInt(value);</span>
+<span class="fc" id="L593">        closeValue();</span>
+<span class="fc" id="L594">    }</span>
 
     public void writeInt(BigInteger value) throws IOException
     {
-<span class="fc bfc" id="L595" title="All 2 branches covered.">        if (value == null) {</span>
-<span class="fc" id="L596">            writeNull(IonType.INT);</span>
-<span class="fc" id="L597">            return;</span>
+<span class="fc bfc" id="L598" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L599">            writeNull(IonType.INT);</span>
+<span class="fc" id="L600">            return;</span>
         }
 
-<span class="fc" id="L600">        startValue();</span>
-<span class="fc" id="L601">        _output.printInt(value);</span>
-<span class="fc" id="L602">        closeValue();</span>
-<span class="fc" id="L603">    }</span>
+<span class="fc" id="L603">        startValue();</span>
+<span class="fc" id="L604">        _output.printInt(value);</span>
+<span class="fc" id="L605">        closeValue();</span>
+<span class="fc" id="L606">    }</span>
 
     public void writeFloat(double value)
         throws IOException
     {
-<span class="fc" id="L608">        startValue();</span>
-<span class="fc" id="L609">        _output.printFloat(value);</span>
-<span class="fc" id="L610">        closeValue();</span>
-<span class="fc" id="L611">    }</span>
+<span class="fc" id="L611">        startValue();</span>
+<span class="fc" id="L612">        _output.printFloat(value);</span>
+<span class="fc" id="L613">        closeValue();</span>
+<span class="fc" id="L614">    }</span>
 
 
     @Override
     public void writeDecimal(BigDecimal value)
         throws IOException
     {
-<span class="fc bfc" id="L618" title="All 2 branches covered.">        if (value == null) {</span>
-<span class="fc" id="L619">            writeNull(IonType.DECIMAL);</span>
-<span class="fc" id="L620">            return;</span>
+<span class="fc bfc" id="L621" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L622">            writeNull(IonType.DECIMAL);</span>
+<span class="fc" id="L623">            return;</span>
         }
 
-<span class="fc" id="L623">        startValue();</span>
-<span class="fc" id="L624">        _output.printDecimal(_options, value);</span>
-<span class="fc" id="L625">        closeValue();</span>
-<span class="fc" id="L626">    }</span>
+<span class="fc" id="L626">        startValue();</span>
+<span class="fc" id="L627">        _output.printDecimal(_options, value);</span>
+<span class="fc" id="L628">        closeValue();</span>
+<span class="fc" id="L629">    }</span>
 
     public void writeTimestamp(Timestamp value) throws IOException
     {
-<span class="fc bfc" id="L630" title="All 2 branches covered.">        if (value == null) {</span>
-<span class="fc" id="L631">            writeNull(IonType.TIMESTAMP);</span>
-<span class="fc" id="L632">            return;</span>
+<span class="fc bfc" id="L633" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L634">            writeNull(IonType.TIMESTAMP);</span>
+<span class="fc" id="L635">            return;</span>
         }
 
-<span class="fc" id="L635">        startValue();</span>
+<span class="fc" id="L638">        startValue();</span>
 
-<span class="pc bpc" id="L637" title="1 of 2 branches missed.">        if (_options._timestamp_as_millis)</span>
+<span class="pc bpc" id="L640" title="1 of 2 branches missed.">        if (_options._timestamp_as_millis)</span>
         {
-<span class="nc" id="L639">            long millis = value.getMillis();</span>
-<span class="nc" id="L640">            _output.appendAscii(Long.toString(millis));</span>
-<span class="nc" id="L641">        }</span>
-<span class="pc bpc" id="L642" title="1 of 2 branches missed.">        else if (_options._timestamp_as_string)</span>
+<span class="nc" id="L642">            long millis = value.getMillis();</span>
+<span class="nc" id="L643">            _output.appendAscii(Long.toString(millis));</span>
+<span class="nc" id="L644">        }</span>
+<span class="pc bpc" id="L645" title="1 of 2 branches missed.">        else if (_options._timestamp_as_string)</span>
         {
             // Timestamp is ASCII-safe so this is easy
-<span class="nc" id="L645">            _output.appendAscii('&quot;');</span>
-<span class="nc" id="L646">            _output.appendAscii(value.toString());</span>
-<span class="nc" id="L647">            _output.appendAscii('&quot;');</span>
+<span class="nc" id="L648">            _output.appendAscii('&quot;');</span>
+<span class="nc" id="L649">            _output.appendAscii(value.toString());</span>
+<span class="nc" id="L650">            _output.appendAscii('&quot;');</span>
         }
         else
         {
-<span class="fc" id="L651">            _output.appendAscii(value.toString());</span>
+<span class="fc" id="L654">            _output.appendAscii(value.toString());</span>
         }
 
-<span class="fc" id="L654">        closeValue();</span>
-<span class="fc" id="L655">    }</span>
+<span class="fc" id="L657">        closeValue();</span>
+<span class="fc" id="L658">    }</span>
 
     public void writeString(String value)
         throws IOException
     {
-<span class="fc" id="L660">        startValue();</span>
-<span class="fc bfc" id="L661" title="All 4 branches covered.">        if (value != null</span>
+<span class="fc" id="L663">        startValue();</span>
+<span class="fc bfc" id="L664" title="All 4 branches covered.">        if (value != null</span>
             &amp;&amp; ! _following_long_string
-<span class="fc bfc" id="L663" title="All 2 branches covered.">            &amp;&amp; _long_string_threshold &lt; value.length())</span>
+<span class="fc bfc" id="L666" title="All 2 branches covered.">            &amp;&amp; _long_string_threshold &lt; value.length())</span>
         {
             // TODO amzn/ion-java/issues/57 This can lead to mixed newlines in the output.
             // It assumes NL line separators, but _options could use CR+NL
-<span class="fc" id="L667">            _output.printLongString(value);</span>
+<span class="fc" id="L670">            _output.printLongString(value);</span>
 
             // This sets _following_long_string = false so we must overwrite
-<span class="fc" id="L670">            closeValue();</span>
-<span class="fc" id="L671">            _following_long_string = true;</span>
+<span class="fc" id="L673">            closeValue();</span>
+<span class="fc" id="L674">            _following_long_string = true;</span>
         }
         else
         {
-<span class="fc bfc" id="L675" title="All 2 branches covered.">            if (_options._string_as_json)</span>
+<span class="fc bfc" id="L678" title="All 2 branches covered.">            if (_options._string_as_json)</span>
             {
-<span class="fc" id="L677">                _output.printJsonString(value);</span>
+<span class="fc" id="L680">                _output.printJsonString(value);</span>
             }
             else
             {
-<span class="fc" id="L681">                _output.printString(value);</span>
+<span class="fc" id="L684">                _output.printString(value);</span>
             }
-<span class="fc" id="L683">            closeValue();</span>
+<span class="fc" id="L686">            closeValue();</span>
         }
-<span class="fc" id="L685">    }</span>
+<span class="fc" id="L688">    }</span>
 
 
     @Override
     void writeSymbolAsIs(int symbolId)
         throws IOException
     {
-<span class="fc" id="L692">        SymbolTable symtab = getSymbolTable();</span>
-<span class="fc" id="L693">        String text = symtab.findKnownSymbol(symbolId);</span>
-<span class="fc bfc" id="L694" title="All 2 branches covered.">        if (text != null)</span>
+<span class="fc" id="L695">        SymbolTable symtab = getSymbolTable();</span>
+<span class="fc" id="L696">        String text = symtab.findKnownSymbol(symbolId);</span>
+<span class="fc bfc" id="L697" title="All 2 branches covered.">        if (text != null)</span>
         {
-<span class="fc" id="L696">            writeSymbolAsIs(text);</span>
+<span class="fc" id="L699">            writeSymbolAsIs(text);</span>
         }
         else
         {
-<span class="fc" id="L700">            startValue();</span>
-<span class="fc" id="L701">            writeSidLiteral(symbolId);</span>
-<span class="fc" id="L702">            closeValue();</span>
+<span class="fc" id="L703">            startValue();</span>
+<span class="fc" id="L704">            writeSidLiteral(symbolId);</span>
+<span class="fc" id="L705">            closeValue();</span>
         }
-<span class="fc" id="L704">    }</span>
+<span class="fc" id="L707">    }</span>
 
     @Override
     public void writeSymbolAsIs(String value)
         throws IOException
     {
-<span class="fc bfc" id="L710" title="All 2 branches covered.">        if (value == null)</span>
+<span class="fc bfc" id="L713" title="All 2 branches covered.">        if (value == null)</span>
         {
-<span class="fc" id="L712">            writeNull(IonType.SYMBOL);</span>
-<span class="fc" id="L713">            return;</span>
+<span class="fc" id="L715">            writeNull(IonType.SYMBOL);</span>
+<span class="fc" id="L716">            return;</span>
         }
 
-<span class="fc" id="L716">        startValue();</span>
-<span class="fc" id="L717">        writeSymbolToken(value);</span>
-<span class="fc" id="L718">        closeValue();</span>
-<span class="fc" id="L719">    }</span>
+<span class="fc" id="L719">        startValue();</span>
+<span class="fc" id="L720">        writeSymbolToken(value);</span>
+<span class="fc" id="L721">        closeValue();</span>
+<span class="fc" id="L722">    }</span>
 
     public void writeBlob(byte[] value, int start, int len)
         throws IOException
     {
-<span class="fc bfc" id="L724" title="All 2 branches covered.">        if (value == null)</span>
+<span class="fc bfc" id="L727" title="All 2 branches covered.">        if (value == null)</span>
         {
-<span class="fc" id="L726">            writeNull(IonType.BLOB);</span>
-<span class="fc" id="L727">            return;</span>
+<span class="fc" id="L729">            writeNull(IonType.BLOB);</span>
+<span class="fc" id="L730">            return;</span>
         }
 
-<span class="fc" id="L730">        startValue();</span>
-<span class="fc" id="L731">        _output.printBlob(_options, value, start, len);</span>
-<span class="fc" id="L732">        closeValue();</span>
-<span class="fc" id="L733">    }</span>
+<span class="fc" id="L733">        startValue();</span>
+<span class="fc" id="L734">        _output.printBlob(_options, value, start, len);</span>
+<span class="fc" id="L735">        closeValue();</span>
+<span class="fc" id="L736">    }</span>
 
     public void writeClob(byte[] value, int start, int len)
         throws IOException
     {
-<span class="fc bfc" id="L738" title="All 2 branches covered.">        if (value == null)</span>
+<span class="fc bfc" id="L741" title="All 2 branches covered.">        if (value == null)</span>
         {
-<span class="fc" id="L740">            writeNull(IonType.CLOB);</span>
-<span class="fc" id="L741">            return;</span>
+<span class="fc" id="L743">            writeNull(IonType.CLOB);</span>
+<span class="fc" id="L744">            return;</span>
         }
 
-<span class="fc" id="L744">        startValue();</span>
-<span class="fc" id="L745">        _output.printClob(_options, value, start, len);</span>
-<span class="fc" id="L746">        closeValue();</span>
-<span class="fc" id="L747">    }</span>
+<span class="fc" id="L747">        startValue();</span>
+<span class="fc" id="L748">        _output.printClob(_options, value, start, len);</span>
+<span class="fc" id="L749">        closeValue();</span>
+<span class="fc" id="L750">    }</span>
 
 
     /**
@@ -755,29 +758,29 @@ import java.math.BigInteger;
      */
     public void flush() throws IOException
     {
-<span class="fc bfc" id="L758" title="All 2 branches covered.">        if (! _closed) {</span>
-<span class="fc" id="L759">            _output.flush();</span>
+<span class="fc bfc" id="L761" title="All 2 branches covered.">        if (! _closed) {</span>
+<span class="fc" id="L762">            _output.flush();</span>
         }
-<span class="fc" id="L761">    }</span>
+<span class="fc" id="L764">    }</span>
 
     public void close() throws IOException
     {
-<span class="fc bfc" id="L765" title="All 2 branches covered.">        if (! _closed) {</span>
+<span class="fc bfc" id="L768" title="All 2 branches covered.">        if (! _closed) {</span>
             try
             {
-<span class="fc bfc" id="L768" title="All 2 branches covered.">                if (getDepth() == 0) {</span>
-<span class="fc" id="L769">                    finish();</span>
+<span class="fc bfc" id="L771" title="All 2 branches covered.">                if (getDepth() == 0) {</span>
+<span class="fc" id="L772">                    finish();</span>
                 }
             }
             finally
             {
                 // Do this first so we are closed even if the call below throws.
-<span class="fc" id="L775">                _closed = true;</span>
+<span class="fc" id="L778">                _closed = true;</span>
 
-<span class="fc" id="L777">                _output.close();</span>
+<span class="fc" id="L780">                _output.close();</span>
             }
         }
-<span class="fc" id="L780">    }</span>
+<span class="fc" id="L783">    }</span>
 }
 
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

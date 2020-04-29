@@ -864,48 +864,10 @@ import java.util.List;
 
     public int writeVarUInt(final long value)
     {
-        if (value < VAR_UINT_2_OCTET_MIN_VALUE)
-        {
-            writeUInt8((value & 0x7F) | 0x80);
-            return 1;
-        }
-        if (value < VAR_UINT_3_OCTET_MIN_VALUE)
-        {
-            if (remaining() < 2)
-            {
-                return writeVarUIntSlow(value);
-            }
-            return writeVarUIntDirect2(value);
-        }
-        if (value < VAR_UINT_4_OCTET_MIN_VALUE)
-        {
-            if (remaining() < 3)
-            {
-                return writeVarUIntSlow(value);
-            }
-            return writeVarUIntDirect3(value);
-        }
-        if (value < VAR_UINT_5_OCTET_MIN_VALUE)
-        {
-            if (remaining() < 4)
-            {
-                return writeVarUIntSlow(value);
-            }
-            return writeVarUIntDirect4(value);
-        }
-        if (value < VAR_UINT_6_OCTET_MIN_VALUE)
-        {
-            if (remaining() < 5)
-            {
-                return writeVarUIntSlow(value);
-            }
-            return writeVarUIntDirect5(value);
-
-        }
-        // TODO determine if it is worth doing the fast path beyond 2**35 - 1
-
-        // we give up--go to the 'slow' path
-        return writeVarUIntSlow(value);
+        byte[] encoded = new byte[IonRawBinaryWriter.PatchPointEncoder.MAX_SUPPORTED_BYTES];
+        int encodedLengthInBytes = IonRawBinaryWriter.PatchPointEncoder.writeVarUInt(value, encoded);
+        writeBytes(encoded, encoded.length - encodedLengthInBytes, encodedLengthInBytes);
+        return encodedLengthInBytes;
     }
 
     private static final long VAR_INT_SIGNED_OCTET_MASK = 0x3F;
@@ -1092,6 +1054,75 @@ import java.util.List;
 
             position += amount;
             length -= amount;
+        }
+    }
+
+    public WriteBufferCursor getCursor() {
+        return new WriteBufferCursor();
+    }
+
+    class WriteBufferCursor {
+        int offsetWithinBlock;
+
+        Block cursorBlock;
+        int blockIndex;
+
+        // This constructor is invoked once per call to IonRawBinaryWriter#finish(), so it needs to be
+        // dead simple.
+        private WriteBufferCursor() {
+            this.blockIndex = 0;
+            this.cursorBlock = blocks.get(0);
+            this.offsetWithinBlock = 0;
+        }
+
+        // Slower than 'skip'
+        public void setPosition(long position) {
+            this.blockIndex = index(position);
+            this.cursorBlock = blocks.get(index);
+            this.offsetWithinBlock = offset(position);
+        }
+
+        public long getPosition() {
+            return (blockIndex * allocator.getBlockSize()) + offsetWithinBlock;
+        }
+
+        public void skip(int numberOfBytes) {
+            // This skip is local to the current Block. We can just bump the offset.
+            int bytesRemainingInBlock = cursorBlock.data.length - offsetWithinBlock;
+            if (numberOfBytes < bytesRemainingInBlock) {
+                this.offsetWithinBlock += numberOfBytes;
+                return;
+            }
+
+            // This skip goes beyond the current block.
+            setPosition((blockIndex * allocator.getBlockSize()) + offsetWithinBlock);
+        }
+
+        private void stepToNextBlock() {
+            blockIndex++;
+            cursorBlock = blocks.get(blockIndex);
+            offsetWithinBlock = 0;
+        }
+
+        public void writeTo(final OutputStream out, long length) throws IOException {
+            int bytesRemaining = (int) length; // OutputStream#write requires an int.
+
+            while (bytesRemaining > 0)
+            {
+                int bytesRemainingInBlock = cursorBlock.data.length - offsetWithinBlock;
+
+                // If all of the data we need is in the current Block, we can perform a single write() using a subset
+                // of the Block's backing array.
+                if (bytesRemainingInBlock >= bytesRemaining) {
+                    out.write(cursorBlock.data, offsetWithinBlock, bytesRemaining);
+                    this.offsetWithinBlock += bytesRemaining;
+                    return;
+                }
+
+                out.write(cursorBlock.data, offsetWithinBlock, bytesRemainingInBlock);
+                bytesRemaining -= bytesRemainingInBlock;
+                stepToNextBlock();
+            }
         }
     }
 }

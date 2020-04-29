@@ -46,6 +46,8 @@ import com.amazon.ion.IonWriter;
 import com.amazon.ion.SymbolTable;
 import com.amazon.ion.SymbolToken;
 import com.amazon.ion.Timestamp;
+
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.math.BigDecimal;
@@ -245,6 +247,60 @@ import java.util.NoSuchElementException;
         }
     }
 
+    public static class PatchPointEncoder {
+        final static int MAX_SUPPORTED_BYTES = 16;
+        final static long LOWER_SEVEN_BITMASK = 0x7F;
+        final static int VAR_UINT_BITS_PER_OCTET = 7;
+        final static long[] MAX_VALUES = new long[MAX_SUPPORTED_BYTES];
+
+        static {
+            for (int m = 0; m < MAX_VALUES.length; m++) {
+                MAX_VALUES[m] = (long) Math.pow(2, (m+1) * VAR_UINT_BITS_PER_OCTET);
+            }
+        }
+
+        public static int encodedSizeInBytes(long value) {
+            for (int m = 0; m < MAX_VALUES.length; m++) {
+                if (value < MAX_VALUES[m]) {
+                    return m + 1;
+                }
+            }
+            throw new IllegalArgumentException(
+                    value + " cannot be encoded as a VarUInt in " + MAX_SUPPORTED_BYTES + " bytes."
+            );
+        }
+
+        public static int writeVarUInt(long value, OutputStream outputStream) throws IOException {
+            // Escape analysis will prevent this from requiring a heap allocation
+            byte[] encoded = new byte[MAX_SUPPORTED_BYTES];
+            int encodedLengthInBytes = writeVarUInt(value, encoded);
+            outputStream.write(encoded, encoded.length - encodedLengthInBytes, encodedLengthInBytes);
+            return encodedLengthInBytes;
+        }
+
+        public static int writeVarUInt(long value, byte[] encoded) {
+            if (value == 0) {
+                encoded[MAX_SUPPORTED_BYTES - 1] = (byte) 0x80;
+                return 1;
+            }
+
+            int lastIndexUsed;
+            for (lastIndexUsed = MAX_SUPPORTED_BYTES - 1; lastIndexUsed >= 0; lastIndexUsed--) {
+                encoded[lastIndexUsed] = (byte) (LOWER_SEVEN_BITMASK & value);
+                value >>= VAR_UINT_BITS_PER_OCTET;
+                if (value == 0) {
+                    break;
+                }
+            }
+
+            // Set the terminal bit
+            encoded[MAX_SUPPORTED_BYTES - 1] |= (byte) 0x80;
+
+            int encodedLengthInBytes = encoded.length - lastIndexUsed;
+            return encodedLengthInBytes;
+        }
+    }
+
     private static class ContainerInfo
     {
         /** Whether or not the container is a struct */
@@ -306,22 +362,33 @@ import java.util.NoSuchElementException;
         /** length of the data being patched out.*/
         public final int oldLength;
         /** position of the patch buffer where the length data is stored. */
-        public final long patchPosition;
+//        public final long patchPosition;
         /** length of the data to be patched in.*/
         public final int patchLength;
 
-        public PatchPoint(final long oldPosition, final int oldLength, final long patchPosition, final int patchLength)
+        public final long value; // TODO: Docs
+
+        public PatchPoint(final long oldPosition, final int oldLength, /*final long patchPosition,*/ final int patchLength, final long value)
         {
             this.oldPosition = oldPosition;
             this.oldLength = oldLength;
-            this.patchPosition = patchPosition;
+//            this.patchPosition = patchPosition;
             this.patchLength = patchLength;
+            this.value = value;
         }
 
         @Override
         public String toString()
         {
-            return "(PP old::(" + oldPosition + " " + oldLength + ") patch::(" + patchPosition + " " + patchLength + ")";
+            return "(PP old::(" + oldPosition + " " + oldLength + ") patch::(value=" + value + ", encodedLength=" + patchLength + ")";
+        }
+
+//        public static List<PatchPoint> newList(int capacity) {
+//            return new LinkedList<PatchPoint>(capacity);
+//        }
+
+        public static List<PatchPoint> newList() {
+            return new ArrayList<PatchPoint>(4);
         }
     }
 
@@ -571,8 +638,8 @@ import java.util.NoSuchElementException;
     private final PreallocationMode             preallocationMode;
     private final boolean                       isFloatBinary32Enabled;
     private final WriteBuffer                   buffer;
-    private final WriteBuffer                   patchBuffer;
-    private final PatchList                     patchPoints;
+//    private final WriteBuffer                   patchBuffer;
+    private PatchList                    patchPoints;
     private final RecyclingStack<ContainerInfo> containers;
     private int                                 depth;
     private boolean                             hasWrittenValuesSinceFinished;
@@ -606,7 +673,7 @@ import java.util.NoSuchElementException;
         this.preallocationMode = preallocationMode;
         this.isFloatBinary32Enabled = isFloatBinary32Enabled;
         this.buffer            = new WriteBuffer(allocator);
-        this.patchBuffer       = new WriteBuffer(allocator);
+//        this.patchBuffer       = new WriteBuffer(allocator);
         this.patchPoints       = new PatchList();
         this.containers        = new RecyclingStack<ContainerInfo>(
             10,
@@ -781,9 +848,10 @@ import java.util.NoSuchElementException;
     private void addPatchPoint(final long position, final int oldLength, final long value)
     {
         // record the size in a patch buffer
-        final long patchPosition = patchBuffer.position();
-        final int patchLength = patchBuffer.writeVarUInt(value);
-        final PatchPoint patch = new PatchPoint(position, oldLength, patchPosition, patchLength);
+//        final long patchPosition = patchBuffer.position();
+//        final int patchLength = patchBuffer.writeVarUInt(value);
+        final int patchLength = PatchPointEncoder.encodedSizeInBytes(value);
+        final PatchPoint patch = new PatchPoint(position, oldLength, /*patchPosition,*/ patchLength, value);
         if (containers.isEmpty())
         {
             // not nested, just append to the root list
@@ -1611,10 +1679,6 @@ import java.util.NoSuchElementException;
         buffer.truncate(position);
         // TODO decide if it is worth making this faster than O(N)
         final PatchPoint patch = patchPoints.truncate(position);
-        if (patch != null)
-        {
-            patchBuffer.truncate(patch.patchPosition);
-        }
     }
 
     public void flush() throws IOException {}
@@ -1637,24 +1701,29 @@ import java.util.NoSuchElementException;
         }
         else
         {
+            WriteBuffer.WriteBufferCursor writeBufferCursor = buffer.getCursor();
             long bufferPosition = 0;
             for (final PatchPoint patch : patchPoints)
             {
                 // write up to the thing to be patched
                 final long bufferLength = patch.oldPosition - bufferPosition;
-                buffer.writeTo(out, bufferPosition, bufferLength);
+                // ORIG: buffer.writeTo(out, bufferPosition, bufferLength);
+                writeBufferCursor.writeTo(out, bufferLength);
 
                 // write out the patch
-                patchBuffer.writeTo(out, patch.patchPosition, patch.patchLength);
+                // ORIG: patchBuffer.writeTo(out, patch.patchPosition, patch.patchLength);
+                PatchPointEncoder.writeVarUInt(patch.value, out);
+
 
                 // skip over the preallocated varuint field
-                bufferPosition = patch.oldPosition;
-                bufferPosition += patch.oldLength;
+//                ORIG: bufferPosition = patch.oldPosition + patch.oldLength;
+
+                bufferPosition += bufferLength;
             }
-            buffer.writeTo(out, bufferPosition, buffer.position() - bufferPosition);
+//            ORIG: buffer.writeTo(out, bufferPosition, buffer.position() - bufferPosition);
+            writeBufferCursor.writeTo(out, buffer.position() - bufferPosition);
         }
         patchPoints.clear();
-        patchBuffer.reset();
         buffer.reset();
 
         if (streamFlushMode == StreamFlushMode.FLUSH)
@@ -1684,7 +1753,6 @@ import java.util.NoSuchElementException;
 
             // release all of our blocks -- these should never throw
             buffer.close();
-            patchBuffer.close();
             allocator.close();
         }
         finally

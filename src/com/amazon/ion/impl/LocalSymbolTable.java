@@ -103,7 +103,7 @@ class LocalSymbolTable
      * Map of symbol names to symbol ids of local symbols that are not in
      * imports.
      */
-    private final Map<String, Integer> mySymbolsMap;
+    private final Map<String, SymbolToken> mySymbolsMap;
 
     /**
      * Whether this symbol table is read only, and thus, immutable.
@@ -135,17 +135,37 @@ class LocalSymbolTable
 
     private void buildSymbolsMap()
     {
-        int sid = myFirstLocalSid;
-        for (int i = 0; i < mySymbolNames.length; i++, sid++)
-        {
+        // Add all of the symbols from each import to `mySymbolsMap`
+        SymbolTable[] imports = myImportsList.getImportedTablesNoCopy();
+        int sidOffset = 0;
+        for (int m = 0; m < imports.length; m++) {
+            sidOffset += addImportedSymbolsToMap(sidOffset, imports[m]);
+        }
+        // Add all of the symbols in the local symbol table to `mySymbolsMap`
+        for (int i = 0; i < mySymbolNames.length; i++) {
             String symbolText = mySymbolNames[i];
             if (symbolText != null)
             {
+                int sid = myFirstLocalSid + i;
                 putToMapIfNotThere(mySymbolsMap, symbolText, sid);
             }
         }
     }
 
+    private int addImportedSymbolsToMap(int sidOffset, SymbolTable symbolTable) {
+        int numberOfSymbols = 0;
+        Iterator<String> symbolNames = symbolTable.iterateDeclaredSymbolNames();
+        while (symbolNames.hasNext()) {
+            String symbolName = symbolNames.next();
+            numberOfSymbols++;
+            if (symbolName == null) {
+                continue;
+            }
+            int sid = symbolTable.findSymbol(symbolName);
+            putToMapIfNotThere(mySymbolsMap, symbolName, sidOffset + sid);
+        }
+        return numberOfSymbols;
+    }
 
     /**
      * @param imports           never null
@@ -168,7 +188,8 @@ class LocalSymbolTable
         myFirstLocalSid = myImportsList.getMaxId() + 1;
 
         // Copy locally declared symbols to mySymbolsMap
-        mySymbolsMap = new HashMap<String, Integer>();
+
+        mySymbolsMap = new HashMap<String, SymbolToken>(mySymbolsCount);
         buildSymbolsMap();
     }
 
@@ -189,11 +210,11 @@ class LocalSymbolTable
         if (maxId == other.getMaxId())
         {
             // Shallow copy
-            mySymbolsMap = new HashMap<String, Integer>(other.mySymbolsMap);
+            mySymbolsMap = new HashMap<String, SymbolToken>(other.mySymbolsMap);
         }
         else
         {
-            mySymbolsMap = new HashMap<String, Integer>(mySymbolsCount);
+            mySymbolsMap = new HashMap<String, SymbolToken>(mySymbolsCount);
             buildSymbolsMap();
         }
     }
@@ -422,34 +443,9 @@ class LocalSymbolTable
 
     public int findSymbol(String name)
     {
-        // Look in system then imports
-        int sid = myImportsList.findSymbol(name);
-
-        // Look in local symbols
-        if (sid == UNKNOWN_SYMBOL_ID)
-        {
-            sid = findLocalSymbol(name);
-        }
-
-        return sid;
+        SymbolToken symbolToken = find(name);
+        return symbolToken == null ? UNKNOWN_SYMBOL_ID : symbolToken.getSid();
     }
-
-    private int findLocalSymbol(String name)
-    {
-        Integer isid;
-        synchronized (this)
-        {
-            isid = mySymbolsMap.get(name);
-        }
-
-        if (isid != null)
-        {
-            assert isid != UNKNOWN_SYMBOL_ID;
-            return isid;
-        }
-        return UNKNOWN_SYMBOL_ID;
-    }
-
 
     public synchronized SymbolToken intern(String text)
     {
@@ -465,32 +461,12 @@ class LocalSymbolTable
 
     public SymbolToken find(String text)
     {
-        text.getClass(); // fast null check
-
-        // Look in system then imports
-        SymbolToken symTok = myImportsList.find(text);
-
-        // Look in local symbols
-        if (symTok == null)
-        {
-            Integer  sid;
-            String[] names;
-            synchronized (this)
-            {
-                sid = mySymbolsMap.get(text);
-                names = mySymbolNames;
-            }
-
-            if (sid != null)
-            {
-                int offset = sid - myFirstLocalSid;
-                String internedText = names[offset];
-                assert internedText != null;
-                symTok = new SymbolTokenImpl(internedText, sid);
-            }
+        if (text == null) {
+            throw new NullPointerException("LocalSymbolTable#find(String) cannot accept null as a parameter.");
         }
-
-        return symTok;
+        synchronized (this) {
+            return mySymbolsMap.get(text); // Can be `null`
+        }
     }
 
     private static final void validateSymbol(String name)
@@ -565,19 +541,28 @@ class LocalSymbolTable
         return sid;
     }
 
-    private static void putToMapIfNotThere(Map<String, Integer> symbolsMap,
+    // This method emulates HashMap#putIfAbsent, which was not introduced until Java 8.
+    // This library targets Java 5.
+    private static void putToMapIfNotThere(Map<String, SymbolToken> symbolsMap,
                                            String text,
                                            int sid)
     {
+        if (text == null) {
+            return;
+        }
+
         // When there's a duplicate name, don't replace the lower sid.
         // This pattern avoids double-lookup in the normal happy case
         // and only requires a second lookup when there's a duplicate.
-        Integer extantSid = symbolsMap.put(text, sid);
-        if (extantSid != null)
+        SymbolToken extantToken = symbolsMap.put(text, new SymbolTokenImpl(text, sid));
+        if (extantToken != null)
         {
             // We always insert symbols with increasing sids
-            assert extantSid < sid;
-            symbolsMap.put(text, extantSid);
+            if (extantToken.getSid() >= sid) {
+                throw new IllegalStateException("LOL");
+            }
+            assert extantToken.getSid() < sid;
+            symbolsMap.put(text, extantToken);
         }
     }
 

@@ -52,7 +52,7 @@ com.amazon.ion:ion-java,com.amazon.ion.impl,_Private_IonWriterFactory,3,52,0,0,1
 com.amazon.ion:ion-java,com.amazon.ion.impl,SimpleByteBuffer.UserByteWriter,238,0,8,0,63,0,25,0,21,0
 com.amazon.ion:ion-java,com.amazon.ion.impl,SubstituteSymbolTable,24,161,6,26,6,49,10,28,4,18
 com.amazon.ion:ion-java,com.amazon.ion.impl,UnifiedDataPageX.Bytes,48,25,4,0,10,8,6,2,4,2
-com.amazon.ion:ion-java,com.amazon.ion.impl,BlockedBuffer,752,1644,157,233,104,342,150,80,7,28
+com.amazon.ion:ion-java,com.amazon.ion.impl,BlockedBuffer,757,1639,161,229,105,341,153,77,7,28
 com.amazon.ion:ion-java,com.amazon.ion.impl,_Private_SymtabExtendsCache,7,58,5,11,0,12,5,6,0,3
 com.amazon.ion:ion-java,com.amazon.ion.impl,LocalSymbolTable.Factory,0,30,0,0,0,6,0,2,0,2
 com.amazon.ion:ion-java,com.amazon.ion.impl,_Private_FastAppendableTrampoline,13,0,0,0,3,0,3,0,3,0
@@ -179,7 +179,7 @@ com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonClobLite,0,67,0,4,0,20,0,13,
 com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonDatagramLite.SystemIteratorPosition,244,354,66,52,54,87,50,24,5,10
 com.amazon.ion:ion-java,com.amazon.ion.impl.lite,ContainerlessContext,0,29,0,0,0,9,0,6,0,6
 com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonStringLite,0,54,1,1,0,17,1,9,0,9
-com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonSequenceLite,122,491,34,70,24,124,25,52,3,22
+com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonSequenceLite,122,490,34,70,24,124,25,52,3,22
 com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonSymbolLite,51,359,21,61,7,97,21,43,2,21
 com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonContainerLite.SequenceContentIterator,79,235,21,35,15,61,20,21,2,11
 com.amazon.ion:ion-java,com.amazon.ion.impl.lite,ReverseBinaryEncoder,290,2425,61,219,57,491,60,132,1,41
@@ -187,7 +187,7 @@ com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonListLite,5,38,0,0,2,12,1,8,1
 com.amazon.ion:ion-java,com.amazon.ion.impl.lite,ValueFactoryLite,68,609,9,59,15,153,10,81,4,47
 com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonSequenceLite.new _Private_CurriedValueFactory() {...},24,0,0,0,4,0,2,0,2,0
 com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonSequenceLite.new _Private_CurriedValueFactory() {...},0,13,0,0,0,3,0,2,0,2
-com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonSequenceLite.SubListView,15,472,7,45,4,115,7,48,0,29
+com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonSequenceLite.SubListView,15,461,7,43,4,112,7,46,0,28
 com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonBlobLite,0,54,0,0,0,19,0,10,0,10
 com.amazon.ion:ion-java,com.amazon.ion.impl.lite,IonBoolLite,0,109,1,7,0,34,1,15,0,12
 com.amazon.ion:ion-java,com.amazon.ion.facet,UnsupportedFacetException,22,9,0,0,3,4,3,1,3,1

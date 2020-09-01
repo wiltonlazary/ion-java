@@ -62,21 +62,26 @@ class LocalSymbolTableAsStruct
                                           boolean alreadyInStruct)
         {
 <span class="fc" id="L64">            List&lt;String&gt; symbolsList = new ArrayList&lt;String&gt;();</span>
-<span class="fc" id="L65">            LocalSymbolTableImports imports = readLocalSymbolTable(reader,</span>
+<span class="fc" id="L65">            SymbolTable currentSymbolTable = reader.getSymbolTable();</span>
+<span class="fc" id="L66">            LocalSymbolTableImports imports = readLocalSymbolTable(reader,</span>
                                                                    catalog,
                                                                    alreadyInStruct,
                                                                    symbolsList,
-<span class="fc" id="L69">                                                                   reader.getSymbolTable());</span>
-<span class="fc" id="L70">            return new LocalSymbolTableAsStruct(imageFactory, imports, symbolsList);</span>
+                                                                   currentSymbolTable);
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            if (imports == null) {</span>
+                // This was an LST append, so the existing symbol table was updated.
+<span class="fc" id="L73">                return currentSymbolTable;</span>
+            }
+<span class="fc" id="L75">            return new LocalSymbolTableAsStruct(imageFactory, imports, symbolsList);</span>
         }
 
         public SymbolTable newLocalSymtab(SymbolTable defaultSystemSymtab,
                                           SymbolTable... imports)
         {
-<span class="fc" id="L76">            LocalSymbolTableImports unifiedSymtabImports =</span>
+<span class="fc" id="L81">            LocalSymbolTableImports unifiedSymtabImports =</span>
                 new LocalSymbolTableImports(defaultSystemSymtab, imports);
 
-<span class="fc" id="L79">            return new LocalSymbolTableAsStruct(imageFactory,</span>
+<span class="fc" id="L84">            return new LocalSymbolTableAsStruct(imageFactory,</span>
                                                 unifiedSymtabImports,
                                                 null /* local symbols */);
         }
@@ -94,22 +99,22 @@ class LocalSymbolTableAsStruct
         public SymbolTable newLocalSymtab(IonCatalog catalog,
                                           IonStruct ionRep)
         {
-<span class="pc bpc" id="L97" title="2 of 4 branches missed.">            assert imageFactory == ionRep.getSystem();</span>
-<span class="fc" id="L98">            IonReader reader = new IonReaderTreeSystem(ionRep);</span>
+<span class="pc bpc" id="L102" title="2 of 4 branches missed.">            assert imageFactory == ionRep.getSystem();</span>
+<span class="fc" id="L103">            IonReader reader = new IonReaderTreeSystem(ionRep);</span>
 
-<span class="fc" id="L100">            List&lt;String&gt; symbolsList = new ArrayList&lt;String&gt;();</span>
-<span class="fc" id="L101">            LocalSymbolTableImports imports = readLocalSymbolTable(reader,</span>
+<span class="fc" id="L105">            List&lt;String&gt; symbolsList = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L106">            LocalSymbolTableImports imports = readLocalSymbolTable(reader,</span>
                                                                    catalog,
                                                                    false,
                                                                    symbolsList,
-<span class="fc" id="L105">                                                                   ionRep.getSymbolTable());</span>
+<span class="fc" id="L110">                                                                   ionRep.getSymbolTable());</span>
 
-<span class="fc" id="L107">            LocalSymbolTableAsStruct table = new LocalSymbolTableAsStruct(imageFactory,</span>
+<span class="fc" id="L112">            LocalSymbolTableAsStruct table = new LocalSymbolTableAsStruct(imageFactory,</span>
                                                                           imports,
                                                                           symbolsList);
-<span class="fc" id="L110">            table.myImage = ionRep;</span>
+<span class="fc" id="L115">            table.myImage = ionRep;</span>
 
-<span class="fc" id="L112">            return table;</span>
+<span class="fc" id="L117">            return table;</span>
         }
 
     }
@@ -136,19 +141,19 @@ class LocalSymbolTableAsStruct
                                      LocalSymbolTableImports imports,
                                      List&lt;String&gt; symbolsList)
     {
-<span class="fc" id="L139">        super(imports, symbolsList);</span>
-<span class="fc" id="L140">        myImageFactory = imageFactory;</span>
-<span class="fc" id="L141">    }</span>
+<span class="fc" id="L144">        super(imports, symbolsList);</span>
+<span class="fc" id="L145">        myImageFactory = imageFactory;</span>
+<span class="fc" id="L146">    }</span>
 
     @Override
     int putSymbol(String symbolName)
     {
-<span class="fc" id="L146">        int sid = super.putSymbol(symbolName);</span>
-<span class="fc bfc" id="L147" title="All 2 branches covered.">        if (myImage != null)</span>
+<span class="fc" id="L151">        int sid = super.putSymbol(symbolName);</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (myImage != null)</span>
         {
-<span class="fc" id="L149">            recordLocalSymbolInIonRep(myImage, symbolName, sid);</span>
+<span class="fc" id="L154">            recordLocalSymbolInIonRep(myImage, symbolName, sid);</span>
         }
-<span class="fc" id="L151">        return sid;</span>
+<span class="fc" id="L156">        return sid;</span>
     }
 
     //
@@ -172,17 +177,17 @@ class LocalSymbolTableAsStruct
      */
     IonStruct getIonRepresentation()
     {
-<span class="fc" id="L175">        synchronized (this)</span>
+<span class="fc" id="L180">        synchronized (this)</span>
         {
-<span class="fc" id="L177">            IonStruct image = myImage;</span>
+<span class="fc" id="L182">            IonStruct image = myImage;</span>
 
-<span class="fc bfc" id="L179" title="All 2 branches covered.">            if (image == null)</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">            if (image == null)</span>
             {
                 // Start a new image from scratch
-<span class="fc" id="L182">                myImage = image = makeIonRepresentation(myImageFactory);</span>
+<span class="fc" id="L187">                myImage = image = makeIonRepresentation(myImageFactory);</span>
             }
 
-<span class="fc" id="L185">            return image;</span>
+<span class="fc" id="L190">            return image;</span>
         }
     }
 
@@ -193,43 +198,43 @@ class LocalSymbolTableAsStruct
      */
     private IonStruct makeIonRepresentation(ValueFactory factory)
     {
-<span class="fc" id="L196">        IonStruct ionRep = factory.newEmptyStruct();</span>
+<span class="fc" id="L201">        IonStruct ionRep = factory.newEmptyStruct();</span>
 
-<span class="fc" id="L198">        ionRep.addTypeAnnotation(ION_SYMBOL_TABLE);</span>
+<span class="fc" id="L203">        ionRep.addTypeAnnotation(ION_SYMBOL_TABLE);</span>
 
-<span class="fc" id="L200">        SymbolTable[] importedTables = getImportedTablesNoCopy();</span>
+<span class="fc" id="L205">        SymbolTable[] importedTables = getImportedTablesNoCopy();</span>
 
-<span class="fc bfc" id="L202" title="All 2 branches covered.">        if (importedTables.length &gt; 1)</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        if (importedTables.length &gt; 1)</span>
         {
-<span class="fc" id="L204">            IonList importsList = factory.newEmptyList();</span>
-<span class="fc bfc" id="L205" title="All 2 branches covered.">            for (int i = 1; i &lt; importedTables.length; i++)</span>
+<span class="fc" id="L209">            IonList importsList = factory.newEmptyList();</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">            for (int i = 1; i &lt; importedTables.length; i++)</span>
             {
-<span class="fc" id="L207">                SymbolTable importedTable = importedTables[i];</span>
-<span class="fc" id="L208">                IonStruct importStruct = factory.newEmptyStruct();</span>
+<span class="fc" id="L212">                SymbolTable importedTable = importedTables[i];</span>
+<span class="fc" id="L213">                IonStruct importStruct = factory.newEmptyStruct();</span>
 
-<span class="fc" id="L210">                importStruct.add(NAME,</span>
-<span class="fc" id="L211">                                 factory.newString(importedTable.getName()));</span>
-<span class="fc" id="L212">                importStruct.add(VERSION,</span>
-<span class="fc" id="L213">                                 factory.newInt(importedTable.getVersion()));</span>
-<span class="fc" id="L214">                importStruct.add(MAX_ID,</span>
-<span class="fc" id="L215">                                 factory.newInt(importedTable.getMaxId()));</span>
+<span class="fc" id="L215">                importStruct.add(NAME,</span>
+<span class="fc" id="L216">                                 factory.newString(importedTable.getName()));</span>
+<span class="fc" id="L217">                importStruct.add(VERSION,</span>
+<span class="fc" id="L218">                                 factory.newInt(importedTable.getVersion()));</span>
+<span class="fc" id="L219">                importStruct.add(MAX_ID,</span>
+<span class="fc" id="L220">                                 factory.newInt(importedTable.getMaxId()));</span>
 
-<span class="fc" id="L217">                importsList.add(importStruct);</span>
+<span class="fc" id="L222">                importsList.add(importStruct);</span>
             }
-<span class="fc" id="L219">            ionRep.add(IMPORTS, importsList);</span>
+<span class="fc" id="L224">            ionRep.add(IMPORTS, importsList);</span>
         }
 
-<span class="fc bfc" id="L222" title="All 2 branches covered.">        if (mySymbolsCount &gt; 0)</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        if (mySymbolsCount &gt; 0)</span>
         {
-<span class="fc" id="L224">            int sid = myFirstLocalSid;</span>
-<span class="fc bfc" id="L225" title="All 2 branches covered.">            for (int offset = 0; offset &lt; mySymbolsCount; offset++, sid++)</span>
+<span class="fc" id="L229">            int sid = myFirstLocalSid;</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">            for (int offset = 0; offset &lt; mySymbolsCount; offset++, sid++)</span>
             {
-<span class="fc" id="L227">                String symbolName = mySymbolNames[offset];</span>
-<span class="fc" id="L228">                recordLocalSymbolInIonRep(ionRep, symbolName, sid);</span>
+<span class="fc" id="L232">                String symbolName = mySymbolNames[offset];</span>
+<span class="fc" id="L233">                recordLocalSymbolInIonRep(ionRep, symbolName, sid);</span>
             }
         }
 
-<span class="fc" id="L232">        return ionRep;</span>
+<span class="fc" id="L237">        return ionRep;</span>
     }
 
     /**
@@ -240,28 +245,28 @@ class LocalSymbolTableAsStruct
                                            String symbolName,
                                            int sid)
     {
-<span class="pc bpc" id="L243" title="2 of 4 branches missed.">        assert sid &gt;= myFirstLocalSid;</span>
+<span class="pc bpc" id="L248" title="2 of 4 branches missed.">        assert sid &gt;= myFirstLocalSid;</span>
 
-<span class="fc" id="L245">        ValueFactory sys = ionRep.getSystem();</span>
+<span class="fc" id="L250">        ValueFactory sys = ionRep.getSystem();</span>
 
         // TODO this is crazy inefficient and not as reliable as it looks
         // since it doesn't handle the case where's theres more than one list
-<span class="fc" id="L249">        IonValue syms = ionRep.get(SYMBOLS);</span>
-<span class="pc bpc" id="L250" title="1 of 4 branches missed.">        while (syms != null &amp;&amp; syms.getType() != IonType.LIST)</span>
+<span class="fc" id="L254">        IonValue syms = ionRep.get(SYMBOLS);</span>
+<span class="pc bpc" id="L255" title="1 of 4 branches missed.">        while (syms != null &amp;&amp; syms.getType() != IonType.LIST)</span>
         {
-<span class="nc" id="L252">            ionRep.remove(syms);</span>
-<span class="nc" id="L253">            syms = ionRep.get(SYMBOLS);</span>
+<span class="nc" id="L257">            ionRep.remove(syms);</span>
+<span class="nc" id="L258">            syms = ionRep.get(SYMBOLS);</span>
         }
-<span class="fc bfc" id="L255" title="All 2 branches covered.">        if (syms == null)</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        if (syms == null)</span>
         {
-<span class="fc" id="L257">            syms = sys.newEmptyList();</span>
-<span class="fc" id="L258">            ionRep.put(SYMBOLS, syms);</span>
+<span class="fc" id="L262">            syms = sys.newEmptyList();</span>
+<span class="fc" id="L263">            ionRep.put(SYMBOLS, syms);</span>
         }
 
-<span class="fc" id="L261">        int this_offset = sid - myFirstLocalSid;</span>
-<span class="fc" id="L262">        IonValue name = sys.newString(symbolName);</span>
-<span class="fc" id="L263">        ((IonList)syms).add(this_offset, name);</span>
-<span class="fc" id="L264">    }</span>
+<span class="fc" id="L266">        int this_offset = sid - myFirstLocalSid;</span>
+<span class="fc" id="L267">        IonValue name = sys.newString(symbolName);</span>
+<span class="fc" id="L268">        ((IonList)syms).add(this_offset, name);</span>
+<span class="fc" id="L269">    }</span>
 
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

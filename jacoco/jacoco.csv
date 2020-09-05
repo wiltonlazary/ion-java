@@ -84,7 +84,7 @@ com.amazon.ion:ion-java,com.amazon.ion.impl,IonReaderTextRawTokensX.ProhibitedCh
 com.amazon.ion:ion-java,com.amazon.ion.impl,SymbolTokenImpl,34,94,10,18,1,23,11,12,1,8
 com.amazon.ion:ion-java,com.amazon.ion.impl,IonTextBufferedStream.SimpleBufferStream,112,0,14,0,23,0,14,0,7,0
 com.amazon.ion:ion-java,com.amazon.ion.impl,_Private_FastAppendableDecorator,43,32,3,1,13,12,8,5,6,5
-com.amazon.ion:ion-java,com.amazon.ion.impl,BlockedBuffer.BlockedByteOutputStream,435,455,89,43,75,88,70,22,11,15
+com.amazon.ion:ion-java,com.amazon.ion.impl,BlockedBuffer.BlockedByteOutputStream,435,455,90,42,75,88,71,21,11,15
 com.amazon.ion:ion-java,com.amazon.ion.impl,IonBinary.Writer,1180,788,214,92,272,165,144,48,26,12
 com.amazon.ion:ion-java,com.amazon.ion.impl,LocalSymbolTableAsStruct.Factory,6,93,3,5,0,20,3,6,0,5
 com.amazon.ion:ion-java,com.amazon.ion.impl,IonReaderTextSystemX.Radix,6,173,3,17,0,25,3,10,0,3
@@ -124,7 +124,7 @@ com.amazon.ion:ion-java,com.amazon.ion.impl,IonTextBufferedStream.StringStream,8
 com.amazon.ion:ion-java,com.amazon.ion.impl,BlockedBuffer.PositionMonitor,4,9,0,0,2,2,2,2,2,2
 com.amazon.ion:ion-java,com.amazon.ion.impl,SharedSymbolTable,69,559,18,92,7,152,19,66,1,28
 com.amazon.ion:ion-java,com.amazon.ion.impl,SimpleByteBuffer.SimpleByteWriter,1441,0,233,0,273,0,167,0,30,0
-com.amazon.ion:ion-java,com.amazon.ion.impl,IonWriterSystemText,140,964,33,133,24,312,33,103,2,39
+com.amazon.ion:ion-java,com.amazon.ion.impl,IonWriterSystemText,140,956,33,131,24,310,33,102,2,39
 com.amazon.ion:ion-java,com.amazon.ion.impl,IonReaderBinaryUserX.RawValueSpanProviderFacet,0,15,0,0,0,3,0,3,0,3
 com.amazon.ion:ion-java,com.amazon.ion.impl,IonBinary,1250,434,245,50,278,74,169,28,27,11
 com.amazon.ion:ion-java,com.amazon.ion.impl,IonReaderTextRawTokensX.CommentStrategy.new IonReaderTextRawTokensX.CommentStrategy() {...},0,8,0,0,0,2,0,2,0,2
